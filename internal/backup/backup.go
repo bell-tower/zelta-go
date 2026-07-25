@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"git.belltower.it/djbell/zelta-go/internal/cmdbuild"
 	"git.belltower.it/djbell/zelta-go/internal/endpoint"
 	"git.belltower.it/djbell/zelta-go/internal/match"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
@@ -39,6 +40,7 @@ type Result struct {
 	Plan     *Plan
 	Output   string
 	Warnings []string // filter warnings from match
+	Errors   []string // non-fatal replication errors
 }
 
 // Run matches source/target, plans snap+send/recv, dry-runs or executes.
@@ -88,6 +90,9 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	}
 
 	flags := req.sendRecv()
+	if flags.BookmarkMode != "" && flags.BookmarkMode != "0" && flags.BookmarkMode != "1" {
+		return nil, fmt.Errorf("invalid bookmark mode: %s", flags.BookmarkMode)
+	}
 	plan, err := PlanFromMatch(views, req.Intermediate, flags)
 	if err != nil {
 		return nil, err
@@ -124,6 +129,12 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	}
 
 	direction := req.syncDirection()
+	if flags.BookmarkMode == "1" {
+		plan.Bookmarks, err = buildBookmarkPlans(plan, req.Source, req.Target, flags.BookmarkPrefix, tgtEp.Host)
+		if err != nil {
+			return nil, err
+		}
+	}
 	// Oracle: dual-remote + no direction → one warning (localhost proxy).
 	// Same remote on both ends is hairpin/local — never warned.
 	if direction == "" && bothRemote(srcEp, tgtEp) && !sameRemote(srcEp, tgtEp) {
@@ -131,6 +142,7 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	}
 
 	var b strings.Builder
+	var errors []string
 	if req.DryRun {
 		out, err := FormatDryRunDirection(plan, req.Source, req.Target, direction)
 		if err != nil {
@@ -141,9 +153,7 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		if err := executePlan(ctx, exec, req, plan, direction); err != nil {
 			return nil, err
 		}
-		if err := createBookmarks(ctx, exec, req, plan, srcEp, tgtEp, flags); err != nil {
-			return nil, err
-		}
+		errors = append(errors, createBookmarks(ctx, exec, req, plan)...)
 	}
 	if sum := plan.Summary(); sum != "" {
 		// Dry-run with work: oracle often skips summary; keep for empty plans / execute.
@@ -158,34 +168,58 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		Plan:     plan,
 		Output:   b.String(),
 		Warnings: append([]string(nil), mres.Warnings...),
+		Errors:   errors,
 	}, nil
 }
 
-func createBookmarks(ctx context.Context, exec zfs.Executor, req Request, plan *Plan, srcEp, tgtEp endpoint.Endpoint, flags opt.SendRecv) error {
-	if flags.BookmarkMode != "1" {
-		return nil
-	}
-	prefix := flags.BookmarkPrefix
+func buildBookmarkPlans(plan *Plan, source, target, prefix, targetHost string) ([]BookmarkPlan, error) {
 	if prefix == "" {
-		prefix = tgtEp.Host + "_"
+		prefix = targetHost + "_"
 	}
+	var out []BookmarkPlan
 	for _, st := range plan.Steps {
 		if st.Kind != KindFull && st.Kind != KindIncremental {
 			continue
 		}
-		if st.SourceEnd == "" {
+		end := st.SourceEnd
+		if st.FinalEnd != "" {
+			end = st.FinalEnd
+		}
+		if end == "" {
 			continue
 		}
-		targetSnap := st.TgtName + st.SourceEnd
-		if _, err := exec.List(ctx, req.Target, targetSnap, []string{"name"}, 0); err != nil {
-			return fmt.Errorf("bookmark verify %s: %w", targetSnap, err)
+		targetSnap := st.TgtName + end
+		name := st.SrcName + "#" + prefix + strings.TrimPrefix(end, "@")
+		verify, err := cmdbuild.CheckArgv(targetSnap)
+		if err != nil {
+			return nil, err
 		}
-		name := st.SrcName + "#" + prefix + strings.TrimPrefix(st.SourceEnd, "@")
-		if err := exec.Bookmark(ctx, req.Source, st.SrcName+st.SourceEnd, name); err != nil {
-			return fmt.Errorf("bookmark %s: %w", name, err)
+		create, err := cmdbuild.BookmarkArgv(st.SrcName+end, name)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, BookmarkPlan{
+			VerifyEndpoint: target,
+			SourceEndpoint: source,
+			Verify:         verify,
+			Create:         create,
+		})
+	}
+	return out, nil
+}
+
+func createBookmarks(ctx context.Context, exec zfs.Executor, req Request, plan *Plan) []string {
+	var errors []string
+	for _, bm := range plan.Bookmarks {
+		if _, err := exec.List(ctx, bm.VerifyEndpoint, bm.Verify[len(bm.Verify)-1], []string{"name"}, 0); err != nil {
+			errors = append(errors, fmt.Sprintf("bookmark verify %s: %v", bm.Verify[len(bm.Verify)-1], err))
+			continue
+		}
+		if err := exec.Bookmark(ctx, bm.SourceEndpoint, bm.Create[len(bm.Create)-2], bm.Create[len(bm.Create)-1]); err != nil {
+			errors = append(errors, fmt.Sprintf("bookmark %s: %v", bm.Create[len(bm.Create)-1], err))
 		}
 	}
-	return nil
+	return errors
 }
 
 func executePlan(ctx context.Context, exec zfs.Executor, req Request, plan *Plan, direction string) error {

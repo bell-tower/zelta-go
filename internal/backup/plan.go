@@ -50,6 +50,15 @@ type Plan struct {
 	SnapSavepoint string
 	SnapReason    string
 	SnapArgv      []string // zfs snapshot -r ds@snap
+	Bookmarks     []BookmarkPlan
+}
+
+// BookmarkPlan is the verification and creation pair for one received snap.
+type BookmarkPlan struct {
+	VerifyEndpoint string
+	SourceEndpoint string
+	Verify         []string
+	Create         []string
 }
 
 // PairView is the match fields backup needs (decoupled for tests).

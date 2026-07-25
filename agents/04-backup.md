@@ -49,8 +49,7 @@
 
 ## Defer
 
-Send-check feature drop, resume tokens, rotate/clone, origin-match. Bookmark
-dry-run/failure parity remains follow-up work.
+Send-check feature drop, resume tokens, rotate/clone, origin-match.
 
 Intentional Awk≠Go notes (dry-run first-pass, quoting, RECV constants, …): **`agents/10-deviations.md`**.
 

@@ -61,6 +61,12 @@ func runBackup(args []string) int {
 	}
 	printWarns(res.Warnings)
 	fmt.Print(res.Output)
+	for _, msg := range res.Errors {
+		fmt.Fprintf(os.Stderr, "zelta backup: %s\n", msg)
+	}
+	if len(res.Errors) > 0 {
+		return 1
+	}
 	return 0
 }
 

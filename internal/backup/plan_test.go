@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"git.belltower.it/djbell/zelta-go/internal/endpoint"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
 	"git.belltower.it/djbell/zelta-go/internal/zfs"
 )
@@ -682,10 +681,51 @@ func TestCreateBookmarksAfterVerifiedReceive(t *testing.T) {
 	plan := &Plan{Steps: []*Step{{Kind: KindIncremental, SourceEnd: "@daily", SrcName: "tank/src", TgtName: "tank/tgt"}}}
 	flags := opt.Default()
 	flags.BookmarkMode = "1"
-	if err := createBookmarks(context.Background(), fake, Request{Source: "root@src:tank/src", Target: "root@dst:tank/tgt"}, plan, endpoint.Endpoint{}, endpoint.Endpoint{Host: "dst"}, flags); err != nil {
+	bookmarks, err := buildBookmarkPlans(plan, "root@src:tank/src", "root@dst:tank/tgt", flags.BookmarkPrefix, "dst")
+	if err != nil {
 		t.Fatal(err)
+	}
+	plan.Bookmarks = bookmarks
+	if errors := createBookmarks(context.Background(), fake, Request{}, plan); len(errors) != 0 {
+		t.Fatal(errors)
 	}
 	if len(fake.Bookmarks) != 1 || fake.Bookmarks[0].Bookmark != "tank/src#dst_daily" {
 		t.Fatalf("bookmarks=%v", fake.Bookmarks)
+	}
+}
+
+func TestBookmarkDryRunUsesLatestIntermediateSnapshot(t *testing.T) {
+	plan, err := PlanFromMatch([]PairView{{
+		DSSuffix: "", Info: "syncable (full)", SrcLast: "@new", SrcNext: "@old",
+		SrcName: "tank/src", TgtName: "tank/tgt",
+	}}, true, opt.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.Bookmarks, err = buildBookmarkPlans(plan, "root@src:tank/src", "root@dst:tank/tgt", "", "dst")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := FormatDryRun(plan, "root@src:tank/src", "root@dst:tank/tgt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "zfs list -Ho name tank/tgt@new") || !strings.Contains(out, "zfs bookmark tank/src@new tank/src#dst_new") {
+		t.Fatalf("bookmark dry-run=%s", out)
+	}
+}
+
+func TestBookmarkFailuresContinueAndReport(t *testing.T) {
+	plan := &Plan{Bookmarks: []BookmarkPlan{
+		{VerifyEndpoint: "tank/tgt", SourceEndpoint: "tank/src", Verify: []string{"zfs", "list", "-Ho", "name", "tank/tgt@a"}, Create: []string{"zfs", "bookmark", "tank/src@a", "tank/src#dst_a"}},
+		{VerifyEndpoint: "tank/tgt", SourceEndpoint: "tank/src", Verify: []string{"zfs", "list", "-Ho", "name", "tank/tgt@b"}, Create: []string{"zfs", "bookmark", "tank/src@b", "tank/src#dst_b"}},
+	}}
+	fake := &zfs.Fake{
+		Lists:      map[string]string{"tank/tgt@b": "tank/tgt@b\n"},
+		ListErrors: map[string]error{"tank/tgt@a": fmt.Errorf("missing")},
+	}
+	errs := createBookmarks(context.Background(), fake, Request{}, plan)
+	if len(errs) != 1 || len(fake.Bookmarks) != 1 || fake.Bookmarks[0].Bookmark != "tank/src#dst_b" {
+		t.Fatalf("errors=%v bookmarks=%v", errs, fake.Bookmarks)
 	}
 }

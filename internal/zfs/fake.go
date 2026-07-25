@@ -17,10 +17,12 @@ type Fake struct {
 	// Existing marks datasets Exists reports true for (plus any Lists keys).
 	Existing map[string]bool
 	// Pipes records left/right argv pairs from RunPipe.
-	Pipes     []PipeCall
-	Bookmarks []BookmarkCall
-	Clones    []CloneCall
-	Renames   []RenameCall
+	Pipes          []PipeCall
+	Bookmarks      []BookmarkCall
+	Clones         []CloneCall
+	Renames        []RenameCall
+	ListErrors     map[string]error
+	BookmarkErrors map[string]error
 }
 
 type BookmarkCall struct{ Endpoint, SourceSnap, Bookmark string }
@@ -35,6 +37,9 @@ type PipeCall struct {
 }
 
 func (f *Fake) List(_ context.Context, endpoint, dataset string, _ []string, _ int) ([]string, error) {
+	if err := f.ListErrors[dataset]; err != nil {
+		return nil, err
+	}
 	if f.Lists == nil {
 		return nil, fmt.Errorf("zfs fake: no lists configured")
 	}
@@ -73,6 +78,9 @@ func (f *Fake) Exists(_ context.Context, _, dataset string) (bool, error) {
 }
 
 func (f *Fake) Bookmark(_ context.Context, endpoint, sourceSnap, bookmark string) error {
+	if err := f.BookmarkErrors[bookmark]; err != nil {
+		return err
+	}
 	f.Bookmarks = append(f.Bookmarks, BookmarkCall{endpoint, sourceSnap, bookmark})
 	return nil
 }

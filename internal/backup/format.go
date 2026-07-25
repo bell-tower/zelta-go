@@ -45,6 +45,22 @@ func FormatDryRunDirection(p *Plan, srcEp, tgtEp, direction string) (string, err
 		b.WriteString(body)
 		b.WriteByte('\n')
 	}
+	for _, bm := range p.Bookmarks {
+		verify, err := zfs.CommandShell(bm.VerifyEndpoint, bm.Verify)
+		if err != nil {
+			return "", err
+		}
+		create, err := zfs.CommandShell(bm.SourceEndpoint, bm.Create)
+		if err != nil {
+			return "", err
+		}
+		b.WriteString("+ ")
+		b.WriteString(verify)
+		b.WriteByte('\n')
+		b.WriteString("+ ")
+		b.WriteString(create)
+		b.WriteByte('\n')
+	}
 	return b.String(), nil
 }
 
