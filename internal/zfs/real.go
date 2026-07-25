@@ -172,6 +172,17 @@ func (r *Real) Bookmark(ctx context.Context, epStr, sourceSnap, bookmark string)
 	return nil
 }
 
+func (r *Real) Clone(ctx context.Context, epStr, sourceSnap, dataset string) error {
+	argv, err := cmdbuild.CloneArgv(sourceSnap, dataset)
+	if err != nil {
+		return err
+	}
+	if _, err := r.output(ctx, epStr, r.rewriteBin(argv)); err != nil {
+		return fmt.Errorf("zfs clone %s: %w", dataset, err)
+	}
+	return nil
+}
+
 func isDatasetExists(err error) bool {
 	if err == nil {
 		return false

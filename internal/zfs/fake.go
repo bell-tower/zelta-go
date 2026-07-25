@@ -19,9 +19,11 @@ type Fake struct {
 	// Pipes records left/right argv pairs from RunPipe.
 	Pipes     []PipeCall
 	Bookmarks []BookmarkCall
+	Clones    []CloneCall
 }
 
 type BookmarkCall struct{ Endpoint, SourceSnap, Bookmark string }
+type CloneCall struct{ Endpoint, SourceSnap, Dataset string }
 
 // PipeCall is one RunPipe invocation.
 type PipeCall struct {
@@ -70,6 +72,11 @@ func (f *Fake) Exists(_ context.Context, _, dataset string) (bool, error) {
 
 func (f *Fake) Bookmark(_ context.Context, endpoint, sourceSnap, bookmark string) error {
 	f.Bookmarks = append(f.Bookmarks, BookmarkCall{endpoint, sourceSnap, bookmark})
+	return nil
+}
+
+func (f *Fake) Clone(_ context.Context, endpoint, sourceSnap, dataset string) error {
+	f.Clones = append(f.Clones, CloneCall{endpoint, sourceSnap, dataset})
 	return nil
 }
 
