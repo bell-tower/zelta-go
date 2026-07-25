@@ -17,17 +17,11 @@ type Fake struct {
 	// Existing marks datasets Exists reports true for (plus any Lists keys).
 	Existing map[string]bool
 	// Pipes records left/right argv pairs from RunPipe.
-	Pipes            []PipeCall
-	Bookmarks        []BookmarkCall
-	SendChecks       []SendCheckCall
-	SendCheckOutputs []string
+	Pipes     []PipeCall
+	Bookmarks []BookmarkCall
 }
 
 type BookmarkCall struct{ Endpoint, SourceSnap, Bookmark string }
-type SendCheckCall struct {
-	Endpoint string
-	Argv     []string
-}
 
 // PipeCall is one RunPipe invocation.
 type PipeCall struct {
@@ -77,16 +71,6 @@ func (f *Fake) Exists(_ context.Context, _, dataset string) (bool, error) {
 func (f *Fake) Bookmark(_ context.Context, endpoint, sourceSnap, bookmark string) error {
 	f.Bookmarks = append(f.Bookmarks, BookmarkCall{endpoint, sourceSnap, bookmark})
 	return nil
-}
-
-func (f *Fake) SendCheck(_ context.Context, endpoint string, argv []string) (string, error) {
-	f.SendChecks = append(f.SendChecks, SendCheckCall{endpoint, append([]string(nil), argv...)})
-	if len(f.SendCheckOutputs) == 0 {
-		return "", nil
-	}
-	out := f.SendCheckOutputs[0]
-	f.SendCheckOutputs = f.SendCheckOutputs[1:]
-	return out, nil
 }
 
 func (f *Fake) RunPipe(ctx context.Context, leftEp string, leftArgv []string, rightEp string, rightArgv []string) error {

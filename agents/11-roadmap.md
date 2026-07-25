@@ -27,23 +27,20 @@ making `internal` types part of a promised external contract.
 2. Extend the bookmark MVP: execute-mode verification and creation are done;
    add dry-run rendering and oracle-compatible non-fatal failure status, while
    keeping clone/revert exclusions explicit.
-3. Wait for the upstream send-check correction in `AGENTS-TODO-upstream.md`;
-   then port the tested NetBSD behavior, including `recv -x` avoidance and
-   encryption-feature mismatch handling.
-4. Investigate Rotate before implementing clone-origin; clone-origin depends
+3. Investigate Rotate before implementing clone-origin; clone-origin depends
    on Rotate's target-preservation path.
-5. Implement filtered intermediate sends. The Awk approach is useful but
+4. Implement filtered intermediate sends. The Awk approach is useful but
    brute-force; record a possible reusable upstream abstraction while porting
    it rather than copying the loop blindly.
-6. Decide and document the public library facade. Only then move or re-export
+5. Decide and document the public library facade. Only then move or re-export
    packages and add external-package tests.
-7. Implement `zprune` as a separate destructive wrapper with prompt, force,
+6. Implement `zprune` as a separate destructive wrapper with prompt, force,
    guard, and send-range semantics. Keep destructive operations out of core
    `zelta prune`.
-8. Implement policy configuration (`zelta.conf`) after the option/env contract
+7. Implement policy configuration (`zelta.conf`) after the option/env contract
    is stable; add precedence tests against `zelta.env`, process environment,
    and CLI flags.
-9. Polish README and public API documentation after the API and behavior are
+8. Polish README and public API documentation after the API and behavior are
    stable.
 
 ## Explicit non-goals

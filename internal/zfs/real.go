@@ -172,26 +172,6 @@ func (r *Real) Bookmark(ctx context.Context, epStr, sourceSnap, bookmark string)
 	return nil
 }
 
-func (r *Real) SendCheck(ctx context.Context, epStr string, argv []string) (string, error) {
-	ep, err := endpoint.Parse(epStr)
-	if err != nil {
-		return "", err
-	}
-	if len(argv) < 2 {
-		return "", fmt.Errorf("zfs send-check: empty argv")
-	}
-	check := append([]string(nil), argv[:2]...)
-	check = append(check, "-n", "-v")
-	check = append(check, argv[2:]...)
-	check = r.rewriteBin(check)
-	cmd, err := r.command(ctx, ep, check)
-	if err != nil {
-		return "", err
-	}
-	out, runErr := cmd.CombinedOutput()
-	return string(out), runErr
-}
-
 func isDatasetExists(err error) bool {
 	if err == nil {
 		return false

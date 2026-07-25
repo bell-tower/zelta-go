@@ -10,11 +10,10 @@ and captured by a test.
   to work reliably.
 - NetBSD does not support `zfs recv -x ...`; the generated receive command
   must avoid or feature-detect receive-property exclusion flags.
-- `zfs send -e` fails when encryption feature flags do not match; send-check
+- `zfs send -e` fails when feature flags do not match; send-check
   must detect this case correctly and remove `-e` when appropriate rather than
   treating the probe as a generic success/failure.
 - Reproduce against `root@netbsd` with pools `apool` and `bpool`, then add a
   deterministic regression fixture before porting the corrected behavior here.
 
-The Go `send-check` preflight is provisional and must not be described as full
-parity until this upstream work is complete.
+This remains upstream-only work for now and must not block the Go line.
