@@ -3,7 +3,18 @@
 **Full log.** Infrequent reads: open when porting, pixel-diffing, or changing shared contracts.
 **Not** a todo list (see package `## Defer`). **Not** pixel goldens (see `testdata/golden/`).
 
-Format per bullet: **area** — Awk → Go — *why / where / example*.
+Format per bullet: **classification** / **area** — Awk → Go — *why / where / example*.
+
+Classifications:
+
+- **DESIGN** — deliberate architectural difference, such as in-process calls.
+- **OUTPUT** — user-visible formatting or presentation difference.
+- **COMPATIBILITY** — behavior intentionally differs from the Awk oracle.
+- **KNOWN GAP** — behavior is incomplete and must not be mistaken for parity.
+- **SAFETY GAP** — incomplete behavior could affect data safety or recovery.
+
+Every new entry must use one classification. If a gap becomes a release
+blocker, also update `agents/14-maturity.md`.
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Private.** Not public until fully documented. No man pages in this repo.
 
-Zelta Go is a **data-driven ZFS composer**: library + single binary, feature-bound toward parity with Zelta 1.2 (Bourne+AWK) and zprune. Parallel experiment — goldens from current Awk are the oracle; Ruby may adopt contracts later.
+Zelta Go is a **private, experimentally feature-rich data-driven ZFS composer**: library-in-progress + single binary, feature-bound toward parity with Zelta 1.2 (Bourne+AWK) and zprune. It is not production-ready, feature-equivalent, or a public Go library yet. Goldens from current Awk are the compatibility oracle; Ruby may adopt contracts later.
 
 Sibling reference tree (read only when extracting a contract): `~/Code/zelta/`.
 
@@ -13,8 +13,9 @@ Sibling reference tree (read only when extracting a contract): `~/Code/zelta/`.
 1. Read **this file** (router only).
 2. Read **`AGENTS-Persona.md`** if present (gitignored local persona + human context).
 3. Query **Memory Palace MCP** for cross-repo / business / session intelligence (see Persona).
-4. Open **one** `agents/NN-*.md` for the package you will touch.
-5. Prefer `testdata/golden/**` + contracts over reading AWK source.
+4. Read `agents/11-roadmap.md` for current strategy and maturity boundaries.
+5. Open **one** package/operation-specific `agents/NN-*.md` file.
+6. Prefer `testdata/golden/**` + contracts over reading AWK source.
 
 ---
 
@@ -27,6 +28,15 @@ Sibling reference tree (read only when extracting a contract): `~/Code/zelta/`.
 5. Cheap loop: `go test ./internal/<pkg>/...` — no ZFS, no sudo.
 6. Expensive loop (OK with frontier models): golden regen from real `zelta match`, integration tags.
 7. Do not invent S3/blob here; that waits for Ruby product line.
+8. Passing tests does not authorize adjacent feature work.
+9. Never start work beyond the explicitly specified bounded loops.
+
+### Model and task fit
+
+- **Tight-loop model:** one package, one contract, one failing test or golden mismatch.
+- **High-context model:** bounded architecture review, contract extraction, risk review, or test-matrix design. It must return a short decision/contract before implementation.
+- No model may ingest the whole sibling Awk tree and then autonomously broaden scope.
+- Every implementation session has explicit stop conditions for each specified bounded loop: focused test, relevant full test, vet/build as appropriate, diff review, status review, report, stop.
 
 ### Subagents (prefer when compound context gets expensive)
 
@@ -53,6 +63,8 @@ Use Task/subagents **proactively** when work would otherwise stuff the main thre
 
 Goals: library, feature-equivalent CLI, pixel-tight match/zprune efficiency for releases, Go-where-it-wins experiments, private Gitea until docs are real.
 
+Current posture: match, backup, read-only prune, clone, revert, rotate, and lineage code exist with deterministic tests. Real-system lifecycle verification and the public library facade remain incomplete. See `agents/14-maturity.md`.
+
 Acceptable deviations: YAML policy → standardize; no recursive self-calls; embed all data except man pages (use `~/Code/zelta/doc` / `ZELTA_DOC`); shellspec scenario-level parity after install checks.
 
 ---
@@ -72,6 +84,11 @@ Acceptable deviations: YAML policy → standardize; no recursive self-calls; emb
 | `agents/08-testing.md` | Unit / golden / integration |
 | `agents/09-style-go.md` | Go conventions for this repo |
 | `agents/10-deviations.md` | **Intentional** Awk→Go deviations (full log; see also `00-contracts`) |
+| `agents/11-roadmap.md` | Current strategy, ordered backlog, explicit non-goals |
+| `agents/12-rotate.md` | Rotate and clone-origin safety contract |
+| `agents/13-lineage.md` | Clone, revert, and four-endpoint lineage contract |
+| `agents/14-maturity.md` | Capability states and release/readiness matrix |
+| `agents/15-session-protocol.md` | Model selection, bounded loops, stop conditions |
 
 ---
 
@@ -86,7 +103,11 @@ internal/zfs/         # Executor, Real, Fake, list parse
 internal/match/       # Phase 1
 internal/report/      # cols.tsv + json.tsv render
 internal/conf/        # zelta.env paths + KEY=value
-internal/backup|prune|policy/  # stubs until needed
+internal/backup/         # replication planning/execution; lifecycle gaps remain
+internal/prune/          # read-only retention analysis
+internal/lineage/        # clone/revert lineage operations
+internal/rotate/         # rotate planning/execution; recovery gaps remain
+internal/policy/         # intentionally deferred
 cmd/zelta/            # thin dispatcher
 cmd/zprune/           # later
 testdata/golden/      # oracle fixtures
@@ -105,6 +126,20 @@ make build         # bin/zelta
 go test ./internal/match/...
 go test -tags=integration ./...   # real ZFS; rare
 ```
+
+Do not run integration tests, golden regeneration, or real ZFS commands unless the
+task explicitly calls for them. Prefer the smallest package test first.
+
+## Session stop protocol
+
+Before reporting completion, the editor must:
+
+1. Run the smallest relevant test.
+2. Run broader tests/vet/build only when relevant.
+3. Review `git diff` and `git status`.
+4. Record a contract/deviation only if behavior actually changed.
+5. Report verified behavior and unverified assumptions.
+6. Stop after the specified bounded loops. Do not select additional roadmap work automatically.
 
 ---
 

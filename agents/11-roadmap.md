@@ -3,6 +3,14 @@
 This is the ordered backlog after checkpoint `bf37bb1`. Keep implementation
 work in small commits and update this file when a contract changes.
 
+## Current phase: hardening and evidence
+
+Pause feature breadth while the current experimental surface is classified and
+verified. The immediate work is to reconcile docs, establish capability
+maturity, and run bounded disposable-ZFS checks. Do not add a new verb,
+implement `zprune`, or design the public facade inside an unrelated bug-fix
+session.
+
 ## Current library boundary
 
 The useful exported implementation symbols are currently internal:
@@ -22,31 +30,33 @@ making `internal` types part of a promised external contract.
 
 ## Ordered work
 
-1. Add prune golden fixtures and CLI integration coverage. Existing prune
-   goldens and fixture-backed CLI coverage now cover the current read-only
-   analysis; keep clone-origin and send-range cases deferred with zprune.
-2. Bookmark MVP is complete for verification, creation, dry-run rendering, and
-   non-fatal failure status; keep clone/revert exclusions explicit.
-3. Compose the four-endpoint clone-and-backup workflow from ordinary `clone`
-   plus `backup --target-origin`; complete, with orchestration kept separate
-   from lineage primitives.
-4. Finish the Rotate lifecycle in `agents/12-rotate.md`: complete for safe
-   planning/execution and failure reporting; exact receive-token and rollback
-   recovery remain manual, with no blind retry of interrupted receives.
-5. Complete filtered intermediate sends across snapshot creation, bookmarks,
-   and oracle edge cases. Snapshot creation, final bookmarks, recursive filter
-   precedence, and zero-eligible no-ops are covered; receive-token discovery
-   and `zfs send -t` recovery remain manual. Retain the reusable planning
-   abstraction rather than copying the Awk loop blindly.
-6. Decide and document the public library facade. Only then move or re-export
+1. Complete the hardening pass: keep `AGENTS.md`, this roadmap,
+   `agents/10-deviations.md`, and `agents/14-maturity.md` consistent; identify
+   the smallest real-ZFS verification set for backup, clone/revert, and rotate.
+2. **Complete:** prune golden fixtures and CLI integration coverage now cover
+   the current read-only analysis; keep clone-origin and send-range cases
+   deferred with zprune.
+3. **Complete:** Bookmark MVP covers verification, creation, dry-run rendering,
+   and non-fatal failure status; clone/revert exclusions remain explicit.
+4. **Complete:** the four-endpoint clone-and-backup workflow composes ordinary
+   `clone` with `backup --target-origin`; orchestration remains separate from
+   lineage primitives.
+5. **Complete for safe paths:** Rotate planning, execution, and failure
+   reporting are covered; exact receive-token and rollback recovery remain
+   manual, with no blind retry of interrupted receives.
+6. **Complete for planned filtered sends:** snapshot creation, final bookmarks,
+   recursive filter precedence, and zero-eligible no-ops are covered;
+   receive-token discovery and `zfs send -t` recovery remain manual. Retain
+   the reusable planning abstraction rather than copying the Awk loop blindly.
+7. Decide and document the public library facade. Only then move or re-export
    packages and add external-package tests.
-7. Implement `zprune` as a separate destructive wrapper with prompt, force,
+8. Implement `zprune` as a separate destructive wrapper with prompt, force,
    guard, and send-range semantics. Keep destructive operations out of core
    `zelta prune`.
-8. Implement policy configuration (`zelta.conf`) after the option/env contract
+9. Implement policy configuration (`zelta.conf`) after the option/env contract
    is stable; add precedence tests against `zelta.env`, process environment,
    and CLI flags.
-9. Polish README and public API documentation after the API and behavior are
+10. Polish README and public API documentation after the API and behavior are
    stable.
 
 ## Explicit non-goals
