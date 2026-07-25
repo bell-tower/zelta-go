@@ -65,7 +65,7 @@ Commands:
   match       Compare dataset trees
   backup      Sync dataset trees (snap-if-needed; -n dry-run)
   prune       Report snapshot prune candidates (read-only)
-  clone       Clone an explicit snapshot (use -n to print commands)
+  clone       Clone a snapshot tree (use -n to print commands)
   revert      Preserve current state and clone an explicit snapshot back
   rotate      Preserve a divergent target and print the safe receive plan
   version     Show version

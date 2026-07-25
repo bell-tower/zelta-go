@@ -77,4 +77,4 @@ func runClone(args []string) int {
 	return 0
 }
 
-func cloneUsage() { fmt.Fprintln(os.Stderr, "usage: zelta clone [-n] SOURCE@SNAPSHOT TARGET") }
+func cloneUsage() { fmt.Fprintln(os.Stderr, "usage: zelta clone [-n] SOURCE[@SNAPSHOT] TARGET") }
