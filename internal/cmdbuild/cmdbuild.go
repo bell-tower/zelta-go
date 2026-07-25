@@ -167,3 +167,19 @@ func BookmarkArgv(sourceSnap, bookmark string) ([]string, error) {
 	}
 	return Build("BOOKMARK", map[string]string{"source_snap": sourceSnap, "bookmark": bookmark})
 }
+
+// CloneArgv builds CLONE source@snap target.
+func CloneArgv(sourceSnap, dataset string) ([]string, error) {
+	if sourceSnap == "" || dataset == "" {
+		return nil, fmt.Errorf("cmdbuild: CLONE requires source and target")
+	}
+	return Build("CLONE", map[string]string{"ds_snap": sourceSnap, "ds": dataset})
+}
+
+// RenameArgv builds RENAME old target.
+func RenameArgv(oldDataset, newDataset string) ([]string, error) {
+	if oldDataset == "" || newDataset == "" {
+		return nil, fmt.Errorf("cmdbuild: RENAME requires old and new dataset")
+	}
+	return Build("RENAME", map[string]string{"old_ds": oldDataset, "new_ds": newDataset})
+}

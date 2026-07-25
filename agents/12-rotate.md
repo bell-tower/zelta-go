@@ -3,6 +3,17 @@
 Rotate is not a destructive shortcut around backup. Its first Go slice should
 be a root-only, dry-run-first planner with explicit safety checks.
 
+## Divergence classes
+
+Rotate handles three distinct diversions:
+
+1. The source was rolled back.
+2. The source was cloned, for example by `zelta revert`.
+3. The target has diverged.
+
+Do not collapse these into one "no match" case. Their lineage and safety
+decisions differ.
+
 ## Required behavior
 
 1. Compare source and target state.
@@ -25,6 +36,10 @@ execution only after dry-run goldens establish the rename and receive order.
 
 The current blockers are explicit origin data in list/property parsing,
 `RENAME` argv construction, receive-origin flags, and a CLI dispatch decision.
+
+Implement `clone` and `revert` lineage operations before Rotate if their
+contracts are not already represented. In particular, `revert` is the normal
+producer of a source clone origin that Rotate must recognize.
 
 ## Reference
 

@@ -135,3 +135,20 @@ func TestBookmarkArgv(t *testing.T) {
 		t.Fatalf("got %v want %v", got, want)
 	}
 }
+
+func TestCloneAndRenameArgv(t *testing.T) {
+	clone, err := CloneArgv("tank/src@daily", "tank/clone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"zfs", "clone", "-p", "-o", "readonly=off", "tank/src@daily", "tank/clone"}; !reflect.DeepEqual(clone, want) {
+		t.Fatalf("clone=%v want %v", clone, want)
+	}
+	rename, err := RenameArgv("tank/live", "tank/live_daily")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"zfs", "rename", "-fp", "tank/live", "tank/live_daily"}; !reflect.DeepEqual(rename, want) {
+		t.Fatalf("rename=%v want %v", rename, want)
+	}
+}
