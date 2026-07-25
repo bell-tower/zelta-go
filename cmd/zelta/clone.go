@@ -72,7 +72,12 @@ func runClone(args []string) int {
 		return 1
 	}
 	if p.Env.Bool("DRYRUN", false) {
-		fmt.Print(lineage.Format(steps))
+		out, err := lineage.FormatRemote(steps, p.Operands[1])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "zelta clone: %v\n", err)
+			return 1
+		}
+		fmt.Print(out)
 		return 0
 	}
 	for _, step := range steps {

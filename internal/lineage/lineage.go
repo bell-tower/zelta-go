@@ -311,3 +311,22 @@ func Format(steps []Step) string {
 	}
 	return strings.Join(lines, "\n") + "\n"
 }
+
+// FormatRemote renders each lineage command on its dataset endpoint. Clone
+// and revert are local ZFS operations on one host, so no pipe direction is
+// involved.
+func FormatRemote(steps []Step, endpointName string) (string, error) {
+	var b strings.Builder
+	for _, step := range steps {
+		if len(step.Argv) == 0 {
+			continue
+		}
+		line, err := zfs.CommandShell(endpointName, step.Argv)
+		if err != nil {
+			return "", err
+		}
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return b.String(), nil
+}

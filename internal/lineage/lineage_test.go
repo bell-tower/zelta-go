@@ -105,6 +105,21 @@ func TestCloneTreatsLocalhostAsLocal(t *testing.T) {
 	}
 }
 
+func TestFormatRemoteWrapsLineageCommands(t *testing.T) {
+	steps, err := Clone(CloneRequest{Source: "root@debian:apool/src@daily", Target: "root@debian:apool/clone"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := FormatRemote(steps, "root@debian:apool/clone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "ssh -n root@debian 'zfs clone -p -o readonly=off apool/src@daily apool/clone'\n"
+	if out != want {
+		t.Fatalf("format=%q want %q", out, want)
+	}
+}
+
 func TestApplyContinuesAfterChildCloneFailure(t *testing.T) {
 	steps, err := RevertPlan(RevertRequest{Endpoint: "tank/live", AfterSnapshot: "after"}, []zfs.ListRow{
 		{Name: "tank/live@root", Props: map[string]string{"type": "snapshot"}},
