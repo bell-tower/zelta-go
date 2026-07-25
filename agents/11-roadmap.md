@@ -30,9 +30,9 @@ making `internal` types part of a promised external contract.
 3. Compose the four-endpoint clone-and-backup workflow from ordinary `clone`
    plus `backup --target-origin`; complete, with orchestration kept separate
    from lineage primitives.
-4. Finish the Rotate lifecycle in `agents/12-rotate.md`: exact receive-token
-   and rollback recovery remain manual; do not blindly retry interrupted
-   receives.
+4. Finish the Rotate lifecycle in `agents/12-rotate.md`: complete for safe
+   planning/execution and failure reporting; exact receive-token and rollback
+   recovery remain manual, with no blind retry of interrupted receives.
 5. Complete filtered intermediate sends across snapshot creation, bookmarks,
    resume handling, and oracle edge cases. The core per-dataset selector is
    implemented; retain the reusable planning abstraction rather than copying

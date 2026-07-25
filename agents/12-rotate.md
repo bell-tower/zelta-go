@@ -1,7 +1,7 @@
 # Rotate / Clone-Origin
 
-Rotate is not a destructive shortcut around backup. Its first Go slice should
-be a root-only, dry-run-first planner with explicit safety checks.
+Rotate is not a destructive shortcut around backup. It is a dry-run-first
+planner/executor with explicit safety checks for the full dataset tree.
 
 ## Divergence classes
 
@@ -39,11 +39,11 @@ from planning and remains covered by dry-run goldens and injected-failure tests.
 Origin data now flows through `match.RotateListProps`, and direct-match plus
 verified source-origin dry-run plans emit per-child send/receive lineage.
 Source snapshot-if-needed/always planning, target preservation collision checks
-are present in the planner/CLI. The
-Execution is available through `internal/rotate.ExecuteResult`; it re-runs
-match and reports remaining divergence. Independent child failures continue
-with structured progress, while source snapshot/preservation failures and
-exact receive-token recovery remain manual safety cases.
+are present in the planner/CLI. Execution is available through
+`internal/rotate.ExecuteResult`; it re-runs match and reports remaining
+divergence. Preservation and source-snapshot failures stop before any receive;
+independent child failures continue with structured progress. Exact
+receive-token and rollback recovery remain manual safety cases.
 
 `clone` and `revert` now represent the prerequisite lineage contracts. In
 particular, `revert` is the normal producer of a source clone origin that

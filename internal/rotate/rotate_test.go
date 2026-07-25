@@ -197,9 +197,60 @@ func TestExecuteResultContinuesAfterChildFailure(t *testing.T) {
 	}
 }
 
+func TestExecuteResultStopsAfterPreservationFailure(t *testing.T) {
+	steps, err := PlanTree(TreeRequest{
+		Source: "tank/src", Target: "tank/target", Intermediate: true, Flags: opt.Default(),
+		Pairs: []*match.Pair{{DSSuffix: "", SrcName: "tank/src", TgtName: "tank/target", Match: "@base", SrcLast: "@new", TgtLast: "@other"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake := &failRenameFake{Fake: &zfs.Fake{}}
+	result, err := ExecuteResult(context.Background(), fake, TreeRequest{Source: "tank/src", Target: "tank/target"}, steps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Preserved || len(result.Failures) != 1 || result.Failures[0].Kind != "rename" {
+		t.Fatalf("result=%+v", result)
+	}
+	if len(fake.Pipes) != 0 {
+		t.Fatalf("preservation failure must not send: %v", fake.Pipes)
+	}
+}
+
+func TestExecuteResultReportsSnapshotFailureAfterPreservation(t *testing.T) {
+	fake := &failSnapshotFake{Fake: &zfs.Fake{}}
+	steps := []Step{
+		{Kind: "rename", Argv: []string{"zfs", "rename", "-fp", "tank/target", "tank/target_base"}},
+		{Kind: "snapshot", Argv: []string{"zfs", "snapshot", "-r", "tank/src@new"}},
+	}
+	result, err := ExecuteResult(context.Background(), fake, TreeRequest{Source: "tank/src", Target: "tank/target"}, steps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Preserved || len(result.Failures) != 1 || result.Failures[0].Kind != "snapshot" {
+		t.Fatalf("result=%+v", result)
+	}
+	if len(fake.Pipes) != 0 {
+		t.Fatalf("snapshot failure must not send: %v", fake.Pipes)
+	}
+}
+
 type failPipeFake struct {
 	*zfs.Fake
 	failSuffix string
+}
+
+type failRenameFake struct{ *zfs.Fake }
+
+func (f *failRenameFake) Rename(context.Context, string, string, string) error {
+	return errors.New("injected rename failure")
+}
+
+type failSnapshotFake struct{ *zfs.Fake }
+
+func (f *failSnapshotFake) Snapshot(context.Context, string, string, bool) error {
+	return errors.New("injected snapshot failure")
 }
 
 func (f *failPipeFake) RunPipeDirection(ctx context.Context, leftEp string, leftArgv []string, rightEp string, rightArgv []string, direction string) error {
