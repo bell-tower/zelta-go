@@ -159,3 +159,11 @@ func CheckArgv(dataset string) ([]string, error) {
 	}
 	return Build("CHECK", map[string]string{"ds": dataset})
 }
+
+// BookmarkArgv builds BOOKMARK source@snap source#bookmark.
+func BookmarkArgv(sourceSnap, bookmark string) ([]string, error) {
+	if sourceSnap == "" || bookmark == "" {
+		return nil, fmt.Errorf("cmdbuild: BOOKMARK requires source and bookmark")
+	}
+	return Build("BOOKMARK", map[string]string{"source_snap": sourceSnap, "bookmark": bookmark})
+}

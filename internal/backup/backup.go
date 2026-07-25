@@ -135,6 +135,9 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		if err := executePlan(ctx, exec, req, plan, direction); err != nil {
 			return nil, err
 		}
+		if err := createBookmarks(ctx, exec, req, plan, srcEp, tgtEp, flags); err != nil {
+			return nil, err
+		}
 	}
 	if sum := plan.Summary(); sum != "" {
 		// Dry-run with work: oracle often skips summary; keep for empty plans / execute.
@@ -150,6 +153,33 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		Output:   b.String(),
 		Warnings: append([]string(nil), mres.Warnings...),
 	}, nil
+}
+
+func createBookmarks(ctx context.Context, exec zfs.Executor, req Request, plan *Plan, srcEp, tgtEp endpoint.Endpoint, flags opt.SendRecv) error {
+	if flags.BookmarkMode != "1" {
+		return nil
+	}
+	prefix := flags.BookmarkPrefix
+	if prefix == "" {
+		prefix = tgtEp.Host + "_"
+	}
+	for _, st := range plan.Steps {
+		if st.Kind != KindFull && st.Kind != KindIncremental {
+			continue
+		}
+		if st.SourceEnd == "" {
+			continue
+		}
+		targetSnap := st.TgtName + st.SourceEnd
+		if _, err := exec.List(ctx, req.Target, targetSnap, []string{"name"}, 0); err != nil {
+			return fmt.Errorf("bookmark verify %s: %w", targetSnap, err)
+		}
+		name := st.SrcName + "#" + prefix + strings.TrimPrefix(st.SourceEnd, "@")
+		if err := exec.Bookmark(ctx, req.Source, st.SrcName+st.SourceEnd, name); err != nil {
+			return fmt.Errorf("bookmark %s: %w", name, err)
+		}
+	}
+	return nil
 }
 
 func executePlan(ctx context.Context, exec zfs.Executor, req Request, plan *Plan, direction string) error {

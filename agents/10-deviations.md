@@ -42,6 +42,7 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
 - **Send-check / feature drop** — Awk may `zfs send -nv` and drop flags on error → Go not implemented.
 - **Filtered intermediate** (`-I` + include/exclude) — Awk multi-snap loop via prune send-range → Go single `-I` range only.
 - **Backup forces written list props** — even if match default cols would skip written, backup passes `match.BackupListProps` so snap-if-needed sees `written` and recv sees `type`.
+- **Bookmark MVP** — Go verifies each successfully executed target snapshot and creates the corresponding source bookmark; default naming uses `<target-host>_`, explicit `BOOKMARK_PREFIX` is honored. *Dry-run output and oracle's non-fatal bookmark-failure exit status remain follow-up work; clone/revert paths are excluded.*
 
 ---
 

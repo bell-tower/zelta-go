@@ -26,6 +26,9 @@ type Executor interface {
 	// Exists reports whether dataset is present on the endpoint (cmds.tsv CHECK).
 	Exists(ctx context.Context, endpoint, dataset string) (bool, error)
 
+	// Bookmark creates sourceSnap#bookmark on the endpoint.
+	Bookmark(ctx context.Context, endpoint, sourceSnap, bookmark string) error
+
 	// RunPipe runs leftArgv | rightArgv (each side local or ssh by endpoint).
 	// Argv includes the zfs binary as argv[0] (e.g. "zfs", "send", ...).
 	RunPipe(ctx context.Context, leftEndpoint string, leftArgv []string, rightEndpoint string, rightArgv []string) error

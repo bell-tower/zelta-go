@@ -2,17 +2,19 @@ package opt
 
 // SendRecv holds zfs send/recv flag fragments (oracle SEND_DEFAULT / RECV_*).
 type SendRecv struct {
-	SendDefault  string   // SEND_DEFAULT
-	RecvDefault  string   // RECV_DEFAULT (always prepended when set)
-	RecvTop      string   // RECV_TOP — full root only
-	RecvFS       string   // RECV_FS — full filesystem
-	RecvVol      string   // RECV_VOL — full volume
-	RecvPartial  string   // RECV_PARTIAL — when Resume
-	Resume       bool     // RESUME gates RecvPartial
-	RecvPropsAdd []string // RECV_PROPS_ADD — repeated zfs recv -o properties
-	RecvPropsDel []string // RECV_PROPS_DEL — repeated zfs recv -x properties
-	SendOverride string   // SEND_OVERRIDE — if set, replaces SendDefault
-	RecvOverride string   // RECV_OVERRIDE — if set, replaces all recv flags
+	SendDefault    string   // SEND_DEFAULT
+	RecvDefault    string   // RECV_DEFAULT (always prepended when set)
+	RecvTop        string   // RECV_TOP — full root only
+	RecvFS         string   // RECV_FS — full filesystem
+	RecvVol        string   // RECV_VOL — full volume
+	RecvPartial    string   // RECV_PARTIAL — when Resume
+	Resume         bool     // RESUME gates RecvPartial
+	RecvPropsAdd   []string // RECV_PROPS_ADD — repeated zfs recv -o properties
+	RecvPropsDel   []string // RECV_PROPS_DEL — repeated zfs recv -x properties
+	BookmarkMode   string
+	BookmarkPrefix string
+	SendOverride   string // SEND_OVERRIDE — if set, replaces SendDefault
+	RecvOverride   string // RECV_OVERRIDE — if set, replaces all recv flags
 }
 
 // Default returns built-in oracle defaults (bin/zelta : ${ZELTA_*=…}).
@@ -55,6 +57,8 @@ func SendRecvFrom(e Env) SendRecv {
 	d.Resume = e.Bool("RESUME", d.Resume)
 	d.RecvPropsAdd = e.List("RECV_PROPS_ADD")
 	d.RecvPropsDel = e.List("RECV_PROPS_DEL")
+	d.BookmarkMode = e.Get("BOOKMARK_MODE")
+	d.BookmarkPrefix = e.Get("BOOKMARK_PREFIX")
 	return d
 }
 

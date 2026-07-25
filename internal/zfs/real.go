@@ -160,6 +160,18 @@ func (r *Real) Exists(ctx context.Context, epStr, dataset string) (bool, error) 
 	return false, nil
 }
 
+func (r *Real) Bookmark(ctx context.Context, epStr, sourceSnap, bookmark string) error {
+	argv, err := cmdbuild.BookmarkArgv(sourceSnap, bookmark)
+	if err != nil {
+		return err
+	}
+	argv = r.rewriteBin(argv)
+	if _, err := r.output(ctx, epStr, argv); err != nil {
+		return fmt.Errorf("zfs bookmark %s: %w", bookmark, err)
+	}
+	return nil
+}
+
 func isDatasetExists(err error) bool {
 	if err == nil {
 		return false

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"git.belltower.it/djbell/zelta-go/internal/endpoint"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
 	"git.belltower.it/djbell/zelta-go/internal/zfs"
 )
@@ -654,5 +655,18 @@ func TestRecvProperties(t *testing.T) {
 	}
 	if got := strings.Join(p.Steps[0].Recv, " "); got != "zfs recv -v -u tank/tgt" {
 		t.Fatalf("override should replace properties: %q", got)
+	}
+}
+
+func TestCreateBookmarksAfterVerifiedReceive(t *testing.T) {
+	fake := &zfs.Fake{Lists: map[string]string{"tank/tgt@daily": "tank/tgt@daily\n"}}
+	plan := &Plan{Steps: []*Step{{Kind: KindIncremental, SourceEnd: "@daily", SrcName: "tank/src", TgtName: "tank/tgt"}}}
+	flags := opt.Default()
+	flags.BookmarkMode = "1"
+	if err := createBookmarks(context.Background(), fake, Request{Source: "root@src:tank/src", Target: "root@dst:tank/tgt"}, plan, endpoint.Endpoint{}, endpoint.Endpoint{Host: "dst"}, flags); err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.Bookmarks) != 1 || fake.Bookmarks[0].Bookmark != "tank/src#dst_daily" {
+		t.Fatalf("bookmarks=%v", fake.Bookmarks)
 	}
 }

@@ -1,6 +1,7 @@
 package cmdbuild
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -121,5 +122,16 @@ func TestCheckArgv(t *testing.T) {
 	want := "zfs list -Ho name tank/parent"
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
+func TestBookmarkArgv(t *testing.T) {
+	got, err := BookmarkArgv("tank/src@daily", "tank/src#backup_daily")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"zfs", "bookmark", "tank/src@daily", "tank/src#backup_daily"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v want %v", got, want)
 	}
 }
