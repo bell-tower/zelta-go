@@ -27,9 +27,9 @@ making `internal` types part of a promised external contract.
 2. Extend the bookmark MVP: execute-mode verification and creation are done;
    add dry-run rendering and oracle-compatible non-fatal failure status, while
    keeping clone/revert exclusions explicit.
-3. Extend send-check with runtime retry after a failed stream, then validate
-   the preflight on `root@netbsd` using pools `apool` and `bpool`; it is
-   feature-drop behavior, not a general send validator.
+3. Wait for the upstream send-check correction in `AGENTS-TODO-upstream.md`;
+   then port the tested NetBSD behavior, including `recv -x` avoidance and
+   encryption-feature mismatch handling.
 4. Investigate Rotate before implementing clone-origin; clone-origin depends
    on Rotate's target-preservation path.
 5. Implement filtered intermediate sends. The Awk approach is useful but
