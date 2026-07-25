@@ -27,8 +27,9 @@ making `internal` types part of a promised external contract.
 2. Extend the bookmark MVP: execute-mode verification and creation are done;
    add dry-run rendering and oracle-compatible non-fatal failure status, while
    keeping clone/revert exclusions explicit.
-3. Investigate Rotate before implementing clone-origin; clone-origin depends
-   on Rotate's target-preservation path.
+3. Implement the root-only, dry-run-first Rotate contract in `agents/12-rotate.md`
+   before implementing clone-origin; clone-origin depends on Rotate's
+   target-preservation path.
 4. Implement filtered intermediate sends. The Awk approach is useful but
    brute-force; record a possible reusable upstream abstraction while porting
    it rather than copying the loop blindly.
