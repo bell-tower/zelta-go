@@ -1,6 +1,7 @@
 package rotate
 
 import (
+	"context"
 	"testing"
 
 	"git.belltower.it/djbell/zelta-go/internal/match"
@@ -65,6 +66,26 @@ func TestPlanTreeUsesVerifiedChildOrigin(t *testing.T) {
 	}
 	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_base\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s -o origin=tank/target_base@base tank/target\nzfs send -P -L -c -e -I tank/original/child@child-base tank/src/child@child-new\nzfs recv -v -u -x mountpoint -o canmount=noauto -s -o origin=tank/target_base/child@child-base tank/target/child\n" {
 		t.Fatalf("format=%q", got)
+	}
+}
+
+func TestExecuteRenamesThenPipesInPlanOrder(t *testing.T) {
+	steps, err := Plan(Request{
+		Source: "tank/src", Target: "tank/target", Match: "@base",
+		SourceLast: "@new", TargetLast: "@other", Intermediate: true, Flags: opt.Default(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake := &zfs.Fake{}
+	if err := Execute(context.Background(), fake, TreeRequest{Source: "tank/src", Target: "tank/target", SyncDirection: "PULL"}, steps); err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.Renames) != 1 || fake.Renames[0].OldDataset != "tank/target" || fake.Renames[0].NewDataset != "tank/target_base" {
+		t.Fatalf("renames=%v", fake.Renames)
+	}
+	if len(fake.Pipes) != 1 || fake.Pipes[0].Direction != "PULL" {
+		t.Fatalf("pipes=%v", fake.Pipes)
 	}
 }
 

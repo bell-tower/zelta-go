@@ -49,7 +49,8 @@ func runRotate(args []string) int {
 	request := rotate.TreeRequest{
 		Source: p.Operands[0], Target: p.Operands[1], Pairs: m.Pairs,
 		TargetRows: m.TgtRows, Intermediate: p.Env.Bool("SEND_INTR", true),
-		Flags: opt.SendRecvFrom(p.Env),
+		SyncDirection: rotateDirection(p.Env.Get("SYNC_DIRECTION")),
+		Flags:         opt.SendRecvFrom(p.Env),
 	}
 	steps, err := rotate.PlanTree(request)
 	if err != nil {
@@ -72,8 +73,26 @@ func runRotate(args []string) int {
 		fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
 		return 1
 	}
-	fmt.Print(rotate.Format(steps))
+	if p.Env.Bool("DRYRUN", false) {
+		fmt.Print(rotate.Format(steps))
+		return 0
+	}
+	if err := rotate.Execute(context.Background(), exec, request, steps); err != nil {
+		fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
+		return 1
+	}
 	return 0
 }
 
 func rotateUsage() { fmt.Fprintln(os.Stderr, "usage: zelta rotate SOURCE TARGET") }
+
+func rotateDirection(value string) string {
+	switch value {
+	case "0", "no", "false", "off", "NO", "FALSE", "OFF":
+		return ""
+	case "", "pull", "PULL":
+		return "PULL"
+	default:
+		return value
+	}
+}

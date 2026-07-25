@@ -2,6 +2,7 @@
 package rotate
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -38,6 +39,7 @@ type TreeRequest struct {
 	TargetRows         []zfs.ListRow
 	PreservationExists bool
 	Intermediate       bool
+	SyncDirection      string
 	Flags              opt.SendRecv
 }
 
@@ -249,4 +251,39 @@ func Format(steps []Step) string {
 		b.WriteByte('\n')
 	}
 	return b.String()
+}
+
+// Execute applies a previously validated plan. Send and receive steps are
+// paired in order and run through the executor so remote stdin semantics stay
+// centralized in zfs.Real.
+func Execute(ctx context.Context, exec zfs.Executor, req TreeRequest, steps []Step) error {
+	target, err := endpoint.Parse(req.Target)
+	if err != nil {
+		return fmt.Errorf("target: %w", err)
+	}
+	target.Snapshot = ""
+	for i := 0; i < len(steps); i++ {
+		step := steps[i]
+		switch step.Kind {
+		case "rename":
+			if len(step.Argv) < 4 {
+				return fmt.Errorf("rotate: malformed rename step")
+			}
+			if err := exec.Rename(ctx, target.String(), step.Argv[len(step.Argv)-2], step.Argv[len(step.Argv)-1]); err != nil {
+				return fmt.Errorf("rename target: %w", err)
+			}
+		case "send":
+			if i+1 >= len(steps) || steps[i+1].Kind != "recv" {
+				return fmt.Errorf("rotate: send without receive for %q", step.DSSuffix)
+			}
+			recv := steps[i+1]
+			if err := exec.RunPipeDirection(ctx, req.Source, step.Argv, req.Target, recv.Argv, req.SyncDirection); err != nil {
+				return fmt.Errorf("sync %s: %w", step.DSSuffix, err)
+			}
+			i++
+		case "recv":
+			return fmt.Errorf("rotate: receive without send for %q", step.DSSuffix)
+		}
+	}
+	return nil
 }

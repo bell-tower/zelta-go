@@ -98,12 +98,14 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
 - **Rotate lineage** — Awk distinguishes rollback, direct target divergence, and
   source clone-origin paths → Go now carries dataset `origin` through match and
   plans recursive direct-divergence plus verified source-clone-origin paths.
-  Rollback-specific classification and execution are not wired.
+  Rollback-specific classification and post-execution confirmation remain.
 - **Rotate receive lifecycle** — The final destination after preserving a
   divergent target is not frozen yet. The current dry-run planner emits the
   preservation rename and receives into the original target path with the
   preserved target snapshot as `origin`, matching the bounded oracle contract.
-  Exact rollback failure recovery and execution still require review/goldens.
+  Exact rollback failure recovery and post-execution confirmation still require
+  review/goldens. Execution is available through `internal/rotate.Execute` but
+  is not yet considered release-safe.
 
 ---
 

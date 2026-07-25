@@ -92,3 +92,13 @@ func TestCloneRejectsRemoteMismatch(t *testing.T) {
 		t.Fatal("expected host mismatch")
 	}
 }
+
+func TestCloneTreatsLocalhostAsLocal(t *testing.T) {
+	steps, err := Clone(CloneRequest{Source: "tank/src@daily", Target: "localhost:tank/clone"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(steps) != 1 {
+		t.Fatalf("steps=%v", steps)
+	}
+}

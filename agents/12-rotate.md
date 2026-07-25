@@ -38,8 +38,9 @@ Origin data now flows through `match.RotateListProps`, and direct-match plus
 verified source-origin dry-run plans emit per-child send/receive lineage.
 Target preservation collision checks are present in the planner/CLI. The
 remaining blockers are oracle goldens, rollback-specific classification, and
-execution after lifecycle review. Root `CLONE`/`RENAME` builders and lineage
-planners are available under `internal/lineage`.
+post-execution confirmation/recovery behavior. Execution is now available
+through `internal/rotate.Execute`, but should remain behind dry-run/golden
+review for production use.
 
 Implement `clone` and `revert` lineage operations before Rotate if their
 contracts are not already represented. In particular, `revert` is the normal

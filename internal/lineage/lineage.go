@@ -194,7 +194,17 @@ func Revert(req RevertRequest) ([]Step, error) {
 }
 
 func sameLocation(a, b endpoint.Endpoint) bool {
-	if a.User != b.User || a.Host != b.Host || a.Remote != b.Remote {
+	aHost := a.Host
+	bHost := b.Host
+	if aHost == "localhost" {
+		aHost = ""
+	}
+	if bHost == "localhost" {
+		bHost = ""
+	}
+	aLocal := !a.Remote || aHost == ""
+	bLocal := !b.Remote || bHost == ""
+	if a.User != b.User || aHost != bHost || aLocal != bLocal {
 		return false
 	}
 	return poolOf(a.Dataset) == poolOf(b.Dataset)
