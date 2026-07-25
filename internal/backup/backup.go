@@ -3,6 +3,7 @@ package backup
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"git.belltower.it/djbell/zelta-go/internal/endpoint"
@@ -132,6 +133,9 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		}
 		b.WriteString(out)
 	} else {
+		if err := sendCheck(ctx, exec, req, plan); err != nil {
+			return nil, err
+		}
 		if err := executePlan(ctx, exec, req, plan, direction); err != nil {
 			return nil, err
 		}
@@ -153,6 +157,57 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		Output:   b.String(),
 		Warnings: append([]string(nil), mres.Warnings...),
 	}, nil
+}
+
+var sendCheckOption = regexp.MustCompile(`(?i)(invalid|illegal|unknown|unrecognized option|usage: zfs send)`)
+
+func sendCheck(ctx context.Context, exec zfs.Executor, req Request, plan *Plan) error {
+	if req.DryRun || !plan.Flags.SendCheck || plan.Flags.SendOverride != "" {
+		return nil
+	}
+	var root *Step
+	for _, st := range plan.Steps {
+		if st.DSSuffix == "" && (st.Kind == KindFull || st.Kind == KindIncremental) {
+			root = st
+			break
+		}
+	}
+	if root == nil {
+		return nil
+	}
+	for _, candidate := range []string{"-e", "-c", "-L"} {
+		for strings.Contains(" "+plan.Flags.SendDefault+" ", " "+candidate+" ") {
+			probe := append([]string(nil), root.Send...)
+			if len(probe) < 2 {
+				return nil
+			}
+			probe = append(probe[:2:2], append([]string{"-n", "-v"}, probe[2:]...)...)
+			out, _ := exec.SendCheck(ctx, req.Source, probe)
+			if !sendCheckOption.MatchString(out) {
+				return nil
+			}
+			plan.Flags.SendDefault = removeSendFlag(plan.Flags.SendDefault, candidate)
+			for _, st := range plan.Steps {
+				if st.Kind == KindFull || st.Kind == KindIncremental {
+					if err := buildCmds(st, req.Intermediate, plan.Flags); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func removeSendFlag(flags, drop string) string {
+	parts := strings.Fields(flags)
+	out := parts[:0]
+	for _, p := range parts {
+		if p != drop {
+			out = append(out, p)
+		}
+	}
+	return strings.Join(out, " ")
 }
 
 func createBookmarks(ctx context.Context, exec zfs.Executor, req Request, plan *Plan, srcEp, tgtEp endpoint.Endpoint, flags opt.SendRecv) error {

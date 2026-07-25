@@ -28,6 +28,7 @@ type Executor interface {
 
 	// Bookmark creates sourceSnap#bookmark on the endpoint.
 	Bookmark(ctx context.Context, endpoint, sourceSnap, bookmark string) error
+	SendCheck(ctx context.Context, endpoint string, argv []string) (string, error)
 
 	// RunPipe runs leftArgv | rightArgv (each side local or ssh by endpoint).
 	// Argv includes the zfs binary as argv[0] (e.g. "zfs", "send", ...).

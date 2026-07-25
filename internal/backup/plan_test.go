@@ -670,3 +670,31 @@ func TestCreateBookmarksAfterVerifiedReceive(t *testing.T) {
 		t.Fatalf("bookmarks=%v", fake.Bookmarks)
 	}
 }
+
+func TestSendCheckDropsUnsupportedFeaturesInOrder(t *testing.T) {
+	fake := &zfs.Fake{SendCheckOutputs: []string{
+		"zfs: invalid option -- e\n",
+		"zfs: unknown option -- c\n",
+		"would send 1M\n",
+	}}
+	flags := opt.Default()
+	flags.SendCheck = true
+	plan, err := PlanFromMatch([]PairView{{DSSuffix: "", Info: "syncable (full)", SrcLast: "@daily", SrcName: "tank/src", TgtName: "tank/tgt"}}, false, flags)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sendCheck(context.Background(), fake, Request{Source: "tank/src"}, plan); err != nil {
+		t.Fatal(err)
+	}
+	if got := plan.Flags.SendDefault; got != "-L" {
+		t.Fatalf("send flags=%q", got)
+	}
+	if len(fake.SendChecks) != 3 {
+		t.Fatalf("probes=%d", len(fake.SendChecks))
+	}
+	for _, st := range plan.Steps {
+		if strings.Contains(strings.Join(st.Send, " "), " -e ") || strings.Contains(strings.Join(st.Send, " "), " -c ") {
+			t.Fatalf("dropped flags remain: %v", st.Send)
+		}
+	}
+}

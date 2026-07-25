@@ -13,6 +13,7 @@ type SendRecv struct {
 	RecvPropsDel   []string // RECV_PROPS_DEL — repeated zfs recv -x properties
 	BookmarkMode   string
 	BookmarkPrefix string
+	SendCheck      bool
 	SendOverride   string // SEND_OVERRIDE — if set, replaces SendDefault
 	RecvOverride   string // RECV_OVERRIDE — if set, replaces all recv flags
 }
@@ -59,6 +60,7 @@ func SendRecvFrom(e Env) SendRecv {
 	d.RecvPropsDel = e.List("RECV_PROPS_DEL")
 	d.BookmarkMode = e.Get("BOOKMARK_MODE")
 	d.BookmarkPrefix = e.Get("BOOKMARK_PREFIX")
+	d.SendCheck = e.Bool("SEND_CHECK", false)
 	return d
 }
 

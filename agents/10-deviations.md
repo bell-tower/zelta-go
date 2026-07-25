@@ -39,7 +39,7 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
 - **Progress / -P parse** — Awk parses send `-P` size / recv `received` into `syncing: …` → Go dry-run has `would sync N` + `+` cmds; execute mostly quiet (pipe output not summarized yet).
 - **Parent create** — Awk/Go both `CREATE` parent when tgt missing (default on); dry-run still creates (no `+` line). OpenZFS readonly `-up` bug: retry same CREATE up to depth−1 (`ErrReadOnlyCreate`). `already exists` → OK.
 - **Push/pull dual-remote** — Awk/Go both: default PULL (pipe on target), `--push` (pipe on source), `--no-pull`/SYNC_DIRECTION=0 → controller `ssh|ssh` proxy + one warning. Same remote still hairpins. Execute + dry-run shapes mirror `get_sync_command`.
-- **Send-check / feature drop** — Awk may `zfs send -nv` and drop flags on error → Go not implemented.
+- **Send-check / feature drop** — Go now performs the opt-in root `zfs send -nv` preflight and drops recognized unsupported defaults in oracle order `-e`, `-c`, `-L`; runtime retry after a failed stream remains deferred. *Where:* `internal/backup/backup.go`, `internal/zfs/exec.go`.
 - **Filtered intermediate** (`-I` + include/exclude) — Awk multi-snap loop via prune send-range → Go single `-I` range only.
 - **Backup forces written list props** — even if match default cols would skip written, backup passes `match.BackupListProps` so snap-if-needed sees `written` and recv sees `type`.
 - **Bookmark MVP** — Go verifies each successfully executed target snapshot and creates the corresponding source bookmark; default naming uses `<target-host>_`, explicit `BOOKMARK_PREFIX` is honored. *Dry-run output and oracle's non-fatal bookmark-failure exit status remain follow-up work; clone/revert paths are excluded.*
