@@ -39,6 +39,18 @@ func TestResolveEnv(t *testing.T) {
 	}
 }
 
+func TestResolveReceiveProperties(t *testing.T) {
+	t.Setenv("ZELTA_RECV_PROPS_ADD", "compression=lz4,quota=10G")
+	t.Setenv("ZELTA_RECV_PROPS_DEL", "mountpoint,canmount")
+	r := Resolve()
+	if want := "compression=lz4"; len(r.RecvPropsAdd) != 2 || r.RecvPropsAdd[0] != want || r.RecvPropsAdd[1] != "quota=10G" {
+		t.Fatalf("RecvPropsAdd=%v", r.RecvPropsAdd)
+	}
+	if want := "mountpoint"; len(r.RecvPropsDel) != 2 || r.RecvPropsDel[0] != want || r.RecvPropsDel[1] != "canmount" {
+		t.Fatalf("RecvPropsDel=%v", r.RecvPropsDel)
+	}
+}
+
 func TestSendOverride(t *testing.T) {
 	t.Setenv("ZELTA_SEND_OVERRIDE", "-w")
 	r := Resolve()

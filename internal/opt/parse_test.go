@@ -42,6 +42,16 @@ func TestParseNegations(t *testing.T) {
 	}
 }
 
+func TestParseReceiveProperties(t *testing.T) {
+	p := parse(t, "backup", "-o", "compression=lz4", "-o", "quota=10G", "-x", "mountpoint", "src", "tgt")
+	if got := p.Env.List("RECV_PROPS_ADD"); len(got) != 2 || got[0] != "compression=lz4" || got[1] != "quota=10G" {
+		t.Fatalf("RECV_PROPS_ADD=%v", got)
+	}
+	if got := p.Env.List("RECV_PROPS_DEL"); len(got) != 1 || got[0] != "mountpoint" {
+		t.Fatalf("RECV_PROPS_DEL=%v", got)
+	}
+}
+
 func TestParseAccumulation(t *testing.T) {
 	// Oracle: -vv -X '*/tmp' --exclude=@hourly --snap-name=daily_1 -L --raw
 	// → LOG_LEVEL=4, EXCLUDE='*/tmp,@hourly', SNAP_NAME=daily_1, SEND_OVERRIDE='-L --raw'

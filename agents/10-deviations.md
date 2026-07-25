@@ -78,7 +78,7 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
 - **`-h` on send/recv verbs: no warning** — oracle opts.tsv puts the "ambiguous" text in the DESCRIPTION column ($7), WARNING ($8) is empty → oracle emits none; Go matches (data quirk, not code).
 - **SNAP_MODE `SKIP` ≈ `IF_NEEDED`** — `--snapshot-skip` parses but Go backup has no SKIP semantics yet; treated as IF_NEEDED.
 - **CLI error prefix** — oracle `stop()` prints `error: <msg>`; Go parse/depth errors use `error:` too, engine errors keep `zelta <verb>:`.
-- **RECV_PROPS_ADD/DEL (`-o`/`-x`)** — parsed into env, not yet wired into recv argv (cmdbuild).
+- **RECV_PROPS_ADD/DEL (`-o`/`-x`)** — repeated values are preserved and emitted as ordered `-o value`/`-x value` receive argv pairs; `RECV_OVERRIDE` still replaces the composed receive flags. *Where:* `internal/opt/sendrecv.go`, `internal/backup/plan.go`.
 - **Bare-key process env** — Go `opt.Lookup` also honors bare `KEY` (no `ZELTA_`); oracle reads only `ZELTA_*`. Superset kept for library ergonomics.
 
 ---

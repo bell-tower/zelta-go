@@ -626,3 +626,33 @@ func TestOptSendRecvFlags(t *testing.T) {
 		t.Fatalf("env SEND_DEFAULT not applied:\n%s", res.Output)
 	}
 }
+
+func TestRecvProperties(t *testing.T) {
+	f := opt.Default()
+	f.RecvPropsAdd = []string{"compression=lz4", "quota=10G"}
+	f.RecvPropsDel = []string{"mountpoint", "canmount"}
+	p, err := PlanFromMatch([]PairView{{
+		DSSuffix: "", Info: "syncable (full)", SrcLast: "@a",
+		SrcName: "tank/src", TgtName: "tank/tgt",
+	}}, false, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.Join(p.Steps[0].Recv, " ")
+	want := "-o readonly=on -u -x mountpoint -o canmount=noauto -o compression=lz4 -o quota=10G -x mountpoint -x canmount -s"
+	if got != "zfs recv -v "+want+" tank/tgt" {
+		t.Fatalf("recv argv=%q", got)
+	}
+
+	f.RecvOverride = "-u"
+	p, err = PlanFromMatch([]PairView{{
+		DSSuffix: "", Info: "syncable (full)", SrcLast: "@a",
+		SrcName: "tank/src", TgtName: "tank/tgt",
+	}}, false, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(p.Steps[0].Recv, " "); got != "zfs recv -v -u tank/tgt" {
+		t.Fatalf("override should replace properties: %q", got)
+	}
+}

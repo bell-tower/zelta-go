@@ -212,6 +212,16 @@ func recvFlags(st *Step, f opt.SendRecv) string {
 			}
 		}
 	}
+	for _, prop := range f.RecvPropsAdd {
+		if prop != "" {
+			parts = append(parts, "-o "+prop)
+		}
+	}
+	for _, prop := range f.RecvPropsDel {
+		if prop != "" {
+			parts = append(parts, "-x "+prop)
+		}
+	}
 	if f.Resume && f.RecvPartial != "" {
 		parts = append(parts, f.RecvPartial)
 	}

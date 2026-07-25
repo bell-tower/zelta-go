@@ -24,20 +24,18 @@ making `internal` types part of a promised external contract.
 
 1. Add prune golden fixtures and CLI integration coverage. This closes the
    largest read-only behavior gap before destructive work.
-2. Wire `RECV_PROPS_ADD` and `RECV_PROPS_DEL` through option resolution,
-   command construction, and backup tests.
-3. Implement remaining backup parity: send-check, bookmarks, clone-origin,
+2. Implement remaining backup parity: send-check, bookmarks, clone-origin,
    and filtered intermediate sends. Add one contract note and focused tests per
    behavior rather than broad rewrites.
-4. Decide and document the public library facade. Only then move or re-export
+3. Decide and document the public library facade. Only then move or re-export
    packages and add external-package tests.
-5. Implement `zprune` as a separate destructive wrapper with prompt, force,
+4. Implement `zprune` as a separate destructive wrapper with prompt, force,
    guard, and send-range semantics. Keep destructive operations out of core
    `zelta prune`.
-6. Implement policy configuration (`zelta.conf`) after the option/env contract
+5. Implement policy configuration (`zelta.conf`) after the option/env contract
    is stable; add precedence tests against `zelta.env`, process environment,
    and CLI flags.
-7. Polish README and public API documentation after the API and behavior are
+6. Polish README and public API documentation after the API and behavior are
    stable.
 
 ## Explicit non-goals
