@@ -107,6 +107,10 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
   Exact rollback failure recovery remains. Execution is available through
   `internal/rotate.Execute`; it re-runs match after execution and reports
   remaining divergence like upstream, without a strict confirmation failure.
+- **Rotate snapshot phase** — Go now predicts/executes the recursive source
+  snapshot when Rotate is at the common latest snapshot, when source state is
+  written, or when snapshot mode is forced. Threshold-based snapshot skipping
+  is not yet wired; upstream `SNAP_TIME`/`SNAP_SIZE` remains a gap.
 
 ---
 

@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
+	"git.belltower.it/djbell/zelta-go/internal/backup"
+	"git.belltower.it/djbell/zelta-go/internal/cmdbuild"
 	"git.belltower.it/djbell/zelta-go/internal/endpoint"
 	"git.belltower.it/djbell/zelta-go/internal/match"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
@@ -47,6 +50,11 @@ func runRotate(args []string) int {
 		fmt.Fprintln(os.Stderr, "zelta rotate: root dataset is missing")
 		return 1
 	}
+	savepoint, shouldSnapshot, err := prepareRotateSnapshot(p.Env.Get("SNAP_MODE"), p.Env.Get("SNAP_NAME"), m.Pairs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
+		return 1
+	}
 	request := rotate.TreeRequest{
 		Source: p.Operands[0], Target: p.Operands[1], Pairs: m.Pairs,
 		TargetRows: m.TgtRows, Intermediate: p.Env.Bool("SEND_INTR", true),
@@ -57,6 +65,19 @@ func runRotate(args []string) int {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
 		return 1
+	}
+	if shouldSnapshot {
+		source, err := endpoint.Parse(p.Operands[0])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "zelta rotate: source: %v\n", err)
+			return 1
+		}
+		argv, err := cmdbuild.SnapArgv(source.Dataset + savepoint)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
+			return 1
+		}
+		steps = append([]rotate.Step{{Kind: "snapshot", Argv: argv}}, steps...)
 	}
 	if len(steps) == 0 || len(steps[0].Argv) == 0 {
 		fmt.Fprintln(os.Stderr, "zelta rotate: empty preservation plan")
@@ -119,4 +140,44 @@ func preservationEndpoint(target, dataset string) string {
 	ep.Dataset = dataset
 	ep.Snapshot = ""
 	return ep.String()
+}
+
+func prepareRotateSnapshot(mode, requested string, pairs []*match.Pair) (string, bool, error) {
+	mode = strings.ToUpper(strings.TrimSpace(mode))
+	if mode == "" {
+		mode = "IF_NEEDED"
+	}
+	force := mode == "ALWAYS" || mode == "1" || mode == "YES" || mode == "TRUE"
+	disabled := mode == "0" || mode == "OFF" || mode == "NO" || mode == "FALSE" || mode == "SKIP"
+	need := force
+	for _, pair := range pairs {
+		if pair == nil || pair.SrcName == "" {
+			continue
+		}
+		if pair.SrcLast == "" || (pair.Match != "" && pair.Match == pair.SrcLast) || written(pair.SrcWritten) {
+			need = true
+		}
+	}
+	if !need {
+		return "", false, nil
+	}
+	if disabled {
+		return "", false, fmt.Errorf("source snapshot required for rotation")
+	}
+	name := strings.TrimPrefix(strings.TrimSpace(requested), "@")
+	if name == "" {
+		name = backup.DefaultSnapName()
+	}
+	savepoint := "@" + name
+	for _, pair := range pairs {
+		if pair != nil && pair.SrcName != "" {
+			pair.SrcLast = savepoint
+		}
+	}
+	return savepoint, true, nil
+}
+
+func written(value string) bool {
+	value = strings.TrimSpace(value)
+	return value != "" && value != "-" && value != "0" && value != "0B"
 }

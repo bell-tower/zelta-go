@@ -295,6 +295,13 @@ func Execute(ctx context.Context, exec zfs.Executor, req TreeRequest, steps []St
 			if err := exec.Rename(ctx, target.String(), step.Argv[len(step.Argv)-2], step.Argv[len(step.Argv)-1]); err != nil {
 				return fmt.Errorf("rename target: %w", err)
 			}
+		case "snapshot":
+			if len(step.Argv) == 0 {
+				return fmt.Errorf("rotate: malformed snapshot step")
+			}
+			if err := exec.Snapshot(ctx, req.Source, step.Argv[len(step.Argv)-1], true); err != nil {
+				return fmt.Errorf("snapshot source: %w", err)
+			}
 		case "send":
 			if i+1 >= len(steps) || steps[i+1].Kind != "recv" {
 				return fmt.Errorf("rotate: send without receive for %q", step.DSSuffix)

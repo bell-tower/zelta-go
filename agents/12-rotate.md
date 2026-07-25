@@ -38,7 +38,8 @@ execution only after dry-run goldens establish the rename and receive order.
 
 Origin data now flows through `match.RotateListProps`, and direct-match plus
 verified source-origin dry-run plans emit per-child send/receive lineage.
-Target preservation collision checks are present in the planner/CLI. The
+Source snapshot-if-needed/always planning, target preservation collision checks
+are present in the planner/CLI. The
 remaining blockers are oracle goldens, rollback-specific classification, and
 post-execution confirmation/recovery behavior. Execution is now available
 through `internal/rotate.Execute`, but should remain behind dry-run/golden
