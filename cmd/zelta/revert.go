@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"git.belltower.it/djbell/zelta-go/internal/backup"
 	"git.belltower.it/djbell/zelta-go/internal/endpoint"
@@ -37,9 +38,18 @@ func runRevert(args []string) int {
 		fmt.Fprintf(os.Stderr, "zelta revert: %v\n", err)
 		return 1
 	}
+	endpointArg := p.Operands[0]
+	if ep.Snapshot == "" && p.Env.Get("SNAP_NAME") != "" {
+		endpointArg += "@" + strings.TrimPrefix(p.Env.Get("SNAP_NAME"), "@")
+		ep, err = endpoint.Parse(endpointArg)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "zelta revert: %v\n", err)
+			return 1
+		}
+	}
 	current := ep
 	current.Snapshot = ""
-	rows, err := exec.List(context.Background(), p.Operands[0], ep.Dataset, []string{"name", "type"}, depth)
+	rows, err := exec.List(context.Background(), endpointArg, ep.Dataset, []string{"name", "type"}, depth)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta revert: list source: %v\n", err)
 		return 1
@@ -49,7 +59,7 @@ func runRevert(args []string) int {
 		fmt.Fprintf(os.Stderr, "zelta revert: parse source: %v\n", err)
 		return 1
 	}
-	request := lineage.RevertRequest{Endpoint: p.Operands[0], Depth: depth, AfterSnapshot: "@" + backup.DefaultSnapName()}
+	request := lineage.RevertRequest{Endpoint: endpointArg, Depth: depth, AfterSnapshot: "@" + backup.DefaultSnapName()}
 	steps, err := lineage.RevertPlan(request, parsedRows, false)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta revert: %v\n", err)

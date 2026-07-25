@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"git.belltower.it/djbell/zelta-go/internal/endpoint"
 	"git.belltower.it/djbell/zelta-go/internal/lineage"
@@ -36,12 +37,21 @@ func runClone(args []string) int {
 		fmt.Fprintf(os.Stderr, "zelta clone: source: %v\n", err)
 		return 1
 	}
+	sourceArg := p.Operands[0]
+	if src.Snapshot == "" && p.Env.Get("SNAP_NAME") != "" {
+		sourceArg += "@" + strings.TrimPrefix(p.Env.Get("SNAP_NAME"), "@")
+		src, err = endpoint.Parse(sourceArg)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "zelta clone: source: %v\n", err)
+			return 1
+		}
+	}
 	tgt, err := endpoint.Parse(p.Operands[1])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta clone: target: %v\n", err)
 		return 1
 	}
-	rows, err := exec.List(context.Background(), p.Operands[0], src.Dataset, []string{"name", "type"}, depth)
+	rows, err := exec.List(context.Background(), sourceArg, src.Dataset, []string{"name", "type"}, depth)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta clone: list source: %v\n", err)
 		return 1
@@ -56,7 +66,7 @@ func runClone(args []string) int {
 		fmt.Fprintf(os.Stderr, "zelta clone: target check: %v\n", err)
 		return 1
 	}
-	steps, err := lineage.ClonePlan(lineage.CloneRequest{Source: p.Operands[0], Target: p.Operands[1], Depth: depth}, parsedRows, exists)
+	steps, err := lineage.ClonePlan(lineage.CloneRequest{Source: sourceArg, Target: p.Operands[1], Depth: depth}, parsedRows, exists)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta clone: %v\n", err)
 		return 1
