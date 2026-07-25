@@ -27,7 +27,7 @@ func runRotate(args []string) int {
 		return 2
 	}
 	m, err := match.Compare(context.Background(), &zfs.Real{}, match.Request{
-		Source: p.Operands[0], Target: p.Operands[1], Props: match.BackupListProps,
+		Source: p.Operands[0], Target: p.Operands[1], Props: match.RotateListProps,
 		Scripting: true, Parsable: true,
 	})
 	if err != nil {
@@ -45,9 +45,17 @@ func runRotate(args []string) int {
 		fmt.Fprintln(os.Stderr, "zelta rotate: root dataset is missing")
 		return 1
 	}
+	originVerified := false
+	if root.Match == "" && root.SrcOrigin != "" {
+		if _, snap, ok := splitOriginForCLI(root.SrcOrigin); ok {
+			originVerified = hasSnapshot(m.TgtRows, m.Target.Dataset+snap)
+		}
+	}
 	steps, err := rotate.Plan(rotate.Request{
 		Source: p.Operands[0], Target: p.Operands[1], Match: root.Match,
 		SourceLast: root.SrcLast, TargetLast: root.TgtLast,
+		SourceOrigin: root.SrcOrigin, OriginVerified: originVerified,
+		SourceType: root.SrcType, Intermediate: p.Env.Bool("SEND_INTR", true),
 		Flags: opt.SendRecvFrom(p.Env),
 	})
 	if err != nil {
@@ -59,3 +67,21 @@ func runRotate(args []string) int {
 }
 
 func rotateUsage() { fmt.Fprintln(os.Stderr, "usage: zelta rotate SOURCE TARGET") }
+
+func splitOriginForCLI(origin string) (string, string, bool) {
+	for i := len(origin) - 1; i > 0; i-- {
+		if origin[i] == '@' {
+			return origin[:i], origin[i:], i < len(origin)-1
+		}
+	}
+	return "", "", false
+}
+
+func hasSnapshot(rows []zfs.ListRow, name string) bool {
+	for _, row := range rows {
+		if row.Name == name {
+			return true
+		}
+	}
+	return false
+}

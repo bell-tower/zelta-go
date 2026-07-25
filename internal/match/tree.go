@@ -30,6 +30,7 @@ type Dataset struct {
 	Suffix  string
 	Name    string
 	GUID    string
+	Origin  string
 	Written string
 	Type    string // filesystem | volume (from zfs list type; empty if not listed)
 	Snaps   []Snap
@@ -92,6 +93,7 @@ func (t *tree) addRow(row zfs.ListRow, filt *Filter, sourceSide bool) error {
 	if typ == objDataset {
 		ds.Name = name
 		ds.GUID = guid
+		ds.Origin = row.Props["origin"]
 		ds.Written = written
 		ds.Type = row.Props["type"]
 		return nil

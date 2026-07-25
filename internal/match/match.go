@@ -49,6 +49,9 @@ var MinimalListProps = []string{"name", "guid"}
 // BackupListProps adds type so backup can choose RECV_FS vs RECV_VOL.
 var BackupListProps = []string{"name", "guid", "written", "creation", "used", "type"}
 
+// RotateListProps includes origin for clone-lineage classification.
+var RotateListProps = []string{"name", "guid", "origin", "written", "creation", "used", "type"}
+
 // Compare loads lists, pairs by ds_suffix/GUID, and renders columns.
 func Compare(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	srcEp, err := endpoint.Parse(req.Source)

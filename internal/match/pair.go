@@ -23,6 +23,8 @@ type Pair struct {
 	NumMatches int
 	SrcName    string
 	TgtName    string
+	SrcOrigin  string
+	TgtOrigin  string
 	SrcFirst   string
 	TgtFirst   string
 	SrcLast    string
@@ -96,6 +98,7 @@ func pairTrees(src, tgt *tree) []*Pair {
 func fillEnds(p *Pair, sds, tds *Dataset) {
 	if sds != nil {
 		p.SrcName = sds.Name
+		p.SrcOrigin = sds.Origin
 		p.SrcWritten = sds.Written
 		p.SrcType = sds.Type
 		p.SrcSnaps = len(sds.Snaps)
@@ -106,6 +109,7 @@ func fillEnds(p *Pair, sds, tds *Dataset) {
 	}
 	if tds != nil {
 		p.TgtName = tds.Name
+		p.TgtOrigin = tds.Origin
 		p.TgtWritten = tds.Written
 		p.TgtType = tds.Type
 		p.TgtSnaps = len(tds.Snaps)

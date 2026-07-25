@@ -96,9 +96,9 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
   are now wired. Snapshot-name option plumbing and full failure recovery remain
   deferred. *Where:* `internal/lineage`, `cmd/zelta/revert.go`.
 - **Rotate lineage** — Awk distinguishes rollback, direct target divergence, and
-  source clone-origin paths → Go currently plans only direct root divergence and
-  refuses missing/common lineage cases. `origin` inspection, target-origin
-  verification, recursive children, and execution are not wired.
+  source clone-origin paths → Go now carries dataset `origin` through match and
+  plans root direct-divergence plus verified source-clone-origin paths.
+  Recursive children, rollback classification, and execution are not wired.
 - **Rotate receive lifecycle** — The final destination after preserving a
   divergent target is not frozen yet. The current dry-run planner emits the
   preservation rename and a receive command, but the exact target name and
