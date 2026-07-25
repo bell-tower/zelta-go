@@ -1,6 +1,7 @@
 # Prune / zprune
 
 - `zelta prune` — **read-only** candidate selection (implemented)
+- CLI integration is covered by fixture-backed command-level golden tests.
 - `zprune` — destructive destroy wrapper + prompt (deferred; `cmd/zprune` stub)
 
 ## Implemented (`internal/prune`)

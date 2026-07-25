@@ -23,7 +23,8 @@ making `internal` types part of a promised external contract.
 ## Ordered work
 
 1. Add prune golden fixtures and CLI integration coverage. Existing prune
-   goldens cover the current read-only analysis; CLI integration remains.
+   goldens and fixture-backed CLI coverage now cover the current read-only
+   analysis; keep clone-origin and send-range cases deferred with zprune.
 2. Bookmark MVP is complete for verification, creation, dry-run rendering, and
    non-fatal failure status; keep clone/revert exclusions explicit.
 3. Compose the four-endpoint clone-and-backup workflow from ordinary `clone`
