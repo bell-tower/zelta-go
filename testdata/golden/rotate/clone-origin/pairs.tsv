@@ -1,0 +1,2 @@
+# suffix	source	target	match	source_last	target_last	source_origin	type
+	tank/clone	tank/target		@new	@base	tank/original@base	filesystem

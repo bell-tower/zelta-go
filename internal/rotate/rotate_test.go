@@ -95,3 +95,23 @@ func TestRotateRejectsNoNewSourceSnapshot(t *testing.T) {
 		t.Fatal("expected up-to-date source error")
 	}
 }
+
+func TestRotateRejectsUnverifiedRollbackLineage(t *testing.T) {
+	_, err := PlanTree(TreeRequest{
+		Source: "tank/src", Target: "tank/target", TargetRows: []zfs.ListRow{{Name: "tank/target@other"}},
+		Pairs: []*match.Pair{{DSSuffix: "", SrcName: "tank/src", TgtName: "tank/target", SrcLast: "@new", TgtLast: "@other"}},
+	})
+	if err == nil {
+		t.Fatal("expected unverified lineage error")
+	}
+}
+
+func TestRotateRejectsPreservationCollision(t *testing.T) {
+	_, err := PlanTree(TreeRequest{
+		Source: "tank/src", Target: "tank/target", PreservationExists: true,
+		Pairs: []*match.Pair{{DSSuffix: "", SrcName: "tank/src", TgtName: "tank/target", Match: "@base", SrcLast: "@new", TgtLast: "@other"}},
+	})
+	if err == nil {
+		t.Fatal("expected preservation collision")
+	}
+}

@@ -1,0 +1,3 @@
+source: tank/src
+target: tank/target
+intermediate: true

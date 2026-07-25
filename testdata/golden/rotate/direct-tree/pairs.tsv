@@ -1,0 +1,3 @@
+# suffix	source	target	match	source_last	target_last	source_origin	type
+	tank/src	tank/target	@base	@new	@other		filesystem
+/child	tank/src/child			@child			filesystem
