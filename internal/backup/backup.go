@@ -59,21 +59,30 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	if strings.TrimSpace(req.SnapTime) != "" || strings.TrimSpace(req.SnapSize) != "" {
 		props = append(props, "snapshots_changed")
 	}
+	filteredIntermediate := req.Intermediate && (len(req.Include) > 0 || len(req.Exclude) > 0)
 	mres, err := match.Compare(ctx, exec, match.Request{
-		Source:    req.Source,
-		Target:    req.Target,
-		Depth:     req.Depth,
-		Include:   req.Include,
-		Exclude:   req.Exclude,
-		Props:     props,
-		Scripting: true,
-		Parsable:  true,
+		Source:                  req.Source,
+		Target:                  req.Target,
+		Depth:                   req.Depth,
+		Include:                 req.Include,
+		Exclude:                 req.Exclude,
+		Props:                   props,
+		Scripting:               true,
+		Parsable:                true,
+		PreserveSourceSnapshots: filteredIntermediate,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("match: %w", err)
 	}
 
 	views := ViewsFromMatch(mres.Pairs)
+	if filteredIntermediate {
+		filter := match.ParseFilter(req.Include, req.Exclude)
+		for i := range views {
+			views[i].FilteredActive = true
+			views[i].FilteredEnds = filteredEnds(views[i], filter)
+		}
+	}
 	for i := range views {
 		if views[i].TgtName == "" && views[i].SrcName != "" {
 			views[i].TgtName = joinTgt(tgtEp.Dataset, views[i].DSSuffix)
@@ -270,6 +279,27 @@ func joinTgt(root, suffix string) string {
 		return root + suffix
 	}
 	return root + "/" + suffix
+}
+
+// filteredEnds returns eligible source snapshots oldest-first, after the
+// dataset's match. Each end becomes its own -i stream; excluded snapshots are
+// never hidden inside a single -I range.
+func filteredEnds(v PairView, filter *match.Filter) []string {
+	var out []string
+	matched := v.Match == ""
+	for i := len(v.SrcSavepoints) - 1; i >= 0; i-- {
+		sp := v.SrcSavepoints[i]
+		if !matched {
+			if sp == v.Match {
+				matched = true
+			}
+			continue
+		}
+		if filter.KeepSourceSnap(sp, v.SrcName, v.DSSuffix) {
+			out = append(out, sp)
+		}
+	}
+	return out
 }
 
 // bothRemote is oracle _orchestrate: SRC_REMOTE && TGT_REMOTE.

@@ -11,7 +11,9 @@
 4. `PlanFromMatch` + optional `ApplySourceSnap` (predicted on dry-run)
 5. `cmdbuild` SEND/RECV flags from `opt.Resolve()` (SEND_DEFAULT, RECV_TOP/FS/VOL/PARTIAL, RESUME)
 6. Dry-run: `would sync N` + snap + first-pass `PipeShell` (same-host ssh hairpin)
-7. Execute: `Snapshot` then `RunPipe`; intermediate full does second-pass incr
+7. Execute: `Snapshot` then `RunPipe`; intermediate full does second-pass incr.
+   With `-I` plus include/exclude, each dataset gets independent oldest-first
+   filtered snapshots and one forced `-i` stream per selected endpoint.
 
 ## Plan rules
 
@@ -22,6 +24,10 @@
 | `syncable (incremental)` | Incr | `send … -I src@match src@end` (default `-I`) |
 | `up-to-date` | Skip → Incr if snap | after snap: match→new |
 | `blocked…` / tgt-only | Blocked | no force |
+
+Filtered intermediate sends are planned per dataset. Dataset filters cascade
+to children; snapshot filters are applied to the retained source history after
+matching, so excluded snapshots cannot be hidden inside a single `-I` range.
 
 ## Recv flags (oracle defaults)
 

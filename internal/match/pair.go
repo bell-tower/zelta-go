@@ -38,6 +38,7 @@ type Pair struct {
 	SrcType             string // filesystem | volume
 	TgtType             string
 	SrcSnaps            int
+	SrcSavepoints       []string
 	TgtSnaps            int
 	XferNum             int
 	XferSize            int64
@@ -105,6 +106,11 @@ func fillEnds(p *Pair, sds, tds *Dataset) {
 		p.SrcSnapshotsChanged = sds.SnapshotsChanged
 		p.SrcType = sds.Type
 		p.SrcSnaps = len(sds.Snaps)
+		for _, sp := range sds.Snaps {
+			if sp.Type == objSnapshot {
+				p.SrcSavepoints = append(p.SrcSavepoints, sp.Savepoint)
+			}
+		}
 		if n := len(sds.Snaps); n > 0 {
 			p.SrcLast = sds.Snaps[0].Savepoint
 			p.SrcFirst = sds.Snaps[n-1].Savepoint

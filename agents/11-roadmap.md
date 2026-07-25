@@ -32,9 +32,10 @@ making `internal` types part of a promised external contract.
 4. Finish the Rotate lifecycle in `agents/12-rotate.md`: exact receive-token
    and rollback recovery remain manual; do not blindly retry interrupted
    receives.
-5. Implement filtered intermediate sends. The Awk approach is useful but
-   brute-force; record a possible reusable upstream abstraction while porting
-   it rather than copying the loop blindly.
+5. Complete filtered intermediate sends across snapshot creation, bookmarks,
+   resume handling, and oracle edge cases. The core per-dataset selector is
+   implemented; retain the reusable planning abstraction rather than copying
+   the Awk loop blindly.
 6. Decide and document the public library facade. Only then move or re-export
    packages and add external-package tests.
 7. Implement `zprune` as a separate destructive wrapper with prompt, force,

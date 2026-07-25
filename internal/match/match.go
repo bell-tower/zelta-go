@@ -13,17 +13,18 @@ import (
 
 // Request is a match comparison.
 type Request struct {
-	Source    string
-	Target    string
-	Props     []string // empty → resolveListProps
-	Cols      []string // empty → expand default proplist
-	Depth     int      // 0 = unlimited; zfs -d + pair filter
-	Include   []string // --include patterns (comma lists / repeated)
-	Exclude   []string // -X / --exclude patterns
-	Scripting bool     // -H
-	Parsable  bool     // -p
-	NoWritten bool     // --no-written: list name,guid only
-	CheckTime bool     // --time: append SOURCE/TARGET_LIST_TIME
+	Source                  string
+	Target                  string
+	Props                   []string // empty → resolveListProps
+	Cols                    []string // empty → expand default proplist
+	Depth                   int      // 0 = unlimited; zfs -d + pair filter
+	Include                 []string // --include patterns (comma lists / repeated)
+	Exclude                 []string // -X / --exclude patterns
+	Scripting               bool     // -H
+	Parsable                bool     // -p
+	NoWritten               bool     // --no-written: list name,guid only
+	CheckTime               bool     // --time: append SOURCE/TARGET_LIST_TIME
+	PreserveSourceSnapshots bool     // retain source history for filtered backup planning
 }
 
 // Result is a completed match comparison.
@@ -98,11 +99,11 @@ func Compare(ctx context.Context, exec zfs.Executor, req Request) (*Result, erro
 	}
 
 	filt := ParseFilter(req.Include, req.Exclude)
-	srcTree, err := buildTree(srcEp.Dataset, srcRows, filt, true)
+	srcTree, err := buildTree(srcEp.Dataset, srcRows, filt, true, req.PreserveSourceSnapshots)
 	if err != nil {
 		return nil, fmt.Errorf("source tree: %w", err)
 	}
-	tgtTree, err := buildTree(tgtEp.Dataset, tgtRows, filt, false)
+	tgtTree, err := buildTree(tgtEp.Dataset, tgtRows, filt, false, false)
 	if err != nil {
 		return nil, fmt.Errorf("target tree: %w", err)
 	}

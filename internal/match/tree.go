@@ -45,21 +45,21 @@ type tree struct {
 	guidIdx map[string]map[string]int // suffix → guid → snap index
 }
 
-func buildTree(root string, rows []zfs.ListRow, filt *Filter, sourceSide bool) (*tree, error) {
+func buildTree(root string, rows []zfs.ListRow, filt *Filter, sourceSide, preserveSourceSnapshots bool) (*tree, error) {
 	t := &tree{
 		root:    root,
 		bySuf:   make(map[string]*Dataset),
 		guidIdx: make(map[string]map[string]int),
 	}
 	for _, row := range rows {
-		if err := t.addRow(row, filt, sourceSide); err != nil {
+		if err := t.addRow(row, filt, sourceSide, preserveSourceSnapshots); err != nil {
 			return nil, err
 		}
 	}
 	return t, nil
 }
 
-func (t *tree) addRow(row zfs.ListRow, filt *Filter, sourceSide bool) error {
+func (t *tree) addRow(row zfs.ListRow, filt *Filter, sourceSide, preserveSourceSnapshots bool) error {
 	name := row.Name
 	base, savepoint, typ := splitName(name)
 	suf, err := endpoint.DSSuffix(t.root, base)
@@ -75,7 +75,7 @@ func (t *tree) addRow(row zfs.ListRow, filt *Filter, sourceSide bool) error {
 			return nil
 		}
 	} else if typ == objSnapshot && sourceSide {
-		if !filt.keepSourceSnap(savepoint, base, suf) {
+		if !preserveSourceSnapshots && !filt.keepSourceSnap(savepoint, base, suf) {
 			return nil
 		}
 	}

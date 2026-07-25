@@ -3,10 +3,12 @@ package backup
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"git.belltower.it/djbell/zelta-go/internal/match"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
 	"git.belltower.it/djbell/zelta-go/internal/zfs"
 )
@@ -727,5 +729,60 @@ func TestBookmarkFailuresContinueAndReport(t *testing.T) {
 	errs := createBookmarks(context.Background(), fake, Request{}, plan)
 	if len(errs) != 1 || len(fake.Bookmarks) != 1 || fake.Bookmarks[0].Bookmark != "tank/src#dst_b" {
 		t.Fatalf("errors=%v bookmarks=%v", errs, fake.Bookmarks)
+	}
+}
+
+func TestFilteredIntermediatePlansPerDataset(t *testing.T) {
+	views := []PairView{
+		{DSSuffix: "", Info: "syncable (full)", SrcName: "tank/src", TgtName: "tank/tgt", FilteredActive: true, FilteredEnds: []string{"@old", "@new"}},
+		{DSSuffix: "/child", Info: "syncable (incremental)", Match: "@child-m", SrcName: "tank/src/child", TgtName: "tank/tgt/child", FilteredActive: true, FilteredEnds: []string{"@child-new"}},
+	}
+	p, err := PlanFromMatch(views, true, opt.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Steps) != 3 || p.Steps[0].Kind != KindFull || p.Steps[1].Kind != KindIncremental || p.Steps[2].SourceStart != "@child-m" {
+		t.Fatalf("steps=%+v", p.Steps)
+	}
+	for _, st := range p.Steps {
+		if st.Filtered && strings.Contains(strings.Join(st.Send, " "), " -I ") {
+			t.Fatalf("filtered step used -I: %v", st.Send)
+		}
+	}
+}
+
+func TestFilteredEndsRespectSnapshotExclusion(t *testing.T) {
+	v := PairView{
+		DSSuffix: "/child", SrcName: "tank/src/child", Match: "@m",
+		SrcSavepoints: []string{"@new", "@skip", "@m", "@old"},
+	}
+	f := match.ParseFilter(nil, []string{"@skip"})
+	got := filteredEnds(v, f)
+	if want := []string{"@new"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("filtered ends=%v want=%v", got, want)
+	}
+}
+
+func TestRunFilteredIntermediateKeepsExcludedHistoryOutOfStream(t *testing.T) {
+	src := "tank/src\t1\t0\t1\t1K\tfilesystem\n" +
+		"tank/src@new\t4\t0\t4\t1K\tsnapshot\n" +
+		"tank/src@skip\t3\t0\t3\t1K\tsnapshot\n" +
+		"tank/src@m\t2\t0\t2\t1K\tsnapshot\n"
+	tgt := "tank/tgt\t10\t0\t1\t0\tfilesystem\n" +
+		"tank/tgt@m\t2\t0\t2\t1K\tsnapshot\n"
+	fake := &zfs.Fake{Lists: map[string]string{"tank/src": src, "tank/tgt": tgt}}
+	res, err := Run(context.Background(), fake, Request{
+		Source: "tank/src", Target: "tank/tgt", Intermediate: true,
+		SnapMode: SnapNever, Exclude: []string{"@skip"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.Pipes) != 1 {
+		t.Fatalf("pipes=%d plan=%+v", len(fake.Pipes), res.Plan.Steps)
+	}
+	joined := strings.Join(fake.Pipes[0].Left, " ")
+	if !strings.Contains(joined, "-i tank/src@m tank/src@new") || strings.Contains(joined, "@skip") {
+		t.Fatalf("filtered send=%s", joined)
 	}
 }

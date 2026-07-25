@@ -35,6 +35,7 @@ type Step struct {
 	Send        []string
 	Recv        []string
 	Notice      string
+	Filtered    bool
 }
 
 // Plan is the full backup plan from a match result.
@@ -73,6 +74,9 @@ type PairView struct {
 	TgtName             string
 	SrcWritten          string
 	SrcSnapshotsChanged string
+	SrcSavepoints       []string
+	FilteredEnds        []string
+	FilteredActive      bool
 	SrcType             string // filesystem | volume; empty → filesystem
 }
 
@@ -91,6 +95,7 @@ func ViewsFromMatch(pairs []*match.Pair) []PairView {
 			TgtName:             p.TgtName,
 			SrcWritten:          p.SrcWritten,
 			SrcSnapshotsChanged: p.SrcSnapshotsChanged,
+			SrcSavepoints:       append([]string(nil), p.SrcSavepoints...),
 			SrcType:             p.SrcType,
 		})
 	}
@@ -103,6 +108,14 @@ func ViewsFromMatch(pairs []*match.Pair) []PairView {
 func PlanFromMatch(pairs []PairView, intermediate bool, flags opt.SendRecv) (*Plan, error) {
 	p := &Plan{Flags: flags}
 	for _, v := range pairs {
+		if len(v.FilteredEnds) > 0 {
+			steps, err := planFilteredPair(v, flags)
+			if err != nil {
+				return nil, err
+			}
+			p.Steps = append(p.Steps, steps...)
+			continue
+		}
 		st, err := planPair(v, intermediate, flags)
 		if err != nil {
 			return nil, err
@@ -164,6 +177,31 @@ func planPair(v PairView, intermediate bool, flags opt.SendRecv) (*Step, error) 
 	return st, nil
 }
 
+func planFilteredPair(v PairView, flags opt.SendRecv) ([]*Step, error) {
+	steps := make([]*Step, 0, len(v.FilteredEnds))
+	start := v.Match
+	for i, end := range v.FilteredEnds {
+		st := &Step{
+			DSSuffix: v.DSSuffix, Info: v.Info, Match: v.Match,
+			SourceStart: start, SourceEnd: end, SrcName: v.SrcName,
+			TgtName: v.TgtName, SrcWritten: v.SrcWritten, SrcType: v.SrcType,
+			Filtered: true,
+		}
+		if v.Info == "syncable (full)" && i == 0 && start == "" {
+			st.Kind = KindFull
+			st.SourceStart = ""
+		} else {
+			st.Kind = KindIncremental
+		}
+		if err := buildCmds(st, false, flags); err != nil {
+			return nil, err
+		}
+		steps = append(steps, st)
+		start = end
+	}
+	return steps, nil
+}
+
 func buildCmds(st *Step, intermediate bool, flags opt.SendRecv) error {
 	srcSnap := st.SrcName + st.SourceEnd
 	vars := map[string]string{
@@ -172,7 +210,7 @@ func buildCmds(st *Step, intermediate bool, flags opt.SendRecv) error {
 	}
 	if st.Kind == KindIncremental && st.SourceStart != "" {
 		flag := "-i"
-		if intermediate {
+		if intermediate && !st.Filtered {
 			flag = "-I"
 		}
 		vars["intr_snap"] = flag + " " + st.SrcName + st.SourceStart
