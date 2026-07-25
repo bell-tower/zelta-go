@@ -65,7 +65,9 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
 ## CLI / product surface
 
 - **No man pages in-repo** — point at `~/Code/zelta/doc` / `ZELTA_DOC`.
-- **Verbs** — `match`, `backup`, `prune`, `version`; others explicit not-implemented.
+- **Verbs** — Go currently exposes `match`, `backup`, `prune`, root `clone`, root
+  `revert`, and root direct-divergence `rotate`; recursive and clone-origin
+  variants remain intentionally incomplete.
 - **Private Gitea** — not public until Daniel says docs are real.
 
 ---
@@ -80,6 +82,26 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
 - **CLI error prefix** — oracle `stop()` prints `error: <msg>`; Go parse/depth errors use `error:` too, engine errors keep `zelta <verb>:`.
 - **RECV_PROPS_ADD/DEL (`-o`/`-x`)** — repeated values are preserved and emitted as ordered `-o value`/`-x value` receive argv pairs; `RECV_OVERRIDE` still replaces the composed receive flags. *Where:* `internal/opt/sendrecv.go`, `internal/backup/plan.go`.
 - **Bare-key process env** — Go `opt.Lookup` also honors bare `KEY` (no `ZELTA_`); oracle reads only `ZELTA_*`. Superset kept for library ergonomics.
+
+---
+
+## Clone / revert / rotate
+
+- **Clone scope** — Awk supports latest-snapshot selection, recursive depth, and
+  a four-endpoint clone-and-backup form → Go requires an explicit root
+  `SOURCE@SNAPSHOT TARGET`. *Where:* `internal/lineage`, `cmd/zelta/clone.go`.
+- **Revert scope** — Awk selects the latest snapshot and recursively preserves
+  and reclones a tree → Go requires an explicit root `DATASET@SNAPSHOT` and
+  performs only the root rename-before-clone sequence. *Where:*
+  `internal/lineage`, `cmd/zelta/revert.go`.
+- **Rotate lineage** — Awk distinguishes rollback, direct target divergence, and
+  source clone-origin paths → Go currently plans only direct root divergence and
+  refuses missing/common lineage cases. `origin` inspection, target-origin
+  verification, recursive children, and execution are not wired.
+- **Rotate receive lifecycle** — The final destination after preserving a
+  divergent target is not frozen yet. The current dry-run planner emits the
+  preservation rename and a receive command, but the exact target name and
+  origin semantics require review against the oracle before execution is added.
 
 ---
 
