@@ -748,7 +748,19 @@ func TestFilteredIntermediatePlansPerDataset(t *testing.T) {
 		if st.Filtered && strings.Contains(strings.Join(st.Send, " "), " -I ") {
 			t.Fatalf("filtered step used -I: %v", st.Send)
 		}
+		if st.Filtered && !containsArg(st.Recv, "-s") {
+			t.Fatalf("filtered step lost resume receive flag: %v", st.Recv)
+		}
 	}
+}
+
+func containsArg(args []string, want string) bool {
+	for _, arg := range args {
+		if arg == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestFilteredEndsRespectSnapshotExclusion(t *testing.T) {
@@ -784,5 +796,41 @@ func TestRunFilteredIntermediateKeepsExcludedHistoryOutOfStream(t *testing.T) {
 	joined := strings.Join(fake.Pipes[0].Left, " ")
 	if !strings.Contains(joined, "-i tank/src@m tank/src@new") || strings.Contains(joined, "@skip") {
 		t.Fatalf("filtered send=%s", joined)
+	}
+}
+
+func TestFilteredIntermediateIncludesCreatedSnapshot(t *testing.T) {
+	src := "tank/src\t1\t1\t1\t1K\tfilesystem\n" +
+		"tank/src@m\t2\t0\t2\t1K\tsnapshot\n"
+	tgt := "tank/tgt\t10\t0\t1\t0\tfilesystem\n" +
+		"tank/tgt@m\t2\t0\t2\t1K\tsnapshot\n"
+	fake := &zfs.Fake{Lists: map[string]string{"tank/src": src, "tank/tgt": tgt}}
+	res, err := Run(context.Background(), fake, Request{
+		Source: "tank/src", Target: "tank/tgt", Intermediate: true,
+		SnapMode: SnapAlways, SnapName: "created", Exclude: []string{"@skip"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.Snapshots) != 1 || len(fake.Pipes) != 1 {
+		t.Fatalf("snapshots=%v pipes=%v plan=%+v", fake.Snapshots, fake.Pipes, res.Plan.Steps)
+	}
+	joined := strings.Join(fake.Pipes[0].Left, " ")
+	if !strings.Contains(joined, "-i tank/src@m tank/src@created") {
+		t.Fatalf("created filtered send=%s", joined)
+	}
+}
+
+func TestFilteredBookmarksOnlyLatestPerDataset(t *testing.T) {
+	plan := &Plan{Steps: []*Step{
+		{DSSuffix: "/child", Kind: KindIncremental, SourceEnd: "@a", SrcName: "tank/src/child", TgtName: "tank/tgt/child"},
+		{DSSuffix: "/child", Kind: KindIncremental, SourceEnd: "@b", SrcName: "tank/src/child", TgtName: "tank/tgt/child"},
+	}}
+	got, err := buildBookmarkPlans(plan, "tank/src", "tank/tgt", "", "dst")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || !strings.HasSuffix(got[0].Create[len(got[0].Create)-1], "dst_b") {
+		t.Fatalf("bookmarks=%v", got)
 	}
 }

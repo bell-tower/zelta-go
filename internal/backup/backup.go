@@ -76,8 +76,10 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	}
 
 	views := ViewsFromMatch(mres.Pairs)
+	var filteredFilter *match.Filter
 	if filteredIntermediate {
 		filter := match.ParseFilter(req.Include, req.Exclude)
+		filteredFilter = filter
 		for i := range views {
 			views[i].FilteredActive = true
 			views[i].FilteredEnds = filteredEnds(views[i], filter)
@@ -102,37 +104,52 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	if flags.BookmarkMode != "" && flags.BookmarkMode != "0" && flags.BookmarkMode != "1" {
 		return nil, fmt.Errorf("invalid bookmark mode: %s", flags.BookmarkMode)
 	}
+	snapReason := ShouldSnapshotWithThresholds(req.SnapMode, views, req.SnapTime, req.SnapSize)
+	var snapSavepoint string
+	var snapArgv []string
+	if snapReason != "" {
+		name := req.SnapName
+		if name == "" {
+			name = DefaultSnapName()
+		}
+		snapSavepoint = "@" + strings.TrimPrefix(name, "@")
+		snapArgv, err = BuildSnapArgv(srcEp.Dataset, snapSavepoint)
+		if err != nil {
+			return nil, err
+		}
+		if filteredIntermediate {
+			for i := range views {
+				if filteredFilter.KeepSourceSnap(snapSavepoint, views[i].SrcName, views[i].DSSuffix) {
+					views[i].FilteredEnds = append(views[i].FilteredEnds, snapSavepoint)
+				}
+			}
+		}
+	}
 	plan, err := PlanFromMatch(views, req.Intermediate, flags)
 	if err != nil {
 		return nil, err
 	}
 
 	// Snap-if-needed (or ALWAYS).
-	if reason := ShouldSnapshotWithThresholds(req.SnapMode, views, req.SnapTime, req.SnapSize); reason != "" {
-		name := req.SnapName
-		if name == "" {
-			name = DefaultSnapName()
-		}
-		name = strings.TrimPrefix(name, "@")
-		savepoint := "@" + name
-		argv, err := BuildSnapArgv(srcEp.Dataset, savepoint)
-		if err != nil {
-			return nil, err
-		}
-		plan.SnapReason = reason
-		plan.SnapSavepoint = savepoint
-		plan.SnapArgv = argv
+	if snapReason != "" {
+		plan.SnapReason = snapReason
+		plan.SnapSavepoint = snapSavepoint
+		plan.SnapArgv = snapArgv
 
 		if req.DryRun {
-			if err := plan.ApplySourceSnap(savepoint, req.Intermediate); err != nil {
-				return nil, err
+			if !filteredIntermediate {
+				if err := plan.ApplySourceSnap(snapSavepoint, req.Intermediate); err != nil {
+					return nil, err
+				}
 			}
 		} else {
-			if err := exec.Snapshot(ctx, req.Source, srcEp.Dataset+savepoint, true); err != nil {
+			if err := exec.Snapshot(ctx, req.Source, srcEp.Dataset+snapSavepoint, true); err != nil {
 				return nil, fmt.Errorf("snapshot: %w", err)
 			}
-			if err := plan.ApplySourceSnap(savepoint, req.Intermediate); err != nil {
-				return nil, err
+			if !filteredIntermediate {
+				if err := plan.ApplySourceSnap(snapSavepoint, req.Intermediate); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
@@ -186,8 +203,17 @@ func buildBookmarkPlans(plan *Plan, source, target, prefix, targetHost string) (
 		prefix = targetHost + "_"
 	}
 	var out []BookmarkPlan
-	for _, st := range plan.Steps {
+	last := make(map[string]int)
+	for i, st := range plan.Steps {
+		if st.Kind == KindFull || st.Kind == KindIncremental {
+			last[st.DSSuffix] = i
+		}
+	}
+	for i, st := range plan.Steps {
 		if st.Kind != KindFull && st.Kind != KindIncremental {
+			continue
+		}
+		if last[st.DSSuffix] != i {
 			continue
 		}
 		end := st.SourceEnd

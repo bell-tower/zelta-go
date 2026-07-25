@@ -108,7 +108,7 @@ func ViewsFromMatch(pairs []*match.Pair) []PairView {
 func PlanFromMatch(pairs []PairView, intermediate bool, flags opt.SendRecv) (*Plan, error) {
 	p := &Plan{Flags: flags}
 	for _, v := range pairs {
-		if len(v.FilteredEnds) > 0 {
+		if v.FilteredActive {
 			steps, err := planFilteredPair(v, flags)
 			if err != nil {
 				return nil, err

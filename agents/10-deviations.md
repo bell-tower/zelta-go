@@ -46,7 +46,10 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
   endpoint. This is an intentional architecture diversion: the per-dataset
   replication plan is straightforward in Go (and should be reusable in Ruby),
   while expressing the same stateful recursion in Kernighan Awk is a major
-  source of complexity. *Where:* `internal/match`, `internal/backup`.
+  source of complexity. Newly created snapshots are added before filtered
+  planning; bookmarks retain only each dataset's final received endpoint.
+  Resume receive flags remain composed normally, while actual token recovery
+  stays an executor concern. *Where:* `internal/match`, `internal/backup`.
 - **Backup forces written list props** — even if match default cols would skip written, backup passes `match.BackupListProps` so snap-if-needed sees `written` and recv sees `type`.
 - **Bookmark MVP** — Go verifies each successfully executed target snapshot and creates the corresponding source bookmark; default naming uses `<target-host>_`, explicit `BOOKMARK_PREFIX` is honored. Dry-run renders both verification and creation commands; bookmark failures continue and produce a non-zero replication status. Clone/revert paths remain excluded.
 

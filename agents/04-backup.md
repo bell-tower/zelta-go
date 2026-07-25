@@ -28,6 +28,9 @@
 Filtered intermediate sends are planned per dataset. Dataset filters cascade
 to children; snapshot filters are applied to the retained source history after
 matching, so excluded snapshots cannot be hidden inside a single `-I` range.
+If backup creates a recursive snapshot, it is appended to each eligible
+dataset's sequence before planning. Bookmark mode records only the final
+received endpoint for each dataset, not every filtered intermediate.
 
 ## Recv flags (oracle defaults)
 
