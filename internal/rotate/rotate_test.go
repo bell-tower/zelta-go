@@ -2,6 +2,7 @@ package rotate
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"git.belltower.it/djbell/zelta-go/internal/match"
@@ -166,4 +167,44 @@ func TestNeedsPreservationDetectsRemainingSourceDelta(t *testing.T) {
 	if NeedsPreservation(&match.Result{Pairs: []*match.Pair{{SrcName: "tank/src", SrcLast: "@same", Match: "@same"}}}) {
 		t.Fatal("did not expect remaining delta")
 	}
+}
+
+func TestExecuteResultContinuesAfterChildFailure(t *testing.T) {
+	steps, err := PlanTree(TreeRequest{
+		Source: "tank/src", Target: "tank/target", Intermediate: true, Flags: opt.Default(),
+		Pairs: []*match.Pair{
+			{DSSuffix: "", SrcName: "tank/src", TgtName: "tank/target", Match: "@base", SrcLast: "@new", TgtLast: "@other"},
+			{DSSuffix: "/child", SrcName: "tank/src/child", TgtName: "tank/target/child", Match: "@base", SrcLast: "@child-new", TgtLast: "@child-other"},
+			{DSSuffix: "/other", SrcName: "tank/src/other", TgtName: "tank/target/other", Match: "@base", SrcLast: "@other-new", TgtLast: "@other-old"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake := &failPipeFake{Fake: &zfs.Fake{}, failSuffix: "tank/src/child"}
+	result, err := ExecuteResult(context.Background(), fake, TreeRequest{Source: "tank/src", Target: "tank/target", SyncDirection: "PULL"}, steps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Preserved || len(result.Completed) != 2 || result.Completed[0] != "" || result.Completed[1] != "/other" {
+		t.Fatalf("progress=%+v", result)
+	}
+	if len(result.Failures) != 1 || result.Failures[0].DSSuffix != "/child" {
+		t.Fatalf("failures=%+v", result.Failures)
+	}
+	if len(fake.Pipes) != 2 {
+		t.Fatalf("pipes=%v", fake.Pipes)
+	}
+}
+
+type failPipeFake struct {
+	*zfs.Fake
+	failSuffix string
+}
+
+func (f *failPipeFake) RunPipeDirection(ctx context.Context, leftEp string, leftArgv []string, rightEp string, rightArgv []string, direction string) error {
+	if len(leftArgv) > 0 && leftArgv[len(leftArgv)-1] == f.failSuffix+"@child-new" {
+		return errors.New("injected receive failure")
+	}
+	return f.Fake.RunPipeDirection(ctx, leftEp, leftArgv, rightEp, rightArgv, direction)
 }

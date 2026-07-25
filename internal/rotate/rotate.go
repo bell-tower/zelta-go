@@ -32,6 +32,20 @@ type Step struct {
 	DSSuffix string
 }
 
+// Failure records one failed operation after Rotate began changing state.
+type Failure struct {
+	Kind     string
+	DSSuffix string
+	Err      error
+}
+
+// ExecutionResult records progress without attempting destructive rollback.
+type ExecutionResult struct {
+	Preserved bool
+	Completed []string
+	Failures  []Failure
+}
+
 // NeedsPreservation reports whether any source dataset still has source
 // snapshots newer than the confirmed target match after a rotation step.
 func NeedsPreservation(result *match.Result) bool {
@@ -322,40 +336,63 @@ func FormatRemote(steps []Step, source, target, direction string) (string, error
 // paired in order and run through the executor so remote stdin semantics stay
 // centralized in zfs.Real.
 func Execute(ctx context.Context, exec zfs.Executor, req TreeRequest, steps []Step) error {
+	result, err := ExecuteResult(ctx, exec, req, steps)
+	if err != nil {
+		return err
+	}
+	if len(result.Failures) > 0 {
+		return result.Failures[0].Err
+	}
+	return nil
+}
+
+// ExecuteResult applies a validated plan. Preservation and source snapshot
+// failures stop the operation; independent child streams continue so callers
+// receive a complete partial-progress report.
+func ExecuteResult(ctx context.Context, exec zfs.Executor, req TreeRequest, steps []Step) (*ExecutionResult, error) {
 	target, err := endpoint.Parse(req.Target)
 	if err != nil {
-		return fmt.Errorf("target: %w", err)
+		return nil, fmt.Errorf("target: %w", err)
 	}
 	target.Snapshot = ""
+	result := &ExecutionResult{}
 	for i := 0; i < len(steps); i++ {
 		step := steps[i]
 		switch step.Kind {
 		case "rename":
 			if len(step.Argv) < 4 {
-				return fmt.Errorf("rotate: malformed rename step")
+				return nil, fmt.Errorf("rotate: malformed rename step")
 			}
 			if err := exec.Rename(ctx, target.String(), step.Argv[len(step.Argv)-2], step.Argv[len(step.Argv)-1]); err != nil {
-				return fmt.Errorf("rename target: %w", err)
+				result.Failures = append(result.Failures, Failure{Kind: step.Kind, Err: fmt.Errorf("rename target: %w", err)})
+				return result, nil
 			}
+			result.Preserved = true
 		case "snapshot":
 			if len(step.Argv) == 0 {
-				return fmt.Errorf("rotate: malformed snapshot step")
+				return nil, fmt.Errorf("rotate: malformed snapshot step")
 			}
 			if err := exec.Snapshot(ctx, req.Source, step.Argv[len(step.Argv)-1], true); err != nil {
-				return fmt.Errorf("snapshot source: %w", err)
+				result.Failures = append(result.Failures, Failure{Kind: step.Kind, Err: fmt.Errorf("snapshot source: %w", err)})
+				return result, nil
 			}
 		case "send":
 			if i+1 >= len(steps) || steps[i+1].Kind != "recv" {
-				return fmt.Errorf("rotate: send without receive for %q", step.DSSuffix)
+				return nil, fmt.Errorf("rotate: send without receive for %q", step.DSSuffix)
 			}
 			recv := steps[i+1]
 			if err := exec.RunPipeDirection(ctx, req.Source, step.Argv, req.Target, recv.Argv, req.SyncDirection); err != nil {
-				return fmt.Errorf("sync %s: %w", step.DSSuffix, err)
+				result.Failures = append(result.Failures, Failure{Kind: step.Kind, DSSuffix: step.DSSuffix, Err: fmt.Errorf("sync %s: %w", step.DSSuffix, err)})
+				i++
+				continue
 			}
+			result.Completed = append(result.Completed, step.DSSuffix)
 			i++
 		case "recv":
-			return fmt.Errorf("rotate: receive without send for %q", step.DSSuffix)
+			return nil, fmt.Errorf("rotate: receive without send for %q", step.DSSuffix)
+		default:
+			return nil, fmt.Errorf("rotate: unknown step %q", step.Kind)
 		}
 	}
-	return nil
+	return result, nil
 }

@@ -2,6 +2,7 @@
 package lineage
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -15,6 +16,81 @@ import (
 type Step struct {
 	Kind string
 	Argv []string
+}
+
+// Failure records an operation that could not be completed. DSSuffix is empty
+// for root-wide operations such as preservation rename or final snapshot.
+type Failure struct {
+	Kind     string
+	DSSuffix string
+	Err      error
+}
+
+// ExecutionResult describes safe progress after a non-destructive operation.
+// A preserved tree is never removed automatically during recovery.
+type ExecutionResult struct {
+	Preserved bool
+	Completed []string
+	Failures  []Failure
+}
+
+// Apply executes a planned revert. Root preservation is a prerequisite; once
+// it succeeds, independent child clones are attempted even if one fails.
+func Apply(ctx context.Context, exec zfs.Executor, endpointName string, steps []Step) (*ExecutionResult, error) {
+	ep, err := endpoint.Parse(endpointName)
+	if err != nil {
+		return nil, err
+	}
+	ep.Snapshot = ""
+	result := &ExecutionResult{}
+	for _, step := range steps {
+		if len(step.Argv) == 0 {
+			return nil, fmt.Errorf("lineage: malformed %s step", step.Kind)
+		}
+		var opErr error
+		switch step.Kind {
+		case "rename":
+			if len(step.Argv) < 4 {
+				return nil, fmt.Errorf("lineage: malformed rename step")
+			}
+			opErr = exec.Rename(ctx, ep.String(), step.Argv[len(step.Argv)-2], step.Argv[len(step.Argv)-1])
+			if opErr == nil {
+				result.Preserved = true
+			}
+		case "clone":
+			if len(step.Argv) < 2 {
+				return nil, fmt.Errorf("lineage: malformed clone step")
+			}
+			opErr = exec.Clone(ctx, ep.String(), step.Argv[len(step.Argv)-2], step.Argv[len(step.Argv)-1])
+		case "snapshot":
+			opErr = exec.Snapshot(ctx, ep.String(), step.Argv[len(step.Argv)-1], true)
+		default:
+			return nil, fmt.Errorf("lineage: unknown step %q", step.Kind)
+		}
+		if opErr != nil {
+			failure := Failure{Kind: step.Kind, Err: opErr}
+			if step.Kind == "clone" {
+				failure.DSSuffix = cloneSuffix(ep.Dataset, step.Argv[len(step.Argv)-1])
+			}
+			result.Failures = append(result.Failures, failure)
+			if step.Kind == "rename" || step.Kind == "snapshot" {
+				return result, nil
+			}
+			continue
+		}
+		if step.Kind == "clone" {
+			result.Completed = append(result.Completed, cloneSuffix(ep.Dataset, step.Argv[len(step.Argv)-1]))
+		}
+	}
+	return result, nil
+}
+
+func cloneSuffix(root, dataset string) string {
+	suffix, err := endpoint.DSSuffix(root, dataset)
+	if err != nil || suffix == "" {
+		return ""
+	}
+	return suffix
 }
 
 // CloneRequest describes a recursive clone operation.

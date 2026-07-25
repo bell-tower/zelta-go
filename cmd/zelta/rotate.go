@@ -83,7 +83,11 @@ func runRotate(args []string) int {
 		fmt.Fprintln(os.Stderr, "zelta rotate: empty preservation plan")
 		return 1
 	}
-	preserved := steps[0].Argv[len(steps[0].Argv)-1]
+	preserved := preservationFromSteps(steps)
+	if preserved == "" {
+		fmt.Fprintln(os.Stderr, "zelta rotate: preservation rename is missing")
+		return 1
+	}
 	exists, err := exec.Exists(context.Background(), p.Operands[1], preserved)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta rotate: preservation check: %v\n", err)
@@ -104,8 +108,13 @@ func runRotate(args []string) int {
 		fmt.Print(out)
 		return 0
 	}
-	if err := rotate.Execute(context.Background(), exec, request, steps); err != nil {
+	execution, err := rotate.ExecuteResult(context.Background(), exec, request, steps)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
+		return 1
+	}
+	if len(execution.Failures) > 0 && !execution.Preserved {
+		printRotateFailures(execution.Failures)
 		return 1
 	}
 	post, err := match.Compare(context.Background(), exec, match.Request{
@@ -120,6 +129,11 @@ func runRotate(args []string) int {
 			fmt.Fprintf(os.Stdout, "ensure preservation of diverged replica with: zelta backup %s %s\n", p.Operands[0], preservedEP)
 		}
 		fmt.Fprintf(os.Stdout, "to ensure target is up-to-date, run: zelta backup %s %s\n", p.Operands[0], p.Operands[1])
+	}
+	if len(execution.Failures) > 0 {
+		printRotateFailures(execution.Failures)
+		fmt.Fprintf(os.Stderr, "zelta rotate: preserved target remains at %s; incomplete children require manual recovery\n", preserved)
+		return 1
 	}
 	return 0
 }
@@ -145,6 +159,25 @@ func preservationEndpoint(target, dataset string) string {
 	ep.Dataset = dataset
 	ep.Snapshot = ""
 	return ep.String()
+}
+
+func preservationFromSteps(steps []rotate.Step) string {
+	for _, step := range steps {
+		if step.Kind == "rename" && len(step.Argv) >= 2 {
+			return step.Argv[len(step.Argv)-1]
+		}
+	}
+	return ""
+}
+
+func printRotateFailures(failures []rotate.Failure) {
+	for _, failure := range failures {
+		if failure.DSSuffix == "" {
+			fmt.Fprintf(os.Stderr, "zelta rotate: %s: %v\n", failure.Kind, failure.Err)
+		} else {
+			fmt.Fprintf(os.Stderr, "zelta rotate: %s %s: %v\n", failure.Kind, failure.DSSuffix, failure.Err)
+		}
+	}
 }
 
 func prepareRotateSnapshot(mode, requested string, pairs []*match.Pair) (string, bool, error) {

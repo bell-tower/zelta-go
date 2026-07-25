@@ -1,6 +1,8 @@
 package lineage
 
 import (
+	"context"
+	"errors"
 	"reflect"
 	"testing"
 
@@ -101,4 +103,41 @@ func TestCloneTreatsLocalhostAsLocal(t *testing.T) {
 	if len(steps) != 1 {
 		t.Fatalf("steps=%v", steps)
 	}
+}
+
+func TestApplyContinuesAfterChildCloneFailure(t *testing.T) {
+	steps, err := RevertPlan(RevertRequest{Endpoint: "tank/live", AfterSnapshot: "after"}, []zfs.ListRow{
+		{Name: "tank/live@root", Props: map[string]string{"type": "snapshot"}},
+		{Name: "tank/live/child@child", Props: map[string]string{"type": "snapshot"}},
+		{Name: "tank/live/other@other", Props: map[string]string{"type": "snapshot"}},
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake := &failCloneFake{Fake: &zfs.Fake{}, failDataset: "tank/live/child"}
+	result, err := Apply(context.Background(), fake, "tank/live", steps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Preserved || len(result.Completed) != 2 || result.Completed[0] != "" || result.Completed[1] != "/other" {
+		t.Fatalf("progress=%+v", result)
+	}
+	if len(result.Failures) != 1 || result.Failures[0].DSSuffix != "/child" {
+		t.Fatalf("failures=%+v", result.Failures)
+	}
+	if len(fake.Clones) != 2 {
+		t.Fatalf("clones=%v", fake.Clones)
+	}
+}
+
+type failCloneFake struct {
+	*zfs.Fake
+	failDataset string
+}
+
+func (f *failCloneFake) Clone(ctx context.Context, endpoint, sourceSnap, dataset string) error {
+	if dataset == f.failDataset {
+		return errors.New("injected clone failure")
+	}
+	return f.Fake.Clone(ctx, endpoint, sourceSnap, dataset)
 }

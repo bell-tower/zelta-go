@@ -28,11 +28,11 @@ making `internal` types part of a promised external contract.
    add dry-run rendering and oracle-compatible non-fatal failure status, while
    keeping clone/revert exclusions explicit.
 3. Extend the implemented `clone` and `revert` lineage operations with
-   structured partial-failure reporting. Keep the four-endpoint clone-and-
-   backup workflow separate as a later orchestration feature.
-4. Finish the Rotate lifecycle in `agents/12-rotate.md`: make lineage dry-run
-   output remote-aware and add structured partial-failure recovery without
-   blindly retrying interrupted receives.
+   endpoint-aware dry-run formatting. Keep the four-endpoint clone-and-backup
+   workflow separate as a later orchestration feature.
+4. Finish the Rotate lifecycle in `agents/12-rotate.md`: exact receive-token
+   and rollback recovery remain manual; do not blindly retry interrupted
+   receives.
 5. Implement filtered intermediate sends. The Awk approach is useful but
    brute-force; record a possible reusable upstream abstraction while porting
    it rather than copying the loop blindly.

@@ -79,24 +79,23 @@ func runRevert(args []string) int {
 		fmt.Print(lineage.Format(steps))
 		return 0
 	}
-	for _, step := range steps {
-		switch step.Kind {
-		case "rename":
-			if err := exec.Rename(context.Background(), current.String(), step.Argv[len(step.Argv)-2], step.Argv[len(step.Argv)-1]); err != nil {
-				fmt.Fprintf(os.Stderr, "zelta revert: %v\n", err)
-				return 1
-			}
-		case "clone":
-			if err := exec.Clone(context.Background(), current.String(), step.Argv[len(step.Argv)-2], step.Argv[len(step.Argv)-1]); err != nil {
-				fmt.Fprintf(os.Stderr, "zelta revert: %v\n", err)
-				return 1
-			}
-		case "snapshot":
-			if err := exec.Snapshot(context.Background(), current.String(), step.Argv[len(step.Argv)-1], true); err != nil {
-				fmt.Fprintf(os.Stderr, "zelta revert: %v\n", err)
-				return 1
-			}
+	result, err := lineage.Apply(context.Background(), exec, current.String(), steps)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zelta revert: %v\n", err)
+		return 1
+	}
+	for _, failure := range result.Failures {
+		if failure.DSSuffix == "" {
+			fmt.Fprintf(os.Stderr, "zelta revert: %s: %v\n", failure.Kind, failure.Err)
+		} else {
+			fmt.Fprintf(os.Stderr, "zelta revert: %s %s: %v\n", failure.Kind, failure.DSSuffix, failure.Err)
 		}
+	}
+	if len(result.Failures) > 0 {
+		if result.Preserved {
+			fmt.Fprintf(os.Stderr, "zelta revert: preserved tree remains at %s; incomplete children require manual recovery\n", preserved)
+		}
+		return 1
 	}
 	fmt.Fprintf(os.Stdout, "to retain replica history, run: zelta rotate '%s' 'TARGET'\n", current.String())
 	return 0

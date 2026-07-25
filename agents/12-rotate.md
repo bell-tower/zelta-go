@@ -40,10 +40,10 @@ Origin data now flows through `match.RotateListProps`, and direct-match plus
 verified source-origin dry-run plans emit per-child send/receive lineage.
 Source snapshot-if-needed/always planning, target preservation collision checks
 are present in the planner/CLI. The
-remaining blockers are remote-aware dry-run formatting and
-post-execution partial-failure recovery. Execution is available through
-`internal/rotate.Execute`; it re-runs match and reports remaining divergence,
-but recursive failures still stop at the first failed child.
+Execution is available through `internal/rotate.ExecuteResult`; it re-runs
+match and reports remaining divergence. Independent child failures continue
+with structured progress, while source snapshot/preservation failures and
+exact receive-token recovery remain manual safety cases.
 
 `clone` and `revert` now represent the prerequisite lineage contracts. In
 particular, `revert` is the normal producer of a source clone origin that

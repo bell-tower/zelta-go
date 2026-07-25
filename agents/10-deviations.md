@@ -109,13 +109,13 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
   Exact rollback failure recovery remains. Execution is available through
   `internal/rotate.Execute`; it re-runs match after execution and reports
   remaining divergence like upstream, without a strict confirmation failure.
-  Recursive execution still stops at the first failed child and does not yet
-  emit a structured partial-progress recovery report.
+   Source snapshot and preservation failures stop safely; independent child
+   stream failures continue and are returned as structured partial progress.
+   Exact receive-token/rollback recovery remains manual.
 - **Lineage dry-run remotes** — Backup dry-run uses endpoint-aware pipe
-  formatting, but Clone/Revert/Rotate lineage plans currently render raw local
-  argv lines. Remote-aware rename, snapshot, and send/receive formatting is a
-  parity gap, not a safety bypass. *Where:* `internal/lineage`,
-  `internal/rotate`, `cmd/zelta/{clone,revert,rotate}.go`.
+  formatting, and Rotate now uses endpoint-aware formatting. Clone/Revert
+  lineage plans still render raw local argv lines. This is a parity gap, not a
+  safety bypass. *Where:* `internal/lineage`, `cmd/zelta/{clone,revert}.go`.
 - **Rotate snapshot phase** — Go now predicts/executes the recursive source
   snapshot when Rotate is at the common latest snapshot, when source state is
   written, or when snapshot mode is forced. Threshold-based snapshot skipping
