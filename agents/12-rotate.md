@@ -34,12 +34,12 @@ Do not add Rotate behavior to ordinary `backup.Run` implicitly. Start with a
 separate request/result/planner surface under `internal/rotate`, then connect
 execution only after dry-run goldens establish the rename and receive order.
 
-Origin data now flows through `match.RotateListProps`, and root direct-match
-and verified source-origin dry-run plans emit the corresponding send/receive
-lineage. The remaining blockers are recursive per-child actions, target
-preservation collision/preflight handling, and execution after golden review.
-Root `CLONE`/`RENAME` builders and lineage planners are available under
-`internal/lineage`.
+Origin data now flows through `match.RotateListProps`, and direct-match plus
+verified source-origin dry-run plans emit per-child send/receive lineage.
+Target preservation collision checks are present in the planner/CLI. The
+remaining blockers are oracle goldens, rollback-specific classification, and
+execution after lifecycle review. Root `CLONE`/`RENAME` builders and lineage
+planners are available under `internal/lineage`.
 
 Implement `clone` and `revert` lineage operations before Rotate if their
 contracts are not already represented. In particular, `revert` is the normal

@@ -6,7 +6,10 @@ import (
 	"strings"
 
 	"git.belltower.it/djbell/zelta-go/internal/cmdbuild"
+	"git.belltower.it/djbell/zelta-go/internal/endpoint"
+	"git.belltower.it/djbell/zelta-go/internal/match"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
+	"git.belltower.it/djbell/zelta-go/internal/zfs"
 )
 
 type Request struct {
@@ -22,52 +25,166 @@ type Request struct {
 }
 
 type Step struct {
-	Kind string
-	Argv []string
+	Kind     string
+	Argv     []string
+	DSSuffix string
 }
 
-// Plan handles root direct-match and verified source-origin paths. It remains a
-// planner only; execution waits for recursive goldens and lifecycle review.
-func Plan(req Request) ([]Step, error) {
-	if req.Source == "" || req.Target == "" {
-		return nil, fmt.Errorf("rotate requires source and target")
+// TreeRequest plans a complete dataset tree. TargetRows are used to verify
+// source clone origins before they are used as incremental bases.
+type TreeRequest struct {
+	Source, Target     string
+	Pairs              []*match.Pair
+	TargetRows         []zfs.ListRow
+	PreservationExists bool
+	Intermediate       bool
+	Flags              opt.SendRecv
+}
+
+// PlanTree handles root direct-match and verified source-origin paths and
+// plans full sends for source-only children. It remains planner-only.
+func PlanTree(req TreeRequest) ([]Step, error) {
+	src, err := endpoint.Parse(req.Source)
+	if err != nil {
+		return nil, fmt.Errorf("source: %w", err)
 	}
-	sourceStart := req.Source + req.Match
-	if req.Match == "" {
-		originDS, originSnap, ok := splitOrigin(req.SourceOrigin)
-		if !ok || !req.OriginVerified {
+	tgt, err := endpoint.Parse(req.Target)
+	if err != nil {
+		return nil, fmt.Errorf("target: %w", err)
+	}
+	root := findRoot(req.Pairs)
+	if root == nil || root.SrcName == "" {
+		return nil, fmt.Errorf("rotate source root is missing")
+	}
+	if root.TgtName == "" {
+		return nil, fmt.Errorf("rotate target root is missing")
+	}
+	matchName := root.Match
+	if matchName == "" {
+		_, originSnap, ok := splitOrigin(root.SrcOrigin)
+		if !ok || !hasSnapshot(req.TargetRows, joinDataset(tgt.Dataset, root.DSSuffix)+originSnap) {
 			return nil, fmt.Errorf("rotate has no verified common snapshot or source origin")
 		}
-		req.Match = originSnap
-		sourceStart = originDS + originSnap
-	}
-	if req.SourceLast == "" || req.SourceLast == req.Match {
-		return nil, fmt.Errorf("rotate source is up-to-date or has no new snapshot")
-	}
-	if req.TargetLast == "" || req.TargetLast == req.Match {
+		matchName = originSnap
+	} else if root.TgtLast == "" || root.TgtLast == matchName {
 		return nil, fmt.Errorf("rotate target is not divergent")
 	}
-	preserved := req.Target + "_" + strings.TrimPrefix(req.Match, "@")
-	rename, err := cmdbuild.RenameArgv(req.Target, preserved)
+	if root.SrcLast == "" || root.SrcLast == matchName {
+		return nil, fmt.Errorf("rotate source is up-to-date or has no new snapshot")
+	}
+	preserved := tgt.Dataset + "_" + strings.TrimPrefix(matchName, "@")
+	if req.PreservationExists {
+		return nil, fmt.Errorf("rotate preservation target already exists: %s", preserved)
+	}
+	rename, err := cmdbuild.RenameArgv(tgt.Dataset, preserved)
 	if err != nil {
 		return nil, err
 	}
-	send, err := cmdbuild.Build("SEND", map[string]string{
-		"flags":     req.Flags.SendFlags(),
-		"intr_snap": incrFlag(req.Intermediate) + " " + sourceStart,
-		"ds_snap":   req.Source + req.SourceLast,
-	})
+	steps := []Step{{Kind: "rename", Argv: rename}}
+	for _, pair := range req.Pairs {
+		action, err := planPair(src.Dataset, tgt.Dataset, preserved, pair, req)
+		if err != nil {
+			return nil, err
+		}
+		steps = append(steps, action...)
+	}
+	return steps, nil
+}
+
+func findRoot(pairs []*match.Pair) *match.Pair {
+	for _, pair := range pairs {
+		if pair != nil && pair.DSSuffix == "" {
+			return pair
+		}
+	}
+	return nil
+}
+
+func planPair(sourceRoot, targetRoot, preserved string, pair *match.Pair, req TreeRequest) ([]Step, error) {
+	if pair == nil || pair.SrcName == "" || pair.SrcLast == "" {
+		return nil, nil
+	}
+	sourceDataset := joinDataset(sourceRoot, pair.DSSuffix)
+	targetDataset := joinDataset(targetRoot, pair.DSSuffix)
+	matchName := pair.Match
+	sourceStart := ""
+	if matchName != "" {
+		sourceStart = sourceDataset + matchName
+	} else if originDS, originSnap, ok := splitOrigin(pair.SrcOrigin); ok && hasSnapshot(req.TargetRows, targetDataset+originSnap) {
+		matchName = originSnap
+		sourceStart = originDS + originSnap
+	}
+	origin := ""
+	if matchName != "" {
+		origin = preserved + pair.DSSuffix + matchName
+	}
+	vars := map[string]string{
+		"flags":   req.Flags.SendFlags(),
+		"ds_snap": sourceDataset + pair.SrcLast,
+	}
+	if sourceStart != "" {
+		vars["intr_snap"] = incrFlag(req.Intermediate) + " " + sourceStart
+	}
+	send, err := cmdbuild.Build("SEND", vars)
 	if err != nil {
 		return nil, err
 	}
 	recv, err := cmdbuild.Build("RECV", map[string]string{
-		"flags": recvFlags(req.Flags, req.SourceType, preserved+req.Match),
-		"ds":    req.Target,
+		"flags": recvFlags(req.Flags, pair.SrcType, origin, pair.DSSuffix == ""),
+		"ds":    targetDataset,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return []Step{{Kind: "rename", Argv: rename}, {Kind: "send", Argv: send}, {Kind: "recv", Argv: recv}}, nil
+	return []Step{
+		{Kind: "send", Argv: send, DSSuffix: pair.DSSuffix},
+		{Kind: "recv", Argv: recv, DSSuffix: pair.DSSuffix},
+	}, nil
+}
+
+func joinDataset(root, suffix string) string {
+	if suffix == "" {
+		return root
+	}
+	return root + suffix
+}
+
+func hasSnapshot(rows []zfs.ListRow, name string) bool {
+	for _, row := range rows {
+		if row.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// Plan handles one root pair for callers that do not yet have a full match
+// tree. PlanTree is preferred for CLI and recursive callers.
+func Plan(req Request) ([]Step, error) {
+	root := &match.Pair{
+		DSSuffix:  "",
+		SrcName:   req.Source,
+		TgtName:   req.Target,
+		Match:     req.Match,
+		SrcLast:   req.SourceLast,
+		TgtLast:   req.TargetLast,
+		SrcOrigin: req.SourceOrigin,
+		SrcType:   req.SourceType,
+	}
+	var targetRows []zfs.ListRow
+	if req.OriginVerified {
+		if _, originSnap, ok := splitOrigin(req.SourceOrigin); ok {
+			tgt, err := endpoint.Parse(req.Target)
+			if err != nil {
+				return nil, err
+			}
+			targetRows = []zfs.ListRow{{Name: tgt.Dataset + originSnap}}
+		}
+	}
+	return PlanTree(TreeRequest{
+		Source: req.Source, Target: req.Target, Pairs: []*match.Pair{root},
+		TargetRows: targetRows, Intermediate: req.Intermediate, Flags: req.Flags,
+	})
 }
 
 func splitOrigin(origin string) (string, string, bool) {
@@ -85,7 +202,7 @@ func incrFlag(intermediate bool) string {
 	return "-i"
 }
 
-func recvFlags(f opt.SendRecv, sourceType, origin string) string {
+func recvFlags(f opt.SendRecv, sourceType, origin string, root bool) string {
 	if f.RecvOverride != "" {
 		return f.RecvOverride
 	}
@@ -93,7 +210,7 @@ func recvFlags(f opt.SendRecv, sourceType, origin string) string {
 	if f.RecvDefault != "" {
 		parts = append(parts, f.RecvDefault)
 	}
-	if f.RecvTop != "" {
+	if root && f.RecvTop != "" {
 		parts = append(parts, f.RecvTop)
 	}
 	if sourceType == "volume" {
@@ -116,7 +233,9 @@ func recvFlags(f opt.SendRecv, sourceType, origin string) string {
 	if f.Resume && f.RecvPartial != "" {
 		parts = append(parts, f.RecvPartial)
 	}
-	parts = append(parts, "-o origin="+origin)
+	if origin != "" {
+		parts = append(parts, "-o origin="+origin)
+	}
 	return strings.Join(parts, " ")
 }
 

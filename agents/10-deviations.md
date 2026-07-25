@@ -97,12 +97,13 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
   deferred. *Where:* `internal/lineage`, `cmd/zelta/revert.go`.
 - **Rotate lineage** — Awk distinguishes rollback, direct target divergence, and
   source clone-origin paths → Go now carries dataset `origin` through match and
-  plans root direct-divergence plus verified source-clone-origin paths.
-  Recursive children, rollback classification, and execution are not wired.
+  plans recursive direct-divergence plus verified source-clone-origin paths.
+  Rollback-specific classification and execution are not wired.
 - **Rotate receive lifecycle** — The final destination after preserving a
   divergent target is not frozen yet. The current dry-run planner emits the
-  preservation rename and a receive command, but the exact target name and
-  origin semantics require review against the oracle before execution is added.
+  preservation rename and receives into the original target path with the
+  preserved target snapshot as `origin`, matching the bounded oracle contract.
+  Exact rollback failure recovery and execution still require review/goldens.
 
 ---
 

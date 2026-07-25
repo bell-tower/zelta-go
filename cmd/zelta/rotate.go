@@ -26,7 +26,8 @@ func runRotate(args []string) int {
 		rotateUsage()
 		return 2
 	}
-	m, err := match.Compare(context.Background(), &zfs.Real{}, match.Request{
+	exec := &zfs.Real{}
+	m, err := match.Compare(context.Background(), exec, match.Request{
 		Source: p.Operands[0], Target: p.Operands[1], Props: match.RotateListProps,
 		Scripting: true, Parsable: true,
 	})
@@ -45,19 +46,28 @@ func runRotate(args []string) int {
 		fmt.Fprintln(os.Stderr, "zelta rotate: root dataset is missing")
 		return 1
 	}
-	originVerified := false
-	if root.Match == "" && root.SrcOrigin != "" {
-		if _, snap, ok := splitOriginForCLI(root.SrcOrigin); ok {
-			originVerified = hasSnapshot(m.TgtRows, m.Target.Dataset+snap)
-		}
-	}
-	steps, err := rotate.Plan(rotate.Request{
-		Source: p.Operands[0], Target: p.Operands[1], Match: root.Match,
-		SourceLast: root.SrcLast, TargetLast: root.TgtLast,
-		SourceOrigin: root.SrcOrigin, OriginVerified: originVerified,
-		SourceType: root.SrcType, Intermediate: p.Env.Bool("SEND_INTR", true),
+	request := rotate.TreeRequest{
+		Source: p.Operands[0], Target: p.Operands[1], Pairs: m.Pairs,
+		TargetRows: m.TgtRows, Intermediate: p.Env.Bool("SEND_INTR", true),
 		Flags: opt.SendRecvFrom(p.Env),
-	})
+	}
+	steps, err := rotate.PlanTree(request)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
+		return 1
+	}
+	if len(steps) == 0 || len(steps[0].Argv) == 0 {
+		fmt.Fprintln(os.Stderr, "zelta rotate: empty preservation plan")
+		return 1
+	}
+	preserved := steps[0].Argv[len(steps[0].Argv)-1]
+	exists, err := exec.Exists(context.Background(), p.Operands[1], preserved)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zelta rotate: preservation check: %v\n", err)
+		return 1
+	}
+	request.PreservationExists = exists
+	steps, err = rotate.PlanTree(request)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
 		return 1
@@ -67,21 +77,3 @@ func runRotate(args []string) int {
 }
 
 func rotateUsage() { fmt.Fprintln(os.Stderr, "usage: zelta rotate SOURCE TARGET") }
-
-func splitOriginForCLI(origin string) (string, string, bool) {
-	for i := len(origin) - 1; i > 0; i-- {
-		if origin[i] == '@' {
-			return origin[:i], origin[i:], i < len(origin)-1
-		}
-	}
-	return "", "", false
-}
-
-func hasSnapshot(rows []zfs.ListRow, name string) bool {
-	for _, row := range rows {
-		if row.Name == name {
-			return true
-		}
-	}
-	return false
-}

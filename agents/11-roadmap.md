@@ -31,9 +31,10 @@ making `internal` types part of a promised external contract.
    dry-run-first form; recursive/latest planning, CLI wiring, execution, and
    post-revert snapshot behavior now exist. The four-endpoint clone workflow
    and failure recovery remain.
-4. Implement the root-only, dry-run-first Rotate contract in
-   `agents/12-rotate.md`, covering rollback, source-clone, and target-divergence
-   separately.
+4. Implement the dry-run-first Rotate contract in `agents/12-rotate.md`;
+   recursive direct-divergence and verified source-clone-origin planning now
+   exist. Add oracle goldens, rollback classification, and execution only
+   after the rename/receive lifecycle review.
 5. Implement filtered intermediate sends. The Awk approach is useful but
    brute-force; record a possible reusable upstream abstraction while porting
    it rather than copying the loop blindly.
