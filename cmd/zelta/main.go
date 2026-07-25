@@ -33,6 +33,8 @@ func main() {
 		os.Exit(runPrune(os.Args[2:]))
 	case "clone":
 		os.Exit(runClone(os.Args[2:]))
+	case "revert":
+		os.Exit(runRevert(os.Args[2:]))
 	default:
 		fmt.Fprintf(os.Stderr, "unrecognized command: %q\n", os.Args[1])
 		usage()
@@ -62,6 +64,7 @@ Commands:
   backup      Sync dataset trees (snap-if-needed; -n dry-run)
   prune       Report snapshot prune candidates (read-only)
   clone       Clone an explicit snapshot (use -n to print commands)
+  revert      Preserve current state and clone an explicit snapshot back
   version     Show version
 
 Private experimental Go port. Docs: ~/Code/zelta/doc/ and AGENTS.md

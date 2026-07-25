@@ -183,6 +183,17 @@ func (r *Real) Clone(ctx context.Context, epStr, sourceSnap, dataset string) err
 	return nil
 }
 
+func (r *Real) Rename(ctx context.Context, epStr, oldDataset, newDataset string) error {
+	argv, err := cmdbuild.RenameArgv(oldDataset, newDataset)
+	if err != nil {
+		return err
+	}
+	if _, err := r.output(ctx, epStr, r.rewriteBin(argv)); err != nil {
+		return fmt.Errorf("zfs rename %s: %w", oldDataset, err)
+	}
+	return nil
+}
+
 func isDatasetExists(err error) bool {
 	if err == nil {
 		return false

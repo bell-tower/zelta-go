@@ -20,10 +20,12 @@ type Fake struct {
 	Pipes     []PipeCall
 	Bookmarks []BookmarkCall
 	Clones    []CloneCall
+	Renames   []RenameCall
 }
 
 type BookmarkCall struct{ Endpoint, SourceSnap, Bookmark string }
 type CloneCall struct{ Endpoint, SourceSnap, Dataset string }
+type RenameCall struct{ Endpoint, OldDataset, NewDataset string }
 
 // PipeCall is one RunPipe invocation.
 type PipeCall struct {
@@ -77,6 +79,11 @@ func (f *Fake) Bookmark(_ context.Context, endpoint, sourceSnap, bookmark string
 
 func (f *Fake) Clone(_ context.Context, endpoint, sourceSnap, dataset string) error {
 	f.Clones = append(f.Clones, CloneCall{endpoint, sourceSnap, dataset})
+	return nil
+}
+
+func (f *Fake) Rename(_ context.Context, endpoint, oldDataset, newDataset string) error {
+	f.Renames = append(f.Renames, RenameCall{endpoint, oldDataset, newDataset})
 	return nil
 }
 
