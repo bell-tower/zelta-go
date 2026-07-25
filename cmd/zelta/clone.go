@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"git.belltower.it/djbell/zelta-go/internal/backup"
 	"git.belltower.it/djbell/zelta-go/internal/endpoint"
 	"git.belltower.it/djbell/zelta-go/internal/lineage"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
@@ -23,10 +24,17 @@ func runClone(args []string) int {
 		cloneUsage()
 		return 0
 	}
+	if len(p.Operands) == 4 {
+		return runCloneAndBackup(p)
+	}
 	if len(p.Operands) != 2 {
 		cloneUsage()
 		return 2
 	}
+	return runCloneParsed(p)
+}
+
+func runCloneParsed(p *opt.Parsed) int {
 	depth, code := depthFrom(p.Env, "clone")
 	if code != 0 {
 		return code
@@ -92,4 +100,57 @@ func runClone(args []string) int {
 	return 0
 }
 
-func cloneUsage() { fmt.Fprintln(os.Stderr, "usage: zelta clone [-n] SOURCE[@SNAPSHOT] TARGET") }
+func runCloneAndBackup(p *opt.Parsed) int {
+	depth, code := depthFrom(p.Env, "clone")
+	if code != 0 {
+		return code
+	}
+	cloneParsed := *p
+	cloneParsed.Operands = p.Operands[:2]
+	if code := runCloneParsed(&cloneParsed); code != 0 {
+		return code
+	}
+
+	snapMode := backup.SnapIfNeeded
+	switch p.Env.Get("SNAP_MODE") {
+	case "0":
+		snapMode = backup.SnapNever
+	case "ALWAYS":
+		snapMode = backup.SnapAlways
+	}
+	flags := opt.SendRecvFrom(p.Env)
+	createParent := p.Env.Bool("CREATE_PARENT", true)
+	res, err := backup.Run(context.Background(), &zfs.Real{}, backup.Request{
+		Source:        p.Operands[1],
+		Target:        p.Operands[3],
+		TargetOrigin:  p.Operands[2],
+		DryRun:        p.Env.Bool("DRYRUN", false),
+		Intermediate:  p.Env.Bool("SEND_INTR", true),
+		SnapMode:      snapMode,
+		SnapTime:      p.Env.Get("SNAP_TIME"),
+		SnapSize:      p.Env.Get("SNAP_SIZE"),
+		Depth:         depth,
+		Include:       p.Env.List("INCLUDE"),
+		Exclude:       p.Env.List("EXCLUDE"),
+		SyncDirection: p.Env.Get("SYNC_DIRECTION"),
+		Flags:         &flags,
+		CreateParent:  &createParent,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zelta clone: backup: %v\n", err)
+		return 1
+	}
+	printWarns(res.Warnings)
+	fmt.Print(res.Output)
+	for _, msg := range res.Errors {
+		fmt.Fprintf(os.Stderr, "zelta clone: backup: %s\n", msg)
+	}
+	if len(res.Errors) > 0 {
+		return 1
+	}
+	return 0
+}
+
+func cloneUsage() {
+	fmt.Fprintln(os.Stderr, "usage: zelta clone [-n] SOURCE[@SNAPSHOT] TARGET [ORIGIN-BACKUP TARGET-BACKUP]")
+}

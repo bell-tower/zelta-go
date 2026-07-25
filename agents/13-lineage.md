@@ -15,8 +15,11 @@ existing dataset tree rather than rolling back or overwriting it in place.
 - Each clone uses `zfs clone -p -o readonly=off source@snapshot target`.
 - Children without a usable snapshot are skipped according to the oracle.
 - The four-endpoint clone-and-backup workflow is separate from ordinary clone:
-  compose `clone SOURCE TARGET` with `backup --clone-origin TARGET ORIGIN_BACKUP
-  TARGET_BACKUP`.
+  compose `clone SOURCE TARGET` with `backup --target-origin ORIGIN_BACKUP
+  TARGET_BACKUP` from the cloned target.
+- Go implements the four-operand form as `clone SOURCE TARGET ORIGIN-BACKUP
+  TARGET-BACKUP`, composing ordinary clone planning/execution with
+  `backup --target-origin`; dry-run preserves that order.
 
 ## Revert contract
 

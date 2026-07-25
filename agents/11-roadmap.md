@@ -28,8 +28,8 @@ making `internal` types part of a promised external contract.
 2. Bookmark MVP is complete for verification, creation, dry-run rendering, and
    non-fatal failure status; keep clone/revert exclusions explicit.
 3. Compose the four-endpoint clone-and-backup workflow from ordinary `clone`
-   plus `backup --clone-origin`; keep it as orchestration rather than a new
-   lineage primitive.
+   plus `backup --target-origin`; complete, with orchestration kept separate
+   from lineage primitives.
 4. Finish the Rotate lifecycle in `agents/12-rotate.md`: exact receive-token
    and rollback recovery remain manual; do not blindly retry interrupted
    receives.

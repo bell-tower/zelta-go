@@ -27,6 +27,7 @@ type Step struct {
 	Match       string
 	SourceStart string // match savepoint (@/#) for incr; empty = full
 	SourceEnd   string // first-pass send end (earliest on intermediate full)
+	Origin      string // clone origin receive property, when using target-origin
 	FinalEnd    string // if set after full+intermediate: second-pass end (latest)
 	SrcName     string
 	TgtName     string
@@ -75,6 +76,8 @@ type PairView struct {
 	SrcWritten          string
 	SrcSnapshotsChanged string
 	SrcSavepoints       []string
+	SrcOrigin           string
+	TargetOrigin        string
 	FilteredEnds        []string
 	FilteredActive      bool
 	SrcType             string // filesystem | volume; empty → filesystem
@@ -96,6 +99,7 @@ func ViewsFromMatch(pairs []*match.Pair) []PairView {
 			SrcWritten:          p.SrcWritten,
 			SrcSnapshotsChanged: p.SrcSnapshotsChanged,
 			SrcSavepoints:       append([]string(nil), p.SrcSavepoints...),
+			SrcOrigin:           p.SrcOrigin,
 			SrcType:             p.SrcType,
 		})
 	}
@@ -165,6 +169,15 @@ func planPair(v PairView, intermediate bool, flags opt.SendRecv) (*Step, error) 
 		st.Notice = v.Info
 		return st, nil
 	}
+	if v.SrcOrigin != "" && v.TargetOrigin != "" {
+		originDS, originSnap, ok := splitOrigin(v.SrcOrigin)
+		if !ok {
+			return nil, fmt.Errorf("backup: invalid source clone origin %q", v.SrcOrigin)
+		}
+		st.Kind = KindIncremental
+		st.SourceStart = originDS + originSnap
+		st.Origin = v.TargetOrigin
+	}
 
 	if st.SourceEnd == "" {
 		st.Kind = KindBlocked
@@ -210,10 +223,14 @@ func buildCmds(st *Step, intermediate bool, flags opt.SendRecv) error {
 	}
 	if st.Kind == KindIncremental && st.SourceStart != "" {
 		flag := "-i"
-		if intermediate && !st.Filtered {
+		if intermediate && !st.Filtered && st.Origin == "" {
 			flag = "-I"
 		}
-		vars["intr_snap"] = flag + " " + st.SrcName + st.SourceStart
+		start := st.SrcName + st.SourceStart
+		if st.Origin != "" {
+			start = st.SourceStart
+		}
+		vars["intr_snap"] = flag + " " + start
 	}
 	send, err := cmdbuild.Build("SEND", vars)
 	if err != nil {
@@ -246,6 +263,9 @@ func recvFlags(st *Step, f opt.SendRecv) string {
 	if f.RecvDefault != "" {
 		parts = append(parts, f.RecvDefault)
 	}
+	if st.Origin != "" {
+		parts = append(parts, "-o origin="+st.Origin)
+	}
 	if st.Kind == KindFull {
 		if st.DSSuffix == "" && f.RecvTop != "" {
 			parts = append(parts, f.RecvTop)
@@ -275,6 +295,14 @@ func recvFlags(st *Step, f opt.SendRecv) string {
 		parts = append(parts, f.RecvPartial)
 	}
 	return strings.Join(parts, " ")
+}
+
+func splitOrigin(origin string) (string, string, bool) {
+	i := strings.LastIndex(origin, "@")
+	if i <= 0 || i == len(origin)-1 {
+		return "", "", false
+	}
+	return origin[:i], origin[i:], true
 }
 
 func (p *Plan) recount() {

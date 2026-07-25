@@ -1,7 +1,7 @@
 # Backup (phase 2)
 
 **Package:** `internal/backup`
-**CLI:** `zelta backup [-n] [-Ii] [--snap|--no-snap] [-d depth] [-X pat] SRC TGT`
+**CLI:** `zelta backup [-n] [-Ii] [--snap|--no-snap] [--target-origin ENDPOINT] [-d depth] [-X pat] SRC TGT`
 
 ## Pipeline
 
@@ -32,6 +32,12 @@ If backup creates a recursive snapshot, it is appended to each eligible
 dataset's sequence before planning. Bookmark mode records only the final
 received endpoint for each dataset, not every filtered intermediate.
 
+Clone-origin backup uses `--target-origin` (alias `--origin`). The source
+dataset origin must be present and its matching snapshot must exist on the
+origin backup endpoint. Sends start at the source origin and receives add
+`-o origin=<origin-backup-dataset>@<snapshot>`; filtered intermediate mode is
+not combined with clone-origin backup.
+
 ## Recv flags (oracle defaults)
 
 | Case | Flags |
@@ -58,7 +64,7 @@ received endpoint for each dataset, not every filtered intermediate.
 
 ## Defer
 
-Send-check feature drop, resume tokens, rotate/clone, origin-match.
+Send-check feature drop, resume tokens, and further rotate/clone parity.
 
 Intentional Awk≠Go notes (dry-run first-pass, quoting, RECV constants, …): **`agents/10-deviations.md`**.
 

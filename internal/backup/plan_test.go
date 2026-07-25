@@ -186,6 +186,54 @@ func TestPlanIncrementalFlag(t *testing.T) {
 	}
 }
 
+func TestPlanTargetOriginUsesOriginSendBase(t *testing.T) {
+	p, err := PlanFromMatch([]PairView{{
+		Info:         "syncable (full)",
+		SrcLast:      "@clone-snap",
+		SrcName:      "tank/clone",
+		TgtName:      "backup/clone",
+		SrcOrigin:    "tank/original@base",
+		TargetOrigin: "backup/original@base",
+	}}, false, defFlags())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Steps) != 1 || p.Steps[0].Kind != KindIncremental {
+		t.Fatalf("steps=%+v", p.Steps)
+	}
+	out, err := FormatDryRun(p, "tank/clone", "backup/clone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-i tank/original@base tank/clone@clone-snap") {
+		t.Fatalf("origin send base missing:\n%s", out)
+	}
+	if !strings.Contains(out, "-o origin=backup/original@base") {
+		t.Fatalf("origin receive property missing:\n%s", out)
+	}
+}
+
+func TestRunTargetOriginRequiresBackedUpOrigin(t *testing.T) {
+	fake := &zfs.Fake{Lists: map[string]string{
+		"tank/clone":      "tank/clone\t1\t0\t100\t1K\tfilesystem\ttank/original@base\ntank/clone@clone-snap\t2\t0\t200\t1K\tsnapshot\t-",
+		"backup/clone":    "",
+		"backup/original": "backup/original\t1\t0\t100\t1K\tfilesystem\t-\nbackup/original@base\t2\t0\t200\t1K\tsnapshot\t-",
+	}}
+	res, err := Run(context.Background(), fake, Request{
+		Source: "tank/clone", Target: "backup/clone", TargetOrigin: "backup/original",
+		SnapMode: SnapNever, DryRun: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(res.Output, "-i tank/original@base tank/clone@clone-snap") {
+		t.Fatalf("origin send base missing:\n%s", res.Output)
+	}
+	if !strings.Contains(res.Output, "-o origin=backup/original@base") {
+		t.Fatalf("origin receive property missing:\n%s", res.Output)
+	}
+}
+
 func TestApplySnapUpToDate(t *testing.T) {
 	views := []PairView{{
 		Info:       "up-to-date",

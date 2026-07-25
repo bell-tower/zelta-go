@@ -43,6 +43,7 @@ func runBackup(args []string) int {
 	res, err := backup.Run(context.Background(), &zfs.Real{}, backup.Request{
 		Source:        p.Operands[0],
 		Target:        p.Operands[1],
+		TargetOrigin:  p.Env.Get("ORIGIN_ID"),
 		DryRun:        p.Env.Bool("DRYRUN", false),
 		Intermediate:  p.Env.Bool("SEND_INTR", true),
 		SnapMode:      snapMode,
@@ -71,5 +72,5 @@ func runBackup(args []string) int {
 }
 
 func backupUsage() {
-	fmt.Fprintln(os.Stderr, "usage: zelta backup [-n] [-Ii] [--snapshot|--no-snapshot] [--push|--pull|--no-pull] [-d depth] [-X pat] SOURCE TARGET")
+	fmt.Fprintln(os.Stderr, "usage: zelta backup [-n] [-Ii] [--snapshot|--no-snapshot] [--target-origin ENDPOINT] [--push|--pull|--no-pull] [-d depth] [-X pat] SOURCE TARGET")
 }

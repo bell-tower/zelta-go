@@ -16,6 +16,7 @@ import (
 type Request struct {
 	Source       string
 	Target       string
+	TargetOrigin string // already-backed-up origin endpoint for clone replication
 	DryRun       bool
 	Intermediate bool   // true → -I (default); false → -i
 	SnapMode     string // IF_NEEDED (default), ALWAYS, NEVER
@@ -56,10 +57,16 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 
 	// Written + type (parsable default cols would skip written via add_written).
 	props := append([]string(nil), match.BackupListProps...)
+	if strings.TrimSpace(req.TargetOrigin) != "" {
+		props = append(props, "origin")
+	}
 	if strings.TrimSpace(req.SnapTime) != "" || strings.TrimSpace(req.SnapSize) != "" {
 		props = append(props, "snapshots_changed")
 	}
 	filteredIntermediate := req.Intermediate && (len(req.Include) > 0 || len(req.Exclude) > 0)
+	if filteredIntermediate && strings.TrimSpace(req.TargetOrigin) != "" {
+		return nil, fmt.Errorf("target origin cannot be combined with filtered intermediate sends")
+	}
 	mres, err := match.Compare(ctx, exec, match.Request{
 		Source:                  req.Source,
 		Target:                  req.Target,
@@ -76,6 +83,11 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	}
 
 	views := ViewsFromMatch(mres.Pairs)
+	if strings.TrimSpace(req.TargetOrigin) != "" {
+		if err := configureTargetOrigin(ctx, exec, req.TargetOrigin, mres, views, props, req.Depth); err != nil {
+			return nil, err
+		}
+	}
 	var filteredFilter *match.Filter
 	if filteredIntermediate {
 		filter := match.ParseFilter(req.Include, req.Exclude)
@@ -196,6 +208,58 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		Warnings: append([]string(nil), mres.Warnings...),
 		Errors:   errors,
 	}, nil
+}
+
+func configureTargetOrigin(ctx context.Context, exec zfs.Executor, targetOrigin string, mres *match.Result, views []PairView, props []string, depth int) error {
+	originTarget, err := endpoint.Parse(targetOrigin)
+	if err != nil {
+		return fmt.Errorf("target origin: %w", err)
+	}
+	if originTarget.Snapshot != "" {
+		return fmt.Errorf("target origin must not include a snapshot")
+	}
+	var sourceOrigin string
+	for _, pair := range mres.Pairs {
+		if pair.DSSuffix == "" {
+			sourceOrigin = pair.SrcOrigin
+			break
+		}
+	}
+	originDS, _, ok := splitOrigin(sourceOrigin)
+	if !ok {
+		return fmt.Errorf("target origin: source has no usable clone origin")
+	}
+	originLines, err := exec.List(ctx, targetOrigin, originTarget.Dataset, props, depth)
+	if err != nil {
+		return fmt.Errorf("target origin list: %w", err)
+	}
+	originRows, err := zfs.ParseListLines(originLines, props)
+	if err != nil {
+		return fmt.Errorf("target origin parse: %w", err)
+	}
+	originNames := make(map[string]bool, len(originRows))
+	for _, row := range originRows {
+		originNames[row.Name] = true
+	}
+	for i := range views {
+		if views[i].SrcOrigin == "" {
+			return fmt.Errorf("target origin: dataset %q has no clone origin", views[i].DSSuffix)
+		}
+		dataset, snap, valid := splitOrigin(views[i].SrcOrigin)
+		if !valid {
+			return fmt.Errorf("target origin: invalid source clone origin %q", views[i].SrcOrigin)
+		}
+		suffix, err := endpoint.DSSuffix(originDS, dataset)
+		if err != nil {
+			return fmt.Errorf("target origin: %w", err)
+		}
+		targetDataset := joinTgt(originTarget.Dataset, suffix)
+		if !originNames[targetDataset+snap] {
+			return fmt.Errorf("target origin: missing %s", targetDataset+snap)
+		}
+		views[i].TargetOrigin = targetDataset + snap
+	}
+	return nil
 }
 
 func buildBookmarkPlans(plan *Plan, source, target, prefix, targetHost string) ([]BookmarkPlan, error) {
