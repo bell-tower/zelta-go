@@ -17,6 +17,7 @@ type Request struct {
 	Source, Target string
 	Match          string
 	SourceLast     string
+	SourceNext     string
 	TargetLast     string
 	SourceOrigin   string
 	OriginVerified bool
@@ -29,6 +30,20 @@ type Step struct {
 	Kind     string
 	Argv     []string
 	DSSuffix string
+}
+
+// NeedsPreservation reports whether any source dataset still has source
+// snapshots newer than the confirmed target match after a rotation step.
+func NeedsPreservation(result *match.Result) bool {
+	if result == nil {
+		return false
+	}
+	for _, pair := range result.Pairs {
+		if pair.SrcName != "" && pair.SrcLast != "" && pair.Match != pair.SrcLast {
+			return true
+		}
+	}
+	return false
 }
 
 // TreeRequest plans a complete dataset tree. TargetRows are used to verify
@@ -109,6 +124,13 @@ func planPair(sourceRoot, targetRoot, preserved string, pair *match.Pair, req Tr
 	sourceDataset := joinDataset(sourceRoot, pair.DSSuffix)
 	targetDataset := joinDataset(targetRoot, pair.DSSuffix)
 	matchName := pair.Match
+	sourceEnd := pair.SrcNext
+	if sourceEnd == "" {
+		sourceEnd = pair.SrcLast
+	}
+	if sourceEnd == "" || sourceEnd == matchName {
+		return nil, nil
+	}
 	sourceStart := ""
 	if matchName != "" {
 		sourceStart = sourceDataset + matchName
@@ -122,7 +144,7 @@ func planPair(sourceRoot, targetRoot, preserved string, pair *match.Pair, req Tr
 	}
 	vars := map[string]string{
 		"flags":   req.Flags.SendFlags(),
-		"ds_snap": sourceDataset + pair.SrcLast,
+		"ds_snap": sourceDataset + sourceEnd,
 	}
 	if sourceStart != "" {
 		vars["intr_snap"] = incrFlag(req.Intermediate) + " " + sourceStart
@@ -169,6 +191,7 @@ func Plan(req Request) ([]Step, error) {
 		TgtName:   req.Target,
 		Match:     req.Match,
 		SrcLast:   req.SourceLast,
+		SrcNext:   req.SourceNext,
 		TgtLast:   req.TargetLast,
 		SrcOrigin: req.SourceOrigin,
 		SrcType:   req.SourceType,

@@ -103,9 +103,9 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
   divergent target is not frozen yet. The current dry-run planner emits the
   preservation rename and receives into the original target path with the
   preserved target snapshot as `origin`, matching the bounded oracle contract.
-  Exact rollback failure recovery and post-execution confirmation still require
-  review/goldens. Execution is available through `internal/rotate.Execute` but
-  is not yet considered release-safe.
+  Exact rollback failure recovery remains. Execution is available through
+  `internal/rotate.Execute`; it re-runs match after execution and reports
+  remaining divergence like upstream, without a strict confirmation failure.
 
 ---
 

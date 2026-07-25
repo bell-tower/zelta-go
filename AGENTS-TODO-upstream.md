@@ -17,3 +17,11 @@ and captured by a test.
   deterministic regression fixture before porting the corrected behavior here.
 
 This remains upstream-only work for now and must not block the Go line.
+
+## Rotate confirmation strictness
+
+- Upstream `zelta rotate` reloads source/target state after rotation and reports
+  remaining divergence, but does not make a failed up-to-date confirmation a
+  separate non-zero status.
+- If strict post-rotation confirmation is desired, add and document an
+  upstream option first; do not invent a Go-only failure mode.

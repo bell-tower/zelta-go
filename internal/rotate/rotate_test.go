@@ -36,6 +36,19 @@ func TestVerifiedSourceOriginPlanUsesOriginForSend(t *testing.T) {
 	}
 }
 
+func TestPlanUsesNextSourceSnapshotForOneRotateStep(t *testing.T) {
+	steps, err := Plan(Request{
+		Source: "tank/src", Target: "tank/target", Match: "@base", SourceNext: "@next",
+		SourceLast: "@latest", TargetLast: "@other", Intermediate: true, Flags: opt.Default(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := steps[1].Argv[len(steps[1].Argv)-1]; got != "tank/src@next" {
+		t.Fatalf("send end=%q", got)
+	}
+}
+
 func TestPlanTreeAddsFullSourceOnlyChild(t *testing.T) {
 	steps, err := PlanTree(TreeRequest{
 		Source: "tank/src", Target: "tank/target", Intermediate: true, Flags: opt.Default(),
@@ -113,5 +126,14 @@ func TestRotateRejectsPreservationCollision(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected preservation collision")
+	}
+}
+
+func TestNeedsPreservationDetectsRemainingSourceDelta(t *testing.T) {
+	if !NeedsPreservation(&match.Result{Pairs: []*match.Pair{{SrcName: "tank/src", SrcLast: "@new", Match: "@next"}}}) {
+		t.Fatal("expected remaining delta")
+	}
+	if NeedsPreservation(&match.Result{Pairs: []*match.Pair{{SrcName: "tank/src", SrcLast: "@same", Match: "@same"}}}) {
+		t.Fatal("did not expect remaining delta")
 	}
 }

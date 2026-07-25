@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"git.belltower.it/djbell/zelta-go/internal/endpoint"
 	"git.belltower.it/djbell/zelta-go/internal/match"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
 	"git.belltower.it/djbell/zelta-go/internal/rotate"
@@ -81,6 +82,19 @@ func runRotate(args []string) int {
 		fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
 		return 1
 	}
+	post, err := match.Compare(context.Background(), exec, match.Request{
+		Source: p.Operands[0], Target: p.Operands[1], Props: match.RotateListProps,
+		Scripting: true, Parsable: true,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: rotate confirmation: %v\n", err)
+	} else {
+		if rotate.NeedsPreservation(post) {
+			preservedEP := preservationEndpoint(p.Operands[1], preserved)
+			fmt.Fprintf(os.Stdout, "ensure preservation of diverged replica with: zelta backup %s %s\n", p.Operands[0], preservedEP)
+		}
+		fmt.Fprintf(os.Stdout, "to ensure target is up-to-date, run: zelta backup %s %s\n", p.Operands[0], p.Operands[1])
+	}
 	return 0
 }
 
@@ -95,4 +109,14 @@ func rotateDirection(value string) string {
 	default:
 		return value
 	}
+}
+
+func preservationEndpoint(target, dataset string) string {
+	ep, err := endpoint.Parse(target)
+	if err != nil {
+		return dataset
+	}
+	ep.Dataset = dataset
+	ep.Snapshot = ""
+	return ep.String()
 }
