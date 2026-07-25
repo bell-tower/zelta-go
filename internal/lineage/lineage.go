@@ -120,11 +120,67 @@ func withinDepth(suffix string, depth int) bool {
 
 // RevertRequest describes a root revert operation.
 type RevertRequest struct {
-	Endpoint string
+	Endpoint      string
+	Depth         int
+	AfterSnapshot string
 }
 
-// Revert preserves the current root and clones the selected snapshot back to
-// its original name. It never uses zfs rollback -F or overwrites in place.
+// RevertPlan preserves the current root and clones the selected snapshot tree
+// back to its original names. It never uses zfs rollback -F or overwrites in
+// place. Rows must contain name and type and be ordered newest-first.
+func RevertPlan(req RevertRequest, rows []zfs.ListRow, preservationExists bool) ([]Step, error) {
+	ep, err := endpoint.Parse(req.Endpoint)
+	if err != nil {
+		return nil, err
+	}
+	selected := selectSnapshots(ep, rows, req.Depth)
+	if len(selected) == 0 {
+		return nil, fmt.Errorf("revert source has no usable snapshots: %s", ep.Dataset)
+	}
+	rootSnapshot := ""
+	for _, snap := range selected {
+		if snap.Dataset == ep.Dataset {
+			rootSnapshot = snap.Snapshot
+			break
+		}
+	}
+	if rootSnapshot == "" {
+		return nil, fmt.Errorf("revert source has no root snapshot: %s", ep.Dataset)
+	}
+	preserved := ep.Dataset + "_" + rootSnapshot
+	if preservationExists {
+		return nil, fmt.Errorf("revert preservation target already exists: %s", preserved)
+	}
+	rename, err := cmdbuild.RenameArgv(ep.Dataset, preserved)
+	if err != nil {
+		return nil, err
+	}
+	steps := []Step{{Kind: "rename", Argv: rename}}
+	for _, snap := range selected {
+		suffix, err := endpoint.DSSuffix(ep.Dataset, snap.Dataset)
+		if err != nil {
+			return nil, err
+		}
+		cloneSource := preserved + suffix + "@" + snap.Snapshot
+		cloneTarget := ep.Dataset + suffix
+		clone, err := cmdbuild.CloneArgv(cloneSource, cloneTarget)
+		if err != nil {
+			return nil, err
+		}
+		steps = append(steps, Step{Kind: "clone", Argv: clone})
+	}
+	if req.AfterSnapshot != "" {
+		snap, err := cmdbuild.SnapArgv(ep.Dataset + "@" + strings.TrimPrefix(req.AfterSnapshot, "@"))
+		if err != nil {
+			return nil, err
+		}
+		steps = append(steps, Step{Kind: "snapshot", Argv: snap})
+	}
+	return steps, nil
+}
+
+// Revert retains the original root-only helper for callers that provide an
+// explicit snapshot. New callers should use RevertPlan with list rows.
 func Revert(req RevertRequest) ([]Step, error) {
 	ep, err := endpoint.Parse(req.Endpoint)
 	if err != nil {
@@ -133,16 +189,8 @@ func Revert(req RevertRequest) ([]Step, error) {
 	if ep.Snapshot == "" {
 		return nil, fmt.Errorf("revert requires an explicit snapshot")
 	}
-	preserved := ep.Dataset + "_" + ep.Snapshot
-	rename, err := cmdbuild.RenameArgv(ep.Dataset, preserved)
-	if err != nil {
-		return nil, err
-	}
-	clone, err := cmdbuild.CloneArgv(ep.Dataset+"@"+ep.Snapshot, ep.Dataset)
-	if err != nil {
-		return nil, err
-	}
-	return []Step{{Kind: "rename", Argv: rename}, {Kind: "clone", Argv: clone}}, nil
+	rows := []zfs.ListRow{{Name: ep.Dataset + "@" + ep.Snapshot, Props: map[string]string{"type": "snapshot"}}}
+	return RevertPlan(req, rows, false)
 }
 
 func sameLocation(a, b endpoint.Endpoint) bool {

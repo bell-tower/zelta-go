@@ -52,12 +52,37 @@ func TestClonePlanRejectsExistingTargetAndHonorsDepth(t *testing.T) {
 }
 
 func TestRevertPreservesBeforeClone(t *testing.T) {
-	steps, err := Revert(RevertRequest{Endpoint: "tank/live@daily"})
+	steps, err := RevertPlan(RevertRequest{Endpoint: "tank/live@daily", AfterSnapshot: "@after"}, []zfs.ListRow{
+		{Name: "tank/live@daily", Props: map[string]string{"type": "snapshot"}},
+	}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Format(steps); got != "zfs rename -fp tank/live tank/live_daily\nzfs clone -p -o readonly=off tank/live@daily tank/live\n" {
+	if got := Format(steps); got != "zfs rename -fp tank/live tank/live_daily\nzfs clone -p -o readonly=off tank/live_daily@daily tank/live\nzfs snapshot -r tank/live@after\n" {
 		t.Fatalf("format=%q", got)
+	}
+}
+
+func TestRevertPlanSelectsRootAndChildSnapshots(t *testing.T) {
+	rows := []zfs.ListRow{
+		{Name: "tank/live/child@child-new", Props: map[string]string{"type": "snapshot"}},
+		{Name: "tank/live@root-new", Props: map[string]string{"type": "snapshot"}},
+	}
+	steps, err := RevertPlan(RevertRequest{Endpoint: "tank/live", AfterSnapshot: "after"}, rows, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := Format(steps); got != "zfs rename -fp tank/live tank/live_root-new\nzfs clone -p -o readonly=off tank/live_root-new/child@child-new tank/live/child\nzfs clone -p -o readonly=off tank/live_root-new@root-new tank/live\nzfs snapshot -r tank/live@after\n" {
+		t.Fatalf("format=%q", got)
+	}
+}
+
+func TestRevertPlanRejectsPreservationCollision(t *testing.T) {
+	_, err := RevertPlan(RevertRequest{Endpoint: "tank/live@daily"}, []zfs.ListRow{
+		{Name: "tank/live@daily", Props: map[string]string{"type": "snapshot"}},
+	}, true)
+	if err == nil {
+		t.Fatal("expected preservation collision")
 	}
 }
 

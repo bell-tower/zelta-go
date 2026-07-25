@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"git.belltower.it/djbell/zelta-go/internal/backup"
 	"git.belltower.it/djbell/zelta-go/internal/endpoint"
 	"git.belltower.it/djbell/zelta-go/internal/lineage"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
@@ -26,26 +27,69 @@ func runRevert(args []string) int {
 		revertUsage()
 		return 2
 	}
-	steps, err := lineage.Revert(lineage.RevertRequest{Endpoint: p.Operands[0]})
+	depth, code := depthFrom(p.Env, "revert")
+	if code != 0 {
+		return code
+	}
+	exec := &zfs.Real{}
+	ep, err := endpoint.Parse(p.Operands[0])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta revert: %v\n", err)
+		return 1
+	}
+	current := ep
+	current.Snapshot = ""
+	rows, err := exec.List(context.Background(), p.Operands[0], ep.Dataset, []string{"name", "type"}, depth)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zelta revert: list source: %v\n", err)
+		return 1
+	}
+	parsedRows, err := zfs.ParseListLines(rows, []string{"name", "type"})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zelta revert: parse source: %v\n", err)
+		return 1
+	}
+	request := lineage.RevertRequest{Endpoint: p.Operands[0], Depth: depth, AfterSnapshot: "@" + backup.DefaultSnapName()}
+	steps, err := lineage.RevertPlan(request, parsedRows, false)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zelta revert: %v\n", err)
+		return 1
+	}
+	preserved := steps[0].Argv[len(steps[0].Argv)-1]
+	exists, err := exec.Exists(context.Background(), current.String(), preserved)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zelta revert: preservation check: %v\n", err)
+		return 1
+	}
+	if exists {
+		fmt.Fprintf(os.Stderr, "zelta revert: preservation target already exists: %s\n", preserved)
 		return 1
 	}
 	if p.Env.Bool("DRYRUN", false) {
 		fmt.Print(lineage.Format(steps))
 		return 0
 	}
-	ep, _ := endpoint.Parse(p.Operands[0])
-	exec := &zfs.Real{}
-	if err := exec.Rename(context.Background(), ep.String(), ep.Dataset, ep.Dataset+"_"+ep.Snapshot); err != nil {
-		fmt.Fprintf(os.Stderr, "zelta revert: %v\n", err)
-		return 1
+	for _, step := range steps {
+		switch step.Kind {
+		case "rename":
+			if err := exec.Rename(context.Background(), current.String(), step.Argv[len(step.Argv)-2], step.Argv[len(step.Argv)-1]); err != nil {
+				fmt.Fprintf(os.Stderr, "zelta revert: %v\n", err)
+				return 1
+			}
+		case "clone":
+			if err := exec.Clone(context.Background(), current.String(), step.Argv[len(step.Argv)-2], step.Argv[len(step.Argv)-1]); err != nil {
+				fmt.Fprintf(os.Stderr, "zelta revert: %v\n", err)
+				return 1
+			}
+		case "snapshot":
+			if err := exec.Snapshot(context.Background(), current.String(), step.Argv[len(step.Argv)-1], true); err != nil {
+				fmt.Fprintf(os.Stderr, "zelta revert: %v\n", err)
+				return 1
+			}
+		}
 	}
-	if err := exec.Clone(context.Background(), ep.String(), ep.Dataset+"@"+ep.Snapshot, ep.Dataset); err != nil {
-		fmt.Fprintf(os.Stderr, "zelta revert: %v\n", err)
-		return 1
-	}
+	fmt.Fprintf(os.Stdout, "to retain replica history, run: zelta rotate '%s' 'TARGET'\n", current.String())
 	return 0
 }
 
-func revertUsage() { fmt.Fprintln(os.Stderr, "usage: zelta revert [-n] DATASET@SNAPSHOT") }
+func revertUsage() { fmt.Fprintln(os.Stderr, "usage: zelta revert [-n] DATASET[@SNAPSHOT]") }

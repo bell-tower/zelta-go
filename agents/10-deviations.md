@@ -87,13 +87,14 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
 
 ## Clone / revert / rotate
 
-- **Clone scope** — Awk supports latest-snapshot selection, recursive depth, and
-  a four-endpoint clone-and-backup form → Go requires an explicit root
-  `SOURCE@SNAPSHOT TARGET`. *Where:* `internal/lineage`, `cmd/zelta/clone.go`.
-- **Revert scope** — Awk selects the latest snapshot and recursively preserves
-  and reclones a tree → Go requires an explicit root `DATASET@SNAPSHOT` and
-  performs only the root rename-before-clone sequence. *Where:*
-  `internal/lineage`, `cmd/zelta/revert.go`.
+- **Clone scope** — Awk also supports a four-endpoint clone-and-backup form →
+  Go now supports recursive/latest root cloning with depth and target
+  preflight, but the four-endpoint workflow remains deferred. *Where:*
+  `internal/lineage`, `cmd/zelta/clone.go`.
+- **Revert scope** — Root and recursive latest/explicit planning, preservation
+  collision checks, preserved-tree clone sources, and the post-revert snapshot
+  are now wired. Snapshot-name option plumbing and full failure recovery remain
+  deferred. *Where:* `internal/lineage`, `cmd/zelta/revert.go`.
 - **Rotate lineage** — Awk distinguishes rollback, direct target divergence, and
   source clone-origin paths → Go currently plans only direct root divergence and
   refuses missing/common lineage cases. `origin` inspection, target-origin

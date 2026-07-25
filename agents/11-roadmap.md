@@ -28,8 +28,9 @@ making `internal` types part of a promised external contract.
    add dry-run rendering and oracle-compatible non-fatal failure status, while
    keeping clone/revert exclusions explicit.
 3. Implement the prerequisite `clone` and `revert` lineage operations in
-   dry-run-first form; root planners and command builders now exist, while
-   CLI wiring, execution, and recursive latest-snapshot selection remain.
+   dry-run-first form; recursive/latest planning, CLI wiring, execution, and
+   post-revert snapshot behavior now exist. The four-endpoint clone workflow
+   and failure recovery remain.
 4. Implement the root-only, dry-run-first Rotate contract in
    `agents/12-rotate.md`, covering rollback, source-clone, and target-divergence
    separately.
