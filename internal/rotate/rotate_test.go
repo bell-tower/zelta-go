@@ -62,6 +62,23 @@ func TestPlanAllowsTargetAtTheCommonMatch(t *testing.T) {
 	}
 }
 
+func TestFormatRemoteUsesDirectionAwarePipe(t *testing.T) {
+	steps := []Step{
+		{Kind: "rename", Argv: []string{"zfs", "rename", "-fp", "bpool/target", "bpool/target_base"}},
+		{Kind: "send", Argv: []string{"zfs", "send", "-I", "apool/src@base", "apool/src@new"}},
+		{Kind: "recv", Argv: []string{"zfs", "recv", "-s", "bpool/target"}},
+	}
+	out, err := FormatRemote(steps, "root@debian:apool/src", "root@vault:bpool/target", "PULL")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "ssh -n root@vault 'zfs rename -fp bpool/target bpool/target_base'\n" +
+		"ssh -n root@vault \"ssh -n root@debian zfs send -I apool/src@base apool/src@new | zfs recv -s bpool/target\"\n"
+	if out != want {
+		t.Fatalf("format=%q, want %q", out, want)
+	}
+}
+
 func TestPlanTreeAddsFullSourceOnlyChild(t *testing.T) {
 	steps, err := PlanTree(TreeRequest{
 		Source: "tank/src", Target: "tank/target", Intermediate: true, Flags: opt.Default(),

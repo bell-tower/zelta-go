@@ -89,8 +89,9 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
 
 - **Clone scope** — Awk also supports a four-endpoint clone-and-backup form →
   Go now supports recursive/latest root cloning with depth and target
-  preflight, but the four-endpoint workflow remains deferred. *Where:*
-  `internal/lineage`, `cmd/zelta/clone.go`.
+  preflight, but the four-endpoint workflow remains deferred. It is a composer
+  of ordinary `clone` followed by `backup --clone-origin`, not a new clone
+  primitive. *Where:* `internal/lineage`, `cmd/zelta/clone.go`.
 - **Revert scope** — Root and recursive latest/explicit planning, preservation
   collision checks, preserved-tree clone sources, and the post-revert snapshot
   are now wired, including snapshot-name option plumbing. Partial-failure

@@ -14,7 +14,9 @@ existing dataset tree rather than rolling back or overwriting it in place.
 - Target must not already exist; validate before issuing any clone.
 - Each clone uses `zfs clone -p -o readonly=off source@snapshot target`.
 - Children without a usable snapshot are skipped according to the oracle.
-- The four-endpoint clone-and-backup workflow is separate from ordinary clone.
+- The four-endpoint clone-and-backup workflow is separate from ordinary clone:
+  compose `clone SOURCE TARGET` with `backup --clone-origin TARGET ORIGIN_BACKUP
+  TARGET_BACKUP`.
 
 ## Revert contract
 

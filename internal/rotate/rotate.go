@@ -276,6 +276,48 @@ func Format(steps []Step) string {
 	return b.String()
 }
 
+// FormatRemote renders a dry-run plan with endpoint-aware command wrappers.
+// Send/receive pairs use the same direction rules as backup dry-runs.
+func FormatRemote(steps []Step, source, target, direction string) (string, error) {
+	var b strings.Builder
+	for i := 0; i < len(steps); i++ {
+		step := steps[i]
+		if len(step.Argv) == 0 {
+			continue
+		}
+		switch step.Kind {
+		case "rename":
+			line, err := zfs.CommandShell(target, step.Argv)
+			if err != nil {
+				return "", err
+			}
+			b.WriteString(line)
+		case "snapshot":
+			line, err := zfs.CommandShell(source, step.Argv)
+			if err != nil {
+				return "", err
+			}
+			b.WriteString(line)
+		case "send":
+			if i+1 >= len(steps) || steps[i+1].Kind != "recv" {
+				return "", fmt.Errorf("rotate: send without receive for %q", step.DSSuffix)
+			}
+			line, err := zfs.PipeShellDirection(source, target, step.Argv, steps[i+1].Argv, direction)
+			if err != nil {
+				return "", err
+			}
+			b.WriteString(line)
+			i++
+		case "recv":
+			return "", fmt.Errorf("rotate: receive without send for %q", step.DSSuffix)
+		default:
+			b.WriteString(zfs.SoftJoin(step.Argv))
+		}
+		b.WriteByte('\n')
+	}
+	return b.String(), nil
+}
+
 // Execute applies a previously validated plan. Send and receive steps are
 // paired in order and run through the executor so remote stdin semantics stay
 // centralized in zfs.Real.

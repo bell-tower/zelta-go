@@ -56,16 +56,22 @@ func PipeShellDirection(leftEp, rightEp string, leftArgv, rightArgv []string, di
 
 // SnapshotShell formats zfs snapshot for dry-run (no leading "+ ").
 func SnapshotShell(epStr, datasetSnap string, recursive bool) (string, error) {
-	ep, err := endpoint.Parse(epStr)
-	if err != nil {
-		return "", err
-	}
 	args := []string{"zfs", "snapshot"}
 	if recursive {
 		args = append(args, "-r")
 	}
 	args = append(args, datasetSnap)
-	cmd := SoftJoin(args)
+	return CommandShell(epStr, args)
+}
+
+// CommandShell formats one zfs command for an endpoint, including its remote
+// ssh wrapper when needed.
+func CommandShell(epStr string, argv []string) (string, error) {
+	ep, err := endpoint.Parse(epStr)
+	if err != nil {
+		return "", err
+	}
+	cmd := SoftJoin(argv)
 	if target, ok := sshTarget(ep); ok {
 		return "ssh -n " + target + " " + shellSingleQuote(cmd), nil
 	}

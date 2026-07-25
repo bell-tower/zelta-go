@@ -96,7 +96,12 @@ func runRotate(args []string) int {
 		return 1
 	}
 	if p.Env.Bool("DRYRUN", false) {
-		fmt.Print(rotate.Format(steps))
+		out, err := rotate.FormatRemote(steps, p.Operands[0], p.Operands[1], request.SyncDirection)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
+			return 1
+		}
+		fmt.Print(out)
 		return 0
 	}
 	if err := rotate.Execute(context.Background(), exec, request, steps); err != nil {
