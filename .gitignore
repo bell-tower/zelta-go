@@ -1,0 +1,31 @@
+# Local persona — never publish
+AGENTS-Persona.md
+
+# Build
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+/zelta
+/zprune
+
+# Go
+vendor/
+
+# OS / editor
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
+.helix/
+
+# Env / secrets
+.env
+.env.*
+*.pem
+
+# Test debris
+/tmp/
+coverage.out
