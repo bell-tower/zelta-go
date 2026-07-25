@@ -1,0 +1,4 @@
+source: apool/treetop
+prune-num: 1
+prune-time: 0
+now: 1000100
