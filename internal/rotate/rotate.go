@@ -83,8 +83,8 @@ func PlanTree(req TreeRequest) ([]Step, error) {
 			return nil, fmt.Errorf("rotate has no verified common snapshot or source origin")
 		}
 		matchName = originSnap
-	} else if root.TgtLast == "" || root.TgtLast == matchName {
-		return nil, fmt.Errorf("rotate target is not divergent")
+	} else if root.TgtLast == "" {
+		return nil, fmt.Errorf("rotate target has no usable snapshot")
 	}
 	if root.SrcLast == "" || root.SrcLast == matchName {
 		return nil, fmt.Errorf("rotate source is up-to-date or has no new snapshot")

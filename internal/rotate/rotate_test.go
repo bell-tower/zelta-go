@@ -49,6 +49,19 @@ func TestPlanUsesNextSourceSnapshotForOneRotateStep(t *testing.T) {
 	}
 }
 
+func TestPlanAllowsTargetAtTheCommonMatch(t *testing.T) {
+	steps, err := Plan(Request{
+		Source: "tank/src", Target: "tank/target", Match: "@base",
+		SourceLast: "@new", TargetLast: "@base", Intermediate: true, Flags: opt.Default(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(steps) != 3 {
+		t.Fatalf("steps=%v", steps)
+	}
+}
+
 func TestPlanTreeAddsFullSourceOnlyChild(t *testing.T) {
 	steps, err := PlanTree(TreeRequest{
 		Source: "tank/src", Target: "tank/target", Intermediate: true, Flags: opt.Default(),

@@ -7,7 +7,9 @@ be a root-only, dry-run-first planner with explicit safety checks.
 
 Rotate handles three distinct diversions:
 
-1. The source was rolled back.
+1. The source was rolled back or otherwise changed without an external
+   operation log. This is intentionally handled like direct target rotation;
+   the two causes are not distinguishable from ZFS state alone.
 2. The source was cloned, for example by `zelta revert`.
 3. The target has diverged.
 
