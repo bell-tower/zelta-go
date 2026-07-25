@@ -1,0 +1,5 @@
+# Oracle: zelta 1.2.0 -H -o dssuffix,last,info
+source: apool/beetop
+target: bpool/bleetop2
+scripting: true
+cols: dssuffix,last,info

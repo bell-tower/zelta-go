@@ -25,3 +25,15 @@ Editable + embedded source of truth: repo-root `data/*.tsv` (`package data`, `//
 - `internal/opt` — opts  
 - `internal/cmdbuild` — cmds  
 - `internal/report` — cols + json  
+
+## cmds.tsv usage (Go)
+
+| Layer | Uses templates |
+|-------|----------------|
+| `cmdbuild.Build` | argv only: `COMMAND` + `ARGS` + `VARS` |
+| `cmdbuild.RemoteRole` | column 2 → `SEND` / `RECV` / `DEFAULT` / `""` |
+| `cmdbuild.StdinNull` | `RECV` → stdin open; else `ssh -n` (oracle REMOTE_*) |
+| `zfs.Real` | `LIST` / `SNAP` via cmdbuild; pipe sides use SEND/RECV roles |
+| `backup` | `SEND` / `RECV` / `SNAP` via cmdbuild |
+
+Still **not** shell-string builders (no recursive `ipc-run` in argv). SSH host wrapping stays in `zfs` (endpoint-aware). Override knobs `REMOTE_SEND`/`RECV`/`DEFAULT` env strings → later via `opt`.

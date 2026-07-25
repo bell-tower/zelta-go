@@ -1,0 +1,4 @@
+tank/tgt	100	0	1000	1M
+tank/tgt@a	101	100	1500	500K
+tank/tgt/extra	200	0	1100	1M
+tank/tgt/extra@a	201	50	1600	200K

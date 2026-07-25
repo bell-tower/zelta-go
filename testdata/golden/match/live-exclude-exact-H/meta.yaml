@@ -1,0 +1,5 @@
+# Oracle: zelta 1.2.0 -X 'apool/treetop/vol1'
+source: apool/treetop
+target: bpool/bleetop
+scripting: true
+exclude: apool/treetop/vol1

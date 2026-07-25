@@ -1,0 +1,5 @@
+# Oracle: zelta 1.2.0 -H -d 2
+source: apool/treetop
+target: bpool/bleetop
+scripting: true
+depth: 2

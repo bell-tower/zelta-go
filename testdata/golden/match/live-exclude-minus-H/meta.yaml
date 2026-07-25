@@ -1,0 +1,5 @@
+# Oracle: zelta 1.2.0 -X '/minus'
+source: apool/treetop
+target: bpool/bleetop
+scripting: true
+exclude: /minus

@@ -1,0 +1,5 @@
+# Oracle: debian zelta 1.1-beta2 live dump 2026-07-25
+source: apool/hmm
+target: bpool/bleetop
+scripting: true
+origin: root@debian apool/hmm -> bpool/bleetop

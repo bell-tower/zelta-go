@@ -1,0 +1,5 @@
+tank/src	100	0	1000	1M
+tank/src@b	102	50	2000	500K
+tank/src@a	101	100	1500	500K
+tank/src/child	200	0	1100	1M
+tank/src/child@a	201	200	1600	200K

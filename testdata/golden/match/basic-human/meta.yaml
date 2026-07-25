@@ -1,0 +1,4 @@
+# Oracle: zelta match tank/src tank/tgt (fake zfs, Zelta 1.2.0)
+source: tank/src
+target: tank/tgt
+scripting: false

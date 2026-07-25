@@ -1,0 +1,6 @@
+# Oracle: zelta 1.2.0 -X '@zelta_2026*' -o ds_suffix,match,src_last,info
+source: apool/treetop
+target: bpool/bleetop
+scripting: true
+exclude: @zelta_2026*
+cols: ds_suffix,match,src_last,info

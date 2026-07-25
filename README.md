@@ -6,7 +6,9 @@ Not public until documented. No man pages here; see `~/Code/zelta/doc/` (or inst
 
 ## Status
 
-Phase 1: **match core + golden fixtures**. Scaffold only.
+Current checkpoint: match, read-only prune, and backup planning/execution are
+implemented with oracle-driven tests. `zprune` and policy configuration remain
+deferred.
 
 ## Build
 

@@ -28,6 +28,19 @@ Sibling reference tree (read only when extracting a contract): `~/Code/zelta/`.
 6. Expensive loop (OK with frontier models): golden regen from real `zelta match`, integration tags.
 7. Do not invent S3/blob here; that waits for Ruby product line.
 
+### Subagents (prefer when compound context gets expensive)
+
+Use Task/subagents **proactively** when work would otherwise stuff the main thread with parallel reads, oracle slices, or multi-file greps. Compound token interest shows up fast once match/backup/prune workflows deepen — clarity, speed, and $ all suffer if one context holds every parse.
+
+| Prefer subagent when… | Keep on main thread when… |
+|-----------------------|---------------------------|
+| Extracting a contract from AWK/doc (bounded slice → note) | Single-file edit you already have open |
+| Building/regen a golden case (fake zfs + oracle capture) | Tight `go test` fix loop on known failure |
+| Exploring sibling `~/Code/zelta` without loading it here | Implementing from an already-written contract |
+| Parallel research (cols + shellspec + list props) | Trivial one-shot answers |
+
+**How:** narrow prompt; demand a short return (contract bullets, file paths, expected I/O) — not a dump of source. Main agent implements from that summary. Explore for search; general for multi-step extract+fixture. Do not fan out subagents for work that fits in one cheap test cycle.
+
 ---
 
 ## Product Role
@@ -58,6 +71,7 @@ Acceptable deviations: YAML policy → standardize; no recursive self-calls; emb
 | `agents/07-cli.md` | `cmd/zelta`, `cmd/zprune` |
 | `agents/08-testing.md` | Unit / golden / integration |
 | `agents/09-style-go.md` | Go conventions for this repo |
+| `agents/10-deviations.md` | **Intentional** Awk→Go deviations (full log; see also `00-contracts`) |
 
 ---
 

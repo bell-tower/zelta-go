@@ -1,0 +1,5 @@
+# Oracle: zelta 1.2.0 -H -o ds_suffix,xfer_num,xfer_size,num_matches
+source: apool/treetop
+target: bpool/bleetop
+scripting: true
+cols: ds_suffix,xfer_num,xfer_size,num_matches
