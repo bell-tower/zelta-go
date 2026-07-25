@@ -34,9 +34,10 @@ making `internal` types part of a promised external contract.
    planning/execution and failure reporting; exact receive-token and rollback
    recovery remain manual, with no blind retry of interrupted receives.
 5. Complete filtered intermediate sends across snapshot creation, bookmarks,
-   resume handling, and oracle edge cases. The core per-dataset selector is
-   implemented; retain the reusable planning abstraction rather than copying
-   the Awk loop blindly.
+   and oracle edge cases. Snapshot creation, final bookmarks, recursive filter
+   precedence, and zero-eligible no-ops are covered; receive-token discovery
+   and `zfs send -t` recovery remain manual. Retain the reusable planning
+   abstraction rather than copying the Awk loop blindly.
 6. Decide and document the public library facade. Only then move or re-export
    packages and add external-package tests.
 7. Implement `zprune` as a separate destructive wrapper with prompt, force,

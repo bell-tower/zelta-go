@@ -48,8 +48,9 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
   while expressing the same stateful recursion in Kernighan Awk is a major
   source of complexity. Newly created snapshots are added before filtered
   planning; bookmarks retain only each dataset's final received endpoint.
-  Resume receive flags remain composed normally, while actual token recovery
-  stays an executor concern. *Where:* `internal/match`, `internal/backup`.
+   Resume receive flags remain composed normally, while receive-token
+   discovery and `zfs send -t` recovery stay manual. *Where:* `internal/match`,
+   `internal/backup`.
 - **Backup forces written list props** — even if match default cols would skip written, backup passes `match.BackupListProps` so snap-if-needed sees `written` and recv sees `type`.
 - **Bookmark MVP** — Go verifies each successfully executed target snapshot and creates the corresponding source bookmark; default naming uses `<target-host>_`, explicit `BOOKMARK_PREFIX` is honored. Dry-run renders both verification and creation commands; bookmark failures continue and produce a non-zero replication status. Clone/revert paths remain excluded.
 
@@ -100,7 +101,7 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
 - **Clone scope** — Awk also supports a four-endpoint clone-and-backup form →
   Go now supports recursive/latest root cloning with depth and target
   preflight, but the four-endpoint workflow remains deferred. It is a composer
-  of ordinary `clone` followed by `backup --clone-origin`, not a new clone
+   of ordinary `clone` followed by `backup --target-origin`, not a new clone
   primitive. *Where:* `internal/lineage`, `cmd/zelta/clone.go`.
 - **Revert scope** — Root and recursive latest/explicit planning, preservation
   collision checks, preserved-tree clone sources, and the post-revert snapshot

@@ -869,6 +869,49 @@ func TestFilteredIntermediateIncludesCreatedSnapshot(t *testing.T) {
 	}
 }
 
+func TestRunFilteredDatasetExclusionWinsOverParentInclude(t *testing.T) {
+	src := "tank/src\t1\t0\t1\t1K\tfilesystem\n" +
+		"tank/src@new\t4\t0\t4\t1K\tsnapshot\n" +
+		"tank/src/child\t2\t0\t2\t1K\tfilesystem\n" +
+		"tank/src/child@new\t5\t0\t5\t1K\tsnapshot\n"
+	tgt := "tank/tgt\t10\t0\t1\t0\tfilesystem\n" +
+		"tank/tgt@old\t1\t0\t1\t1K\tsnapshot\n" +
+		"tank/tgt/child\t20\t0\t1\t0\tfilesystem\n" +
+		"tank/tgt/child@old\t2\t0\t1\t1K\tsnapshot\n"
+	fake := &zfs.Fake{Lists: map[string]string{"tank/src": src, "tank/tgt": tgt}}
+	res, err := Run(context.Background(), fake, Request{
+		Source: "tank/src", Target: "tank/tgt", Intermediate: true, SnapMode: SnapNever,
+		Include: []string{"tank/src"}, Exclude: []string{"tank/src/child"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.Pipes) != 1 || len(res.Plan.Steps) != 1 {
+		t.Fatalf("pipes=%v steps=%+v", fake.Pipes, res.Plan.Steps)
+	}
+	if res.Plan.Steps[0].DSSuffix != "" {
+		t.Fatalf("steps=%+v", res.Plan.Steps)
+	}
+}
+
+func TestRunFilteredWithNoEligibleSnapshotsIsNoOp(t *testing.T) {
+	src := "tank/src\t1\t0\t1\t1K\tfilesystem\n" +
+		"tank/src@new\t4\t0\t4\t1K\tsnapshot\n"
+	tgt := "tank/tgt\t10\t0\t1\t0\tfilesystem\n" +
+		"tank/tgt@new\t4\t0\t4\t1K\tsnapshot\n"
+	fake := &zfs.Fake{Lists: map[string]string{"tank/src": src, "tank/tgt": tgt}}
+	res, err := Run(context.Background(), fake, Request{
+		Source: "tank/src", Target: "tank/tgt", Intermediate: true, SnapMode: SnapNever,
+		Exclude: []string{"@new"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.Pipes) != 0 || len(res.Plan.Steps) != 0 {
+		t.Fatalf("filtered no-op produced work: pipes=%v steps=%+v", fake.Pipes, res.Plan.Steps)
+	}
+}
+
 func TestFilteredBookmarksOnlyLatestPerDataset(t *testing.T) {
 	plan := &Plan{Steps: []*Step{
 		{DSSuffix: "/child", Kind: KindIncremental, SourceEnd: "@a", SrcName: "tank/src/child", TgtName: "tank/tgt/child"},

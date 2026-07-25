@@ -38,6 +38,11 @@ origin backup endpoint. Sends start at the source origin and receives add
 `-o origin=<origin-backup-dataset>@<snapshot>`; filtered intermediate mode is
 not combined with clone-origin backup.
 
+When filters retain no source snapshot for a dataset, filtered planning is a
+no-op for that dataset: it emits no invalid send range and creates no bookmark.
+Receive-token discovery and `zfs send -t` recovery are not automatic yet; an
+interrupted receive remains a manual recovery case.
+
 ## Recv flags (oracle defaults)
 
 | Case | Flags |
