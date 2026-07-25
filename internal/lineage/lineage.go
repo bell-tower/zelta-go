@@ -7,6 +7,7 @@ import (
 
 	"git.belltower.it/djbell/zelta-go/internal/cmdbuild"
 	"git.belltower.it/djbell/zelta-go/internal/endpoint"
+	"git.belltower.it/djbell/zelta-go/internal/zfs"
 )
 
 // Step is one local argv operation in a dry-run plan.
@@ -15,15 +16,22 @@ type Step struct {
 	Argv []string
 }
 
-// CloneRequest describes a root clone operation. Snapshot must be explicit in
-// the first slice; recursive latest-snapshot selection comes later.
+// CloneRequest describes a recursive clone operation.
 type CloneRequest struct {
 	Source string
 	Target string
+	Depth  int
 }
 
-// Clone builds a non-overwriting root clone plan.
-func Clone(req CloneRequest) ([]Step, error) {
+// Snapshot is one source dataset snapshot selected for cloning.
+type Snapshot struct {
+	Dataset  string
+	Snapshot string
+}
+
+// ClonePlan builds clone commands from source list rows. Rows must contain
+// name and type and be ordered newest-first, as produced by ListArgv.
+func ClonePlan(req CloneRequest, rows []zfs.ListRow, targetExists bool) ([]Step, error) {
 	src, err := endpoint.Parse(req.Source)
 	if err != nil {
 		return nil, fmt.Errorf("source: %w", err)
@@ -32,20 +40,82 @@ func Clone(req CloneRequest) ([]Step, error) {
 	if err != nil {
 		return nil, fmt.Errorf("target: %w", err)
 	}
-	if src.Snapshot == "" {
-		return nil, fmt.Errorf("source: clone requires an explicit snapshot")
-	}
 	if tgt.Snapshot != "" {
 		return nil, fmt.Errorf("target: clone target must not include a snapshot")
 	}
-	if !sameHost(src, tgt) {
-		return nil, fmt.Errorf("clone source and target must be on the same host")
+	if !sameLocation(src, tgt) {
+		return nil, fmt.Errorf("clone source and target must be on the same host and pool")
 	}
-	argv, err := cmdbuild.CloneArgv(src.Dataset+"@"+src.Snapshot, tgt.Dataset)
+	if targetExists {
+		return nil, fmt.Errorf("clone target already exists: %s", tgt.Dataset)
+	}
+	selected := selectSnapshots(src, rows, req.Depth)
+	if len(selected) == 0 {
+		return nil, fmt.Errorf("clone source has no usable snapshots: %s", src.Dataset)
+	}
+	steps := make([]Step, 0, len(selected))
+	for _, snap := range selected {
+		suffix, err := endpoint.DSSuffix(src.Dataset, snap.Dataset)
+		if err != nil {
+			return nil, err
+		}
+		target := tgt.Dataset + suffix
+		argv, err := cmdbuild.CloneArgv(snap.Dataset+"@"+snap.Snapshot, target)
+		if err != nil {
+			return nil, err
+		}
+		steps = append(steps, Step{Kind: "clone", Argv: argv})
+	}
+	return steps, nil
+}
+
+// Clone retains the small root API for callers that already supply an
+// explicit source snapshot.
+func Clone(req CloneRequest) ([]Step, error) {
+	src, err := endpoint.Parse(req.Source)
 	if err != nil {
 		return nil, err
 	}
-	return []Step{{Kind: "clone", Argv: argv}}, nil
+	if src.Snapshot == "" {
+		return nil, fmt.Errorf("source: clone requires an explicit snapshot")
+	}
+	rows := []zfs.ListRow{{Name: src.Dataset + "@" + src.Snapshot, Props: map[string]string{"type": "snapshot"}}}
+	return ClonePlan(req, rows, false)
+}
+
+func selectSnapshots(src endpoint.Endpoint, rows []zfs.ListRow, depth int) []Snapshot {
+	seen := make(map[string]bool)
+	var out []Snapshot
+	for _, row := range rows {
+		if row.Props["type"] != "snapshot" {
+			continue
+		}
+		at := strings.LastIndex(row.Name, "@")
+		if at <= 0 || at == len(row.Name)-1 {
+			continue
+		}
+		dataset, snap := row.Name[:at], row.Name[at+1:]
+		suffix, err := endpoint.DSSuffix(src.Dataset, dataset)
+		if err != nil || !withinDepth(suffix, depth) || seen[suffix] {
+			continue
+		}
+		if src.Snapshot != "" && snap != src.Snapshot {
+			continue
+		}
+		seen[suffix] = true
+		out = append(out, Snapshot{Dataset: dataset, Snapshot: snap})
+	}
+	return out
+}
+
+func withinDepth(suffix string, depth int) bool {
+	if depth <= 0 {
+		return true
+	}
+	if suffix == "" {
+		return 1 <= depth
+	}
+	return strings.Count(suffix, "/")+1 <= depth
 }
 
 // RevertRequest describes a root revert operation.
@@ -75,8 +145,18 @@ func Revert(req RevertRequest) ([]Step, error) {
 	return []Step{{Kind: "rename", Argv: rename}, {Kind: "clone", Argv: clone}}, nil
 }
 
-func sameHost(a, b endpoint.Endpoint) bool {
-	return a.User == b.User && a.Host == b.Host && a.Remote == b.Remote
+func sameLocation(a, b endpoint.Endpoint) bool {
+	if a.User != b.User || a.Host != b.Host || a.Remote != b.Remote {
+		return false
+	}
+	return poolOf(a.Dataset) == poolOf(b.Dataset)
+}
+
+func poolOf(dataset string) string {
+	if i := strings.IndexByte(dataset, '/'); i >= 0 {
+		return dataset[:i]
+	}
+	return dataset
 }
 
 // Format renders a plan in the same one-command-per-line style as dry-run

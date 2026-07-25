@@ -26,7 +26,37 @@ func runClone(args []string) int {
 		cloneUsage()
 		return 2
 	}
-	steps, err := lineage.Clone(lineage.CloneRequest{Source: p.Operands[0], Target: p.Operands[1]})
+	depth, code := depthFrom(p.Env, "clone")
+	if code != 0 {
+		return code
+	}
+	exec := &zfs.Real{}
+	src, err := endpoint.Parse(p.Operands[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zelta clone: source: %v\n", err)
+		return 1
+	}
+	tgt, err := endpoint.Parse(p.Operands[1])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zelta clone: target: %v\n", err)
+		return 1
+	}
+	rows, err := exec.List(context.Background(), p.Operands[0], src.Dataset, []string{"name", "type"}, depth)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zelta clone: list source: %v\n", err)
+		return 1
+	}
+	parsedRows, err := zfs.ParseListLines(rows, []string{"name", "type"})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zelta clone: parse source: %v\n", err)
+		return 1
+	}
+	exists, err := exec.Exists(context.Background(), p.Operands[1], tgt.Dataset)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zelta clone: target check: %v\n", err)
+		return 1
+	}
+	steps, err := lineage.ClonePlan(lineage.CloneRequest{Source: p.Operands[0], Target: p.Operands[1], Depth: depth}, parsedRows, exists)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta clone: %v\n", err)
 		return 1
@@ -35,11 +65,14 @@ func runClone(args []string) int {
 		fmt.Print(lineage.Format(steps))
 		return 0
 	}
-	src, _ := endpoint.Parse(p.Operands[0])
-	tgt, _ := endpoint.Parse(p.Operands[1])
-	if err := (&zfs.Real{}).Clone(context.Background(), tgt.String(), src.Dataset+"@"+src.Snapshot, tgt.Dataset); err != nil {
-		fmt.Fprintf(os.Stderr, "zelta clone: %v\n", err)
-		return 1
+	for _, step := range steps {
+		if len(step.Argv) < 2 {
+			continue
+		}
+		if err := exec.Clone(context.Background(), tgt.String(), step.Argv[len(step.Argv)-2], step.Argv[len(step.Argv)-1]); err != nil {
+			fmt.Fprintf(os.Stderr, "zelta clone: %v\n", err)
+			return 1
+		}
 	}
 	return 0
 }
