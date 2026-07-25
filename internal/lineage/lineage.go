@@ -3,6 +3,7 @@ package lineage
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"git.belltower.it/djbell/zelta-go/internal/cmdbuild"
@@ -105,6 +106,9 @@ func selectSnapshots(src endpoint.Endpoint, rows []zfs.ListRow, depth int) []Sna
 		seen[suffix] = true
 		out = append(out, Snapshot{Dataset: dataset, Snapshot: snap})
 	}
+	sort.SliceStable(out, func(i, j int) bool {
+		return strings.Count(out[i].Dataset, "/") < strings.Count(out[j].Dataset, "/")
+	})
 	return out
 }
 

@@ -29,7 +29,7 @@ func TestClonePlanSelectsLatestSnapshotPerDataset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Format(steps); got != "zfs clone -p -o readonly=off tank/src/child@new tank/clone/child\nzfs clone -p -o readonly=off tank/src@new tank/clone\n" {
+	if got := Format(steps); got != "zfs clone -p -o readonly=off tank/src@new tank/clone\nzfs clone -p -o readonly=off tank/src/child@new tank/clone/child\n" {
 		t.Fatalf("format=%q", got)
 	}
 }
@@ -72,7 +72,7 @@ func TestRevertPlanSelectsRootAndChildSnapshots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Format(steps); got != "zfs rename -fp tank/live tank/live_root-new\nzfs clone -p -o readonly=off tank/live_root-new/child@child-new tank/live/child\nzfs clone -p -o readonly=off tank/live_root-new@root-new tank/live\nzfs snapshot -r tank/live@after\n" {
+	if got := Format(steps); got != "zfs rename -fp tank/live tank/live_root-new\nzfs clone -p -o readonly=off tank/live_root-new@root-new tank/live\nzfs clone -p -o readonly=off tank/live_root-new/child@child-new tank/live/child\nzfs snapshot -r tank/live@after\n" {
 		t.Fatalf("format=%q", got)
 	}
 }
