@@ -46,6 +46,8 @@ func runBackup(args []string) int {
 		DryRun:        p.Env.Bool("DRYRUN", false),
 		Intermediate:  p.Env.Bool("SEND_INTR", true),
 		SnapMode:      snapMode,
+		SnapTime:      p.Env.Get("SNAP_TIME"),
+		SnapSize:      p.Env.Get("SNAP_SIZE"),
 		Depth:         depth,
 		Include:       p.Env.List("INCLUDE"),
 		Exclude:       p.Env.List("EXCLUDE"),

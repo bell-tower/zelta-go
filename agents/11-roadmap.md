@@ -27,9 +27,9 @@ making `internal` types part of a promised external contract.
 2. Extend the bookmark MVP: execute-mode verification and creation are done;
    add dry-run rendering and oracle-compatible non-fatal failure status, while
    keeping clone/revert exclusions explicit.
-3. Extend the implemented `clone` and `revert` lineage operations with
-   endpoint-aware dry-run formatting. Keep the four-endpoint clone-and-backup
-   workflow separate as a later orchestration feature.
+3. Compose the four-endpoint clone-and-backup workflow from ordinary `clone`
+   plus `backup --clone-origin`; keep it as orchestration rather than a new
+   lineage primitive.
 4. Finish the Rotate lifecycle in `agents/12-rotate.md`: exact receive-token
    and rollback recovery remain manual; do not blindly retry interrupted
    receives.

@@ -54,16 +54,17 @@ type Plan struct {
 
 // PairView is the match fields backup needs (decoupled for tests).
 type PairView struct {
-	DSSuffix   string
-	Info       string
-	Match      string
-	SrcLast    string
-	SrcNext    string
-	TgtLast    string
-	SrcName    string
-	TgtName    string
-	SrcWritten string
-	SrcType    string // filesystem | volume; empty → filesystem
+	DSSuffix            string
+	Info                string
+	Match               string
+	SrcLast             string
+	SrcNext             string
+	TgtLast             string
+	SrcName             string
+	TgtName             string
+	SrcWritten          string
+	SrcSnapshotsChanged string
+	SrcType             string // filesystem | volume; empty → filesystem
 }
 
 // ViewsFromMatch maps match.Pair → PairView.
@@ -71,16 +72,17 @@ func ViewsFromMatch(pairs []*match.Pair) []PairView {
 	out := make([]PairView, 0, len(pairs))
 	for _, p := range pairs {
 		out = append(out, PairView{
-			DSSuffix:   p.DSSuffix,
-			Info:       p.Info,
-			Match:      p.Match,
-			SrcLast:    p.SrcLast,
-			SrcNext:    p.SrcNext,
-			TgtLast:    p.TgtLast,
-			SrcName:    p.SrcName,
-			TgtName:    p.TgtName,
-			SrcWritten: p.SrcWritten,
-			SrcType:    p.SrcType,
+			DSSuffix:            p.DSSuffix,
+			Info:                p.Info,
+			Match:               p.Match,
+			SrcLast:             p.SrcLast,
+			SrcNext:             p.SrcNext,
+			TgtLast:             p.TgtLast,
+			SrcName:             p.SrcName,
+			TgtName:             p.TgtName,
+			SrcWritten:          p.SrcWritten,
+			SrcSnapshotsChanged: p.SrcSnapshotsChanged,
+			SrcType:             p.SrcType,
 		})
 	}
 	return out

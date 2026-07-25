@@ -27,13 +27,14 @@ type Snap struct {
 
 // Dataset holds one dataset node and its savepoints (newest-first).
 type Dataset struct {
-	Suffix  string
-	Name    string
-	GUID    string
-	Origin  string
-	Written string
-	Type    string // filesystem | volume (from zfs list type; empty if not listed)
-	Snaps   []Snap
+	Suffix           string
+	Name             string
+	GUID             string
+	Origin           string
+	Written          string
+	SnapshotsChanged string
+	Type             string // filesystem | volume (from zfs list type; empty if not listed)
+	Snaps            []Snap
 }
 
 // tree is datasets keyed by ds_suffix, plus discovery order.
@@ -95,6 +96,7 @@ func (t *tree) addRow(row zfs.ListRow, filt *Filter, sourceSide bool) error {
 		ds.GUID = guid
 		ds.Origin = row.Props["origin"]
 		ds.Written = written
+		ds.SnapshotsChanged = row.Props["snapshots_changed"]
 		ds.Type = row.Props["type"]
 		return nil
 	}

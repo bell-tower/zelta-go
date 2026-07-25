@@ -50,7 +50,7 @@ func runRotate(args []string) int {
 		fmt.Fprintln(os.Stderr, "zelta rotate: root dataset is missing")
 		return 1
 	}
-	savepoint, shouldSnapshot, err := prepareRotateSnapshot(p.Env.Get("SNAP_MODE"), p.Env.Get("SNAP_NAME"), m.Pairs)
+	savepoint, shouldSnapshot, err := prepareRotateSnapshot(p.Env.Get("SNAP_MODE"), p.Env.Get("SNAP_NAME"), p.Env.Get("SNAP_TIME"), p.Env.Get("SNAP_SIZE"), m.Pairs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
 		return 1
@@ -180,7 +180,7 @@ func printRotateFailures(failures []rotate.Failure) {
 	}
 }
 
-func prepareRotateSnapshot(mode, requested string, pairs []*match.Pair) (string, bool, error) {
+func prepareRotateSnapshot(mode, requested, snapTime, snapSize string, pairs []*match.Pair) (string, bool, error) {
 	mode = strings.ToUpper(strings.TrimSpace(mode))
 	if mode == "" {
 		mode = "IF_NEEDED"
@@ -188,8 +188,21 @@ func prepareRotateSnapshot(mode, requested string, pairs []*match.Pair) (string,
 	force := mode == "ALWAYS" || mode == "1" || mode == "YES" || mode == "TRUE"
 	disabled := mode == "0" || mode == "OFF" || mode == "NO" || mode == "FALSE" || mode == "SKIP"
 	need := force
+	if !force && !disabled && (strings.TrimSpace(snapTime) != "" || strings.TrimSpace(snapSize) != "") {
+		views := make([]backup.PairView, 0, len(pairs))
+		for _, pair := range pairs {
+			views = append(views, backup.PairView{
+				SrcName: pair.SrcName, SrcLast: pair.SrcLast, SrcWritten: pair.SrcWritten,
+				SrcSnapshotsChanged: pair.SrcSnapshotsChanged,
+			})
+		}
+		need = backup.ShouldSnapshotWithThresholds(backup.SnapIfNeeded, views, snapTime, snapSize) != ""
+	}
 	for _, pair := range pairs {
 		if pair == nil || pair.SrcName == "" {
+			continue
+		}
+		if strings.TrimSpace(snapTime) != "" || strings.TrimSpace(snapSize) != "" {
 			continue
 		}
 		if pair.SrcLast == "" || (pair.Match != "" && pair.Match == pair.SrcLast) || written(pair.SrcWritten) {

@@ -19,6 +19,8 @@ type Request struct {
 	Intermediate bool   // true → -I (default); false → -i
 	SnapMode     string // IF_NEEDED (default), ALWAYS, NEVER
 	SnapName     string // bare name without @; empty → DefaultSnapName()
+	SnapTime     string // IF_NEEDED threshold; recent snapshots may skip
+	SnapSize     string // IF_NEEDED threshold in bytes; small changes may skip
 	Depth        int
 	Include      []string
 	Exclude      []string
@@ -51,13 +53,17 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	}
 
 	// Written + type (parsable default cols would skip written via add_written).
+	props := append([]string(nil), match.BackupListProps...)
+	if strings.TrimSpace(req.SnapTime) != "" || strings.TrimSpace(req.SnapSize) != "" {
+		props = append(props, "snapshots_changed")
+	}
 	mres, err := match.Compare(ctx, exec, match.Request{
 		Source:    req.Source,
 		Target:    req.Target,
 		Depth:     req.Depth,
 		Include:   req.Include,
 		Exclude:   req.Exclude,
-		Props:     match.BackupListProps,
+		Props:     props,
 		Scripting: true,
 		Parsable:  true,
 	})
@@ -88,7 +94,7 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	}
 
 	// Snap-if-needed (or ALWAYS).
-	if reason := ShouldSnapshot(req.SnapMode, views); reason != "" {
+	if reason := ShouldSnapshotWithThresholds(req.SnapMode, views, req.SnapTime, req.SnapSize); reason != "" {
 		name := req.SnapName
 		if name == "" {
 			name = DefaultSnapName()

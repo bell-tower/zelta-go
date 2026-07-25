@@ -2,8 +2,10 @@ package backup
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"git.belltower.it/djbell/zelta-go/internal/endpoint"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
@@ -228,6 +230,23 @@ func TestShouldSnapshot(t *testing.T) {
 	r = ShouldSnapshot(SnapIfNeeded, []PairView{{SrcName: "t", SrcLast: ""}})
 	if !strings.Contains(r, "missing") {
 		t.Fatalf("missing: %q", r)
+	}
+}
+
+func TestShouldSnapshotThresholds(t *testing.T) {
+	recent := time.Now().Add(-time.Minute).Unix()
+	view := PairView{SrcName: "tank/src", SrcLast: "@a", SrcWritten: "100", SrcSnapshotsChanged: fmt.Sprint(recent)}
+	if got := ShouldSnapshotWithThresholds(SnapIfNeeded, []PairView{view}, "1h", "200"); got != "" {
+		t.Fatalf("recent small change should skip: %q", got)
+	}
+	if got := ShouldSnapshotWithThresholds(SnapIfNeeded, []PairView{view}, "1s", "200"); got == "" {
+		t.Fatal("stale time threshold should snapshot")
+	}
+	if got := ShouldSnapshotWithThresholds(SnapIfNeeded, []PairView{view}, "1h", "100"); got == "" {
+		t.Fatal("reached size threshold should snapshot")
+	}
+	if got := ShouldSnapshotWithThresholds(SnapIfNeeded, []PairView{view}, "bad", "200"); got == "" {
+		t.Fatal("invalid threshold should snapshot")
 	}
 }
 

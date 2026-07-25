@@ -113,13 +113,18 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
    stream failures continue and are returned as structured partial progress.
    Exact receive-token/rollback recovery remains manual.
 - **Lineage dry-run remotes** — Backup dry-run uses endpoint-aware pipe
-  formatting, and Rotate now uses endpoint-aware formatting. Clone/Revert
-  lineage plans still render raw local argv lines. This is a parity gap, not a
-  safety bypass. *Where:* `internal/lineage`, `cmd/zelta/{clone,revert}.go`.
+  formatting, and Clone/Revert/Rotate now use endpoint-aware command
+  formatting. *Where:* `internal/lineage`, `internal/rotate`,
+  `cmd/zelta/{clone,revert,rotate}.go`.
+- **Snapshot thresholds** — Go now collects `snapshots_changed` when
+  `SNAP_TIME`/`SNAP_SIZE` are configured and applies conjunctive thresholds in
+  `IF_NEEDED` mode to backup and Rotate. Invalid or missing threshold data
+  forces a snapshot; `ALWAYS` and `NEVER` remain authoritative. *Where:*
+  `internal/backup/snap.go`, `cmd/zelta/rotate.go`.
 - **Rotate snapshot phase** — Go now predicts/executes the recursive source
   snapshot when Rotate is at the common latest snapshot, when source state is
   written, or when snapshot mode is forced. Threshold-based snapshot skipping
-  is not yet wired; upstream `SNAP_TIME`/`SNAP_SIZE` remains a gap.
+  is handled by the threshold rule above.
 
 ---
 

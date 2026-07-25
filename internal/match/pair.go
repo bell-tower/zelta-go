@@ -17,31 +17,33 @@ const (
 
 // Pair is one source/target dataset comparison row.
 type Pair struct {
-	DSSuffix   string
-	Match      string
-	MatchIVSet string
-	NumMatches int
-	SrcName    string
-	TgtName    string
-	SrcOrigin  string
-	TgtOrigin  string
-	SrcFirst   string
-	TgtFirst   string
-	SrcLast    string
-	TgtLast    string
-	SrcNext    string
-	TgtNext    string
-	SrcWritten string
-	TgtWritten string
-	SrcType    string // filesystem | volume
-	TgtType    string
-	SrcSnaps   int
-	TgtSnaps   int
-	XferNum    int
-	XferSize   int64
-	NumBlocked int
-	Info       string
-	status     pairStatus
+	DSSuffix            string
+	Match               string
+	MatchIVSet          string
+	NumMatches          int
+	SrcName             string
+	TgtName             string
+	SrcOrigin           string
+	TgtOrigin           string
+	SrcFirst            string
+	TgtFirst            string
+	SrcLast             string
+	TgtLast             string
+	SrcNext             string
+	TgtNext             string
+	SrcWritten          string
+	TgtWritten          string
+	SrcSnapshotsChanged string
+	TgtSnapshotsChanged string
+	SrcType             string // filesystem | volume
+	TgtType             string
+	SrcSnaps            int
+	TgtSnaps            int
+	XferNum             int
+	XferSize            int64
+	NumBlocked          int
+	Info                string
+	status              pairStatus
 }
 
 func pairTrees(src, tgt *tree) []*Pair {
@@ -100,6 +102,7 @@ func fillEnds(p *Pair, sds, tds *Dataset) {
 		p.SrcName = sds.Name
 		p.SrcOrigin = sds.Origin
 		p.SrcWritten = sds.Written
+		p.SrcSnapshotsChanged = sds.SnapshotsChanged
 		p.SrcType = sds.Type
 		p.SrcSnaps = len(sds.Snaps)
 		if n := len(sds.Snaps); n > 0 {
@@ -111,6 +114,7 @@ func fillEnds(p *Pair, sds, tds *Dataset) {
 		p.TgtName = tds.Name
 		p.TgtOrigin = tds.Origin
 		p.TgtWritten = tds.Written
+		p.TgtSnapshotsChanged = tds.SnapshotsChanged
 		p.TgtType = tds.Type
 		p.TgtSnaps = len(tds.Snaps)
 		if n := len(tds.Snaps); n > 0 {
