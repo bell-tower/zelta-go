@@ -27,14 +27,12 @@ making `internal` types part of a promised external contract.
 2. Extend the bookmark MVP: execute-mode verification and creation are done;
    add dry-run rendering and oracle-compatible non-fatal failure status, while
    keeping clone/revert exclusions explicit.
-3. Implement the prerequisite `clone` and `revert` lineage operations in
-   dry-run-first form; recursive/latest planning, CLI wiring, execution, and
-   post-revert snapshot behavior now exist. The four-endpoint clone workflow
-   and failure recovery remain.
-4. Implement the dry-run-first Rotate contract in `agents/12-rotate.md`;
-   recursive direct-divergence and verified source-clone-origin planning now
-   exist. Add oracle goldens, rollback classification, and execution only
-   after the rename/receive lifecycle review.
+3. Extend the implemented `clone` and `revert` lineage operations with
+   structured partial-failure reporting. Keep the four-endpoint clone-and-
+   backup workflow separate as a later orchestration feature.
+4. Finish the Rotate lifecycle in `agents/12-rotate.md`: make lineage dry-run
+   output remote-aware and add structured partial-failure recovery without
+   blindly retrying interrupted receives.
 5. Implement filtered intermediate sends. The Awk approach is useful but
    brute-force; record a possible reusable upstream abstraction while porting
    it rather than copying the loop blindly.

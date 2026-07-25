@@ -93,8 +93,9 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
   `internal/lineage`, `cmd/zelta/clone.go`.
 - **Revert scope** — Root and recursive latest/explicit planning, preservation
   collision checks, preserved-tree clone sources, and the post-revert snapshot
-  are now wired. Snapshot-name option plumbing and full failure recovery remain
-  deferred. *Where:* `internal/lineage`, `cmd/zelta/revert.go`.
+  are now wired, including snapshot-name option plumbing. Partial-failure
+  recovery/reporting remains deferred. *Where:* `internal/lineage`,
+  `cmd/zelta/revert.go`.
 - **Rotate lineage** — Awk handles source rollback/direct target divergence
   through the same direct-match rotation path and uses source `origin` only for
   clone-created trees → Go now carries dataset `origin` through match and
@@ -107,6 +108,13 @@ Format per bullet: **area** — Awk → Go — *why / where / example*.
   Exact rollback failure recovery remains. Execution is available through
   `internal/rotate.Execute`; it re-runs match after execution and reports
   remaining divergence like upstream, without a strict confirmation failure.
+  Recursive execution still stops at the first failed child and does not yet
+  emit a structured partial-progress recovery report.
+- **Lineage dry-run remotes** — Backup dry-run uses endpoint-aware pipe
+  formatting, but Clone/Revert/Rotate lineage plans currently render raw local
+  argv lines. Remote-aware rename, snapshot, and send/receive formatting is a
+  parity gap, not a safety bypass. *Where:* `internal/lineage`,
+  `internal/rotate`, `cmd/zelta/{clone,revert,rotate}.go`.
 - **Rotate snapshot phase** — Go now predicts/executes the recursive source
   snapshot when Rotate is at the common latest snapshot, when source state is
   written, or when snapshot mode is forced. Threshold-based snapshot skipping

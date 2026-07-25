@@ -32,22 +32,22 @@ decisions differ.
 
 ## Go boundary
 
-Do not add Rotate behavior to ordinary `backup.Run` implicitly. Start with a
-separate request/result/planner surface under `internal/rotate`, then connect
-execution only after dry-run goldens establish the rename and receive order.
+Do not add Rotate behavior to ordinary `backup.Run` implicitly. Keep the
+request/planner/executor surface under `internal/rotate`; execution is separate
+from planning and remains covered by dry-run goldens and injected-failure tests.
 
 Origin data now flows through `match.RotateListProps`, and direct-match plus
 verified source-origin dry-run plans emit per-child send/receive lineage.
 Source snapshot-if-needed/always planning, target preservation collision checks
 are present in the planner/CLI. The
-remaining blockers are oracle goldens, rollback-specific classification, and
-post-execution confirmation/recovery behavior. Execution is now available
-through `internal/rotate.Execute`, but should remain behind dry-run/golden
-review for production use.
+remaining blockers are remote-aware dry-run formatting and
+post-execution partial-failure recovery. Execution is available through
+`internal/rotate.Execute`; it re-runs match and reports remaining divergence,
+but recursive failures still stop at the first failed child.
 
-Implement `clone` and `revert` lineage operations before Rotate if their
-contracts are not already represented. In particular, `revert` is the normal
-producer of a source clone origin that Rotate must recognize.
+`clone` and `revert` now represent the prerequisite lineage contracts. In
+particular, `revert` is the normal producer of a source clone origin that
+Rotate recognizes.
 
 ## Reference
 
