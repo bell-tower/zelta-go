@@ -8,7 +8,6 @@ import (
 
 	"git.belltower.it/djbell/zelta-go/backup"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
-	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
 func runBackup(args []string) int {
@@ -42,7 +41,7 @@ func runBackup(args []string) int {
 	flags := opt.SendRecvFrom(p.Env)
 	createParent := p.Env.Bool("CREATE_PARENT", true)
 
-	res, err := backup.Run(context.Background(), &zfs.Real{}, backup.Request{
+	res, err := backup.Run(context.Background(), newReal(), backup.Request{
 		Source:        p.Operands[0],
 		Target:        p.Operands[1],
 		DryRun:        p.Env.Bool("DRYRUN", false),

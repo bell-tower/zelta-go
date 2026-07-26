@@ -48,7 +48,7 @@ func runZprune(args []string) int {
 		pruneNum = n
 	}
 
-	res, err := prune.Run(context.Background(), &zfs.Real{}, prune.Request{
+	res, err := prune.Run(context.Background(), newReal(), prune.Request{
 		Source:      p.Operands[0],
 		GuardTarget: p.Env.Get("MATCH_ENDPOINT"),
 		PruneGuard:  p.Env.Get("PRUNE_GUARD"),
@@ -141,26 +141,34 @@ func groupByDataset(candidates []string) map[string][]string {
 }
 
 func runDestroyCmd(ep endpoint.Endpoint, args []string) int {
-	if ep.Remote {
-		sshArgs := []string{ep.User + "@" + ep.Host, "zfs"}
-		sshArgs = append(sshArgs, args...)
-		fmt.Fprintf(os.Stderr, "+ ssh %s\n", strings.Join(sshArgs, " "))
-		cmd := exec.Command("ssh", sshArgs...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "zprune: destroy command failed: %s\n", strings.Join(sshArgs, " "))
-			return 1
-		}
-	} else {
+	if !ep.Remote || ep.Host == "" || ep.Host == "localhost" {
 		fmt.Fprintf(os.Stderr, "+ zfs %s\n", strings.Join(args, " "))
 		cmd := exec.Command("zfs", args...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "zprune: destroy command failed: %s\n", strings.Join(args, " "))
+			fmt.Fprintf(os.Stderr, "zprune: destroy command failed: zfs %s\n", strings.Join(args, " "))
 			return 1
 		}
+		return 0
+	}
+	host := ep.Host
+	if ep.User != "" {
+		host = ep.User + "@" + ep.Host
+	}
+	remoteCmd := "zfs " + strings.Join(args, " ")
+	argv, err := remoteFromEnv().Argv(host, remoteCmd, zfs.RoleDefault)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zprune: remote wrap: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(os.Stderr, "+ %s\n", strings.Join(argv, " "))
+	cmd := exec.Command(argv[0], argv[1:]...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "zprune: destroy command failed: %s\n", strings.Join(argv, " "))
+		return 1
 	}
 	return 0
 }

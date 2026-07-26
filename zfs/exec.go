@@ -1,7 +1,12 @@
 // Package zfs is the transport port for ZFS list/snap/send/recv.
 //
-// Production: &Real{ZFS: "zfs", SSH: SSHConfig{IdentityFile: key, Port: 22}}.
+// Production:
+//
+//	&Real{SSH: SSHConfig{IdentityFile: key, Port: 22}}           // structured SSH
+//	&Real{Remote: CommandRemote{Command: "ssh -p 2202"}}         // raw REMOTE_* / mbuffer
+//
 // Tests: &Fake{Lists: map[string]string{…}}.
+// Remote is a small interface — other backends can implement it later.
 package zfs
 
 import (

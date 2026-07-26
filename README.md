@@ -25,10 +25,20 @@ Curated public packages for ZFS remote-action SDK - stable CLI as consumer:
 | `rotate` | Rotate lifecycle for divergent targets |
 | `report` | JSON output schema, col expansion |
 
-Import path: `git.belltower.it/djbell/zelta-go/<package>`. Production:
-`&zfs.Real{ZFS: "zfs", SSH: zfs.SSHConfig{...}}`; tests: `&zfs.Fake{}`.
+Import path: `git.belltower.it/djbell/zelta-go/<package>`.
 
-See `agents/16-sdk.md` for the full plan and Sylve drop-in guide.
+```go
+// Structured SSH (library / Sylve):
+&zfs.Real{SSH: zfs.SSHConfig{IdentityFile: key, Port: 22}}
+
+// Raw remote prefixes (Awk REMOTE_*, mbuffer, socat, …):
+&zfs.Real{Remote: zfs.CommandRemote{Command: "ssh -p 2202"}}
+
+// Tests:
+&zfs.Fake{}
+```
+
+See `agents/16-sdk.md`. Runnable samples: `go test ./backup -run Example`.
 
 ## Build
 

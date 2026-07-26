@@ -6,10 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"git.belltower.it/djbell/zelta-go/match"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
+	"git.belltower.it/djbell/zelta-go/match"
 	"git.belltower.it/djbell/zelta-go/report"
-	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
 func runMatch(args []string) int {
@@ -67,7 +66,7 @@ func runMatch(args []string) int {
 	// LIST_WRITTEN default on; --no-written (WRITTEN=0) disables unless
 	// --written was explicitly given (oracle asymmetric-key quirk).
 	noWritten := p.Env.Get("WRITTEN") == "0" && !p.Changed["LIST_WRITTEN"]
-	res, err := match.Compare(context.Background(), &zfs.Real{}, match.Request{
+	res, err := match.Compare(context.Background(), newReal(), match.Request{
 		Source:    p.Operands[0],
 		Target:    p.Operands[1],
 		Cols:      cols,

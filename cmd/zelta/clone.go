@@ -8,8 +8,8 @@ import (
 
 	"git.belltower.it/djbell/zelta-go/backup"
 	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/lineage"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
+	"git.belltower.it/djbell/zelta-go/lineage"
 	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
@@ -39,7 +39,7 @@ func runCloneParsed(p *opt.Parsed) int {
 	if code != 0 {
 		return code
 	}
-	exec := &zfs.Real{}
+	exec := newReal()
 	src, err := endpoint.Parse(p.Operands[0])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta clone: source: %v\n", err)
@@ -120,7 +120,7 @@ func runCloneAndBackup(p *opt.Parsed) int {
 	}
 	flags := opt.SendRecvFrom(p.Env)
 	createParent := p.Env.Bool("CREATE_PARENT", true)
-	res, err := backup.Run(context.Background(), &zfs.Real{}, backup.Request{
+	res, err := backup.Run(context.Background(), newReal(), backup.Request{
 		Source:        p.Operands[1],
 		Target:        p.Operands[3],
 		TargetOrigin:  p.Operands[2],

@@ -72,29 +72,31 @@ is path-only.
 
 ## Sylve-critical API gaps (same batch as promote)
 
-### 1. SSH / remote transport on `zfs.Real`
-
-Extend `Real` with structured config (not shell-string env):
+### 1. Remote transport on `zfs.Real` (done)
 
 ```go
-type SSHConfig struct {
-    Bin          string   // default "ssh"
-    Port         int      // -p if non-zero
-    IdentityFile string   // -i
-    Options      []string // raw -o key=value extras (e.g. StrictHostKeyChecking)
+type Remote interface {
+    Argv(host, remoteCmd string, role Role) ([]string, error)
+    Shell(host, remoteCmd string, role Role) (string, error)
 }
 
+// Structured OpenSSH (Sylve):
+type SSHConfig struct { Bin, Port, IdentityFile, Options … }
+
+// Awk REMOTE_* strings / mbuffer|socat (CLI + power users):
+type CommandRemote struct { Command, Default, Send, Recv string }
+
 type Real struct {
-    ZFS string     // default "zfs"
-    SSH SSHConfig
+    ZFS    string
+    SSH    SSHConfig // used when Remote == nil
+    Remote Remote    // optional override
 }
 ```
 
-Wire into `sshCmd` so `-i`/`-p`/`-o` apply on all ssh hops. Dual-remote inner
-calls (`send | recv` on target/source) reuse the same config.
+CLI: `cmd/zelta/remote.go` `remoteFromEnv()` → `CommandRemote` when
+`ZELTA_REMOTE_*` is non-default, else `SSHConfig{}`.
 
-Document mapping from Sylve's `buildZeltaEnv` / `ZELTA_REMOTE_*` env →
-`zfs.SSHConfig`.
+Sylve drop-in: set `Real.SSH` (or `Remote: SSHConfig{…}`) — no env strings.
 
 ### 2. Progress / log callback
 
@@ -136,7 +138,7 @@ Document this — Sylve may use a custom zfs path in test/dev environments.
 ## CLI as consumer
 
 After promote, `cmd/zelta/*` changes import paths only. If desired, wire
-CLI env → SSHConfig for parity with Awk REMOTE_* env (optional).
+CLI env → Remote via `remoteFromEnv()` (done).
 
 ```
 opt.Parse → build Request → backup.Run(ctx, &zfs.Real{}, req) → print

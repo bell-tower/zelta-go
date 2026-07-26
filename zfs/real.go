@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	"git.belltower.it/djbell/zelta-go/endpoint"
@@ -19,22 +18,17 @@ func osPipe() (io.ReadCloser, io.WriteCloser, error) {
 	return os.Pipe()
 }
 
-// SSHConfig controls the ssh binary and flags for remote ZFS operations.
-type SSHConfig struct {
-	// Bin is the ssh binary path; default "ssh".
-	Bin string
-	// Port is the remote port; passed as -p when non-zero.
-	Port int
-	// IdentityFile is the private key path; passed as -i.
-	IdentityFile string
-	// Options are extra -o key=value pairs (e.g. StrictHostKeyChecking=accept-new).
-	Options []string
-}
-
-// Real invokes local or remote zfs (ssh for remote endpoints).
+// Real invokes local or remote zfs.
+//
+// Remote transport:
+//   - If Remote != nil, use it (SSHConfig, CommandRemote, or custom).
+//   - Else use SSH (structured OpenSSH). Zero SSH is plain ssh with BatchMode.
 type Real struct {
 	ZFS string // default "zfs"
+	// SSH is used when Remote is nil.
 	SSH SSHConfig
+	// Remote overrides SSH when non-nil.
+	Remote Remote
 
 	// StderrLog, when non-nil, receives a copy of stderr from zfs pipe
 	// commands. Useful for progress logging (see backup.Request.OnLine).
@@ -53,11 +47,11 @@ func (r *Real) bin() string {
 	return "zfs"
 }
 
-func (r *Real) sshBin() string {
-	if r.SSH.Bin != "" {
-		return r.SSH.Bin
+func (r *Real) remote() Remote {
+	if r.Remote != nil {
+		return r.Remote
 	}
-	return "ssh"
+	return r.SSH
 }
 
 func (r *Real) List(ctx context.Context, epStr, dataset string, props []string, depth int) ([]string, error) {
@@ -251,7 +245,10 @@ func (r *Real) RunPipeDirection(ctx context.Context, leftEp string, leftArgv []s
 	// Same remote host: one ssh shell with pipe (oracle hairpin).
 	if lok && rok && lt == rt {
 		remote := "{ " + shellJoin(leftArgv) + " | " + shellJoin(rightArgv) + " ; }"
-		cmd := r.sshCmd(ctx, lt, remote, true)
+		cmd, err := r.remoteCmd(ctx, lt, remote, RoleDefault)
+		if err != nil {
+			return err
+		}
 		if r.StderrLog != nil {
 			out, err := r.runWithStderrLog(ctx, cmd)
 			if err != nil {
@@ -270,9 +267,15 @@ func (r *Real) RunPipeDirection(ctx context.Context, leftEp string, leftArgv []s
 		switch strings.ToUpper(direction) {
 		case "PULL":
 			// On target: ssh -n src 'send' | recv
-			inner := r.sshShellCmd(lt, shellJoin(leftArgv), true) +
-				" | " + shellJoin(rightArgv)
-			cmd := r.sshCmd(ctx, rt, inner, true)
+			innerSend, err := r.remoteShell(lt, shellJoin(leftArgv), RoleSend)
+			if err != nil {
+				return err
+			}
+			inner := innerSend + " | " + shellJoin(rightArgv)
+			cmd, err := r.remoteCmd(ctx, rt, inner, RoleDefault)
+			if err != nil {
+				return err
+			}
 			if r.StderrLog != nil {
 				out, err := r.runWithStderrLog(ctx, cmd)
 				if err != nil {
@@ -286,9 +289,15 @@ func (r *Real) RunPipeDirection(ctx context.Context, leftEp string, leftArgv []s
 			return nil
 		case "PUSH":
 			// On source: send | ssh tgt 'recv'
-			inner := shellJoin(leftArgv) +
-				" | " + r.sshShellCmd(rt, shellJoin(rightArgv), false)
-			cmd := r.sshCmd(ctx, lt, inner, true)
+			innerRecv, err := r.remoteShell(rt, shellJoin(rightArgv), RoleRecv)
+			if err != nil {
+				return err
+			}
+			inner := shellJoin(leftArgv) + " | " + innerRecv
+			cmd, err := r.remoteCmd(ctx, lt, inner, RoleDefault)
+			if err != nil {
+				return err
+			}
 			if r.StderrLog != nil {
 				out, err := r.runWithStderrLog(ctx, cmd)
 				if err != nil {
@@ -301,18 +310,18 @@ func (r *Real) RunPipeDirection(ctx context.Context, leftEp string, leftArgv []s
 			}
 			return nil
 		}
-		// Proxy (controller-side): fall through to ssh|ssh below.
+		// Proxy (controller-side): fall through to remote|remote below.
 	}
 
 	pctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// cmds.tsv roles: SEND → ssh -n; RECV → ssh (stdin open for stream).
-	leftCmd, err := r.commandOpts(pctx, lep, leftArgv, cmdbuild.StdinNull(cmdbuild.RoleSend))
+	// cmds.tsv roles: SEND → -n; RECV → stdin open for stream.
+	leftCmd, err := r.commandOpts(pctx, lep, leftArgv, RoleSend)
 	if err != nil {
 		return err
 	}
-	rightCmd, err := r.commandOpts(pctx, rep, rightArgv, cmdbuild.StdinNull(cmdbuild.RoleRecv))
+	rightCmd, err := r.commandOpts(pctx, rep, rightArgv, RoleRecv)
 	if err != nil {
 		return err
 	}
@@ -402,65 +411,33 @@ func (r *Real) output(ctx context.Context, epStr string, argv []string) ([]byte,
 }
 
 func (r *Real) command(ctx context.Context, ep endpoint.Endpoint, argv []string) (*exec.Cmd, error) {
-	// List/snapshot use DEFAULT role → ssh -n.
-	return r.commandOpts(ctx, ep, argv, cmdbuild.StdinNull(cmdbuild.RoleDefault))
+	return r.commandOpts(ctx, ep, argv, RoleDefault)
 }
 
-// commandOpts builds local or ssh argv. stdinNull → ssh -n (DEFAULT/SEND); false keeps stdin (RECV).
-func (r *Real) commandOpts(ctx context.Context, ep endpoint.Endpoint, argv []string, stdinNull bool) (*exec.Cmd, error) {
+// commandOpts builds local or remote-wrapped argv.
+func (r *Real) commandOpts(ctx context.Context, ep endpoint.Endpoint, argv []string, role Role) (*exec.Cmd, error) {
 	if len(argv) == 0 {
 		return nil, fmt.Errorf("empty argv")
 	}
 	if target, ok := sshTarget(ep); ok {
-		return r.sshCmd(ctx, target, shellJoin(argv), stdinNull), nil
+		return r.remoteCmd(ctx, target, shellJoin(argv), role)
 	}
 	return exec.CommandContext(ctx, argv[0], argv[1:]...), nil
 }
 
-func (r *Real) sshCmd(ctx context.Context, target, remote string, stdinNull bool) *exec.Cmd {
-	args := make([]string, 0, 8)
-	if stdinNull {
-		args = append(args, "-n")
+func (r *Real) remoteCmd(ctx context.Context, target, remoteCmd string, role Role) (*exec.Cmd, error) {
+	argv, err := r.remote().Argv(target, remoteCmd, role)
+	if err != nil {
+		return nil, err
 	}
-	args = append(args, r.sshArgs()...)
-	args = append(args, target, remote)
-	return exec.CommandContext(ctx, r.sshBin(), args...)
+	if len(argv) == 0 {
+		return nil, fmt.Errorf("zfs remote: empty argv")
+	}
+	return exec.CommandContext(ctx, argv[0], argv[1:]...), nil
 }
 
-// sshArgs returns the shared SSH flags (excluding -n, target, command).
-func (r *Real) sshArgs() []string {
-	var args []string
-	args = append(args, "-o", "BatchMode=yes", "-o", "ConnectTimeout=30")
-	if r.SSH.IdentityFile != "" {
-		args = append(args, "-i", r.SSH.IdentityFile)
-	}
-	if r.SSH.Port > 0 {
-		args = append(args, "-p", strconv.Itoa(r.SSH.Port))
-	}
-	for _, opt := range r.SSH.Options {
-		args = append(args, "-o", opt)
-	}
-	return args
-}
-
-// sshShellCmd returns a quoted ssh invocation string for embedding in a
-// remote shell pipeline. Includes -n (when stdinNull), sshArgs, target, and
-// the quoted command string.
-func (r *Real) sshShellCmd(target, command string, stdinNull bool) string {
-	var b strings.Builder
-	b.WriteString(r.sshBin())
-	if stdinNull {
-		b.WriteString(" -n")
-	}
-	for _, a := range r.sshArgs() {
-		b.WriteString(" ")
-		b.WriteString(a)
-	}
-	b.WriteString(" ")
-	b.WriteString(shellSingleQuote(target))
-	b.WriteString(" ")
-	b.WriteString(shellSingleQuote(command))
-	return b.String()
+func (r *Real) remoteShell(target, remoteCmd string, role Role) (string, error) {
+	return r.remote().Shell(target, remoteCmd, role)
 }
 
 // runWithStderrLog runs cmd with separate stdout/stderr pipes, writes stderr

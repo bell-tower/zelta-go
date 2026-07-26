@@ -7,12 +7,11 @@ import (
 	"strings"
 
 	"git.belltower.it/djbell/zelta-go/backup"
-	"git.belltower.it/djbell/zelta-go/internal/cmdbuild"
 	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/match"
+	"git.belltower.it/djbell/zelta-go/internal/cmdbuild"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
+	"git.belltower.it/djbell/zelta-go/match"
 	"git.belltower.it/djbell/zelta-go/rotate"
-	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
 func runRotate(args []string) int {
@@ -30,7 +29,7 @@ func runRotate(args []string) int {
 		rotateUsage()
 		return 2
 	}
-	exec := &zfs.Real{}
+	exec := newReal()
 	m, err := match.Compare(context.Background(), exec, match.Request{
 		Source: p.Operands[0], Target: p.Operands[1], Props: match.RotateListProps,
 		Scripting: true, Parsable: true,

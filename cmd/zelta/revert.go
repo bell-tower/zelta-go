@@ -8,8 +8,8 @@ import (
 
 	"git.belltower.it/djbell/zelta-go/backup"
 	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/lineage"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
+	"git.belltower.it/djbell/zelta-go/lineage"
 	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
@@ -32,7 +32,7 @@ func runRevert(args []string) int {
 	if code != 0 {
 		return code
 	}
-	exec := &zfs.Real{}
+	exec := newReal()
 	ep, err := endpoint.Parse(p.Operands[0])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta revert: %v\n", err)

@@ -8,7 +8,6 @@ import (
 
 	"git.belltower.it/djbell/zelta-go/internal/opt"
 	"git.belltower.it/djbell/zelta-go/prune"
-	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
 func runPrune(args []string) int {
@@ -41,7 +40,7 @@ func runPrune(args []string) int {
 		pruneNum = n
 	}
 
-	res, err := prune.Run(context.Background(), &zfs.Real{}, prune.Request{
+	res, err := prune.Run(context.Background(), newReal(), prune.Request{
 		Source:      p.Operands[0],
 		GuardTarget: p.Env.Get("MATCH_ENDPOINT"),
 		PruneGuard:  p.Env.Get("PRUNE_GUARD"),

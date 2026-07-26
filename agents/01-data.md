@@ -36,4 +36,4 @@ Editable + embedded source of truth: repo-root `data/*.tsv` (`package data`, `//
 | `zfs.Real` | `LIST` / `SNAP` via cmdbuild; pipe sides use SEND/RECV roles |
 | `backup` | `SEND` / `RECV` / `SNAP` via cmdbuild |
 
-Still **not** shell-string builders (no recursive `ipc-run` in argv). SSH host wrapping stays in `zfs` (endpoint-aware). Override knobs `REMOTE_SEND`/`RECV`/`DEFAULT` env strings → later via `opt`.
+Still **not** shell-string builders (no recursive `ipc-run` in argv). Remote wrapping stays in `zfs` (`Remote` / `SSHConfig` / `CommandRemote`). CLI maps `ZELTA_REMOTE_*` via `cmd/zelta/remote.go`.
