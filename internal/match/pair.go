@@ -32,6 +32,8 @@ type Pair struct {
 	SrcNext               string
 	TgtNext               string
 	SrcWritten            string
+	SrcEncryption         string
+	TgtEncryption         string
 	TgtWritten            string
 	SrcSnapshotsChanged   string
 	TgtSnapshotsChanged   string
@@ -104,6 +106,7 @@ func fillEnds(p *Pair, sds, tds *Dataset) {
 		p.SrcName = sds.Name
 		p.SrcOrigin = sds.Origin
 		p.SrcWritten = sds.Written
+		p.SrcEncryption = sds.Encryption
 		p.SrcSnapshotsChanged = sds.SnapshotsChanged
 		p.SrcType = sds.Type
 		p.SrcSnaps = len(sds.Snaps)
@@ -121,8 +124,11 @@ func fillEnds(p *Pair, sds, tds *Dataset) {
 		p.TgtName = tds.Name
 		p.TgtOrigin = tds.Origin
 		p.TgtWritten = tds.Written
+		p.TgtEncryption = tds.Encryption
 		p.TgtSnapshotsChanged = tds.SnapshotsChanged
-		p.TgtReceiveResumeToken = tds.ReceiveResumeToken
+		if tds.ReceiveResumeToken != "-" {
+			p.TgtReceiveResumeToken = tds.ReceiveResumeToken
+		}
 		p.TgtType = tds.Type
 		p.TgtSnaps = len(tds.Snaps)
 		if n := len(tds.Snaps); n > 0 {
@@ -141,6 +147,9 @@ func compareSnaps(p *Pair, sds *Dataset, tgt *tree) {
 		if ok && tgSnap.Type == objSnapshot {
 			if p.NumMatches == 0 {
 				p.Match = sp.Savepoint
+				if sp.IVSetGUID != "" && sp.IVSetGUID != "-" && sp.IVSetGUID == tgSnap.IVSetGUID {
+					p.MatchIVSet = sp.IVSetGUID
+				}
 			}
 			p.NumMatches++
 			continue

@@ -9,7 +9,7 @@
 2. **Parent CREATE** if tgt missing: `zfs create -vupo canmount=noauto PARENT` (default on; runs even on `-n`; retry on OpenZFS readonly `-up` bug)
 3. **Snap IF_NEEDED** (default): source written or missing snaps → `zfs snapshot -r SRC@zelta_…`
 4. `PlanFromMatch` + optional `ApplySourceSnap` (predicted on dry-run)
-5. `cmdbuild` SEND/RECV flags from `opt.Resolve()` (SEND_DEFAULT, RECV_TOP/FS/VOL/PARTIAL, RESUME)
+5. `cmdbuild` SEND/RECV flags from `opt.Resolve()` (SEND_DEFAULT, RECV_TOP/FS/VOL/PARTIAL, RESUME), adjusted for encryption compatibility
 6. Dry-run: `would sync N` + snap + first-pass `PipeShell` (same-host ssh hairpin)
 7. Execute: `Snapshot` then `RunPipe`; intermediate full does second-pass incr.
    With `-I` plus include/exclude, each dataset gets independent oldest-first
@@ -45,6 +45,15 @@ precedence over ordinary matching and resumes with `zfs send -t TOKEN`; failed
 resumes do not fall back to an ordinary send. Manual `zfs receive -A` remains
 the operator's abort path.
 
+Encryption compatibility is evaluated per matched dataset. If source and
+target encryption state differs, or both are encrypted without the same
+matched snapshot IV-set GUID, the send flags drop `-e` (including bundled short
+flags) unless `SEND_OVERRIDE` is explicit. An encrypted source in this fallback
+case emits a warning because the stream is decrypted and the encrypted side or
+sides must be unlocked; an unencrypted source to an encrypted target has no
+additional warning. Matching encrypted IV sets retain the normal `-L -c -e`
+flags.
+
 ## Recv flags (oracle defaults)
 
 | Case | Flags |
@@ -71,7 +80,7 @@ the operator's abort path.
 
 ## Defer
 
-Send-check feature drop, resume tokens, and further rotate/clone parity.
+Send-check feature drop and further rotate/clone parity.
 
 Intentional Awk≠Go notes (dry-run first-pass, quoting, RECV constants, …): **`agents/10-deviations.md`**.
 

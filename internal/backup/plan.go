@@ -21,23 +21,27 @@ const (
 
 // Step is one dataset's send/recv plan.
 type Step struct {
-	DSSuffix    string
-	Kind        Kind
-	Info        string
-	Match       string
-	SourceStart string // match savepoint (@/#) for incr; empty = full
-	SourceEnd   string // first-pass send end (earliest on intermediate full)
-	Origin      string // clone origin receive property, when using target-origin
-	FinalEnd    string // if set after full+intermediate: second-pass end (latest)
-	SrcName     string
-	TgtName     string
-	SrcWritten  string
-	SrcType     string // filesystem (default) or volume
-	Send        []string
-	Recv        []string
-	Notice      string
-	Filtered    bool
-	ResumeToken string
+	DSSuffix      string
+	Kind          Kind
+	Info          string
+	Match         string
+	SourceStart   string // match savepoint (@/#) for incr; empty = full
+	SourceEnd     string // first-pass send end (earliest on intermediate full)
+	Origin        string // clone origin receive property, when using target-origin
+	FinalEnd      string // if set after full+intermediate: second-pass end (latest)
+	SrcName       string
+	TgtName       string
+	SrcWritten    string
+	SrcType       string // filesystem (default) or volume
+	SrcEncryption string
+	TgtEncryption string
+	MatchIVSet    string
+	Send          []string
+	Recv          []string
+	Notice        string
+	Warning       string
+	Filtered      bool
+	ResumeToken   string
 }
 
 // Plan is the full backup plan from a match result.
@@ -48,7 +52,8 @@ type Plan struct {
 	Skip  int
 	Block int
 	// Flags drive SEND/RECV fragments (from opt.Resolve or Request).
-	Flags opt.SendRecv
+	Flags    opt.SendRecv
+	Warnings []string
 	// Snap is set when a source snapshot is planned (@name without dataset).
 	SnapSavepoint string
 	SnapReason    string
@@ -75,6 +80,9 @@ type PairView struct {
 	SrcName               string
 	TgtName               string
 	SrcWritten            string
+	SrcEncryption         string
+	TgtEncryption         string
+	MatchIVSet            string
 	SrcSnapshotsChanged   string
 	SrcSavepoints         []string
 	SrcOrigin             string
@@ -99,6 +107,9 @@ func ViewsFromMatch(pairs []*match.Pair) []PairView {
 			SrcName:               p.SrcName,
 			TgtName:               p.TgtName,
 			SrcWritten:            p.SrcWritten,
+			SrcEncryption:         p.SrcEncryption,
+			TgtEncryption:         p.TgtEncryption,
+			MatchIVSet:            p.MatchIVSet,
 			SrcSnapshotsChanged:   p.SrcSnapshotsChanged,
 			SrcSavepoints:         append([]string(nil), p.SrcSavepoints...),
 			SrcOrigin:             p.SrcOrigin,
@@ -130,19 +141,23 @@ func PlanFromMatch(pairs []PairView, intermediate bool, flags opt.SendRecv) (*Pl
 		p.Steps = append(p.Steps, st)
 	}
 	p.recount()
+	p.refreshWarnings()
 	return p, nil
 }
 
 func planPair(v PairView, intermediate bool, flags opt.SendRecv) (*Step, error) {
 	st := &Step{
-		DSSuffix:    v.DSSuffix,
-		Info:        v.Info,
-		Match:       v.Match,
-		SrcName:     v.SrcName,
-		TgtName:     v.TgtName,
-		SrcWritten:  v.SrcWritten,
-		SrcType:     v.SrcType,
-		ResumeToken: v.TgtReceiveResumeToken,
+		DSSuffix:      v.DSSuffix,
+		Info:          v.Info,
+		Match:         v.Match,
+		SrcName:       v.SrcName,
+		TgtName:       v.TgtName,
+		SrcWritten:    v.SrcWritten,
+		SrcType:       v.SrcType,
+		SrcEncryption: v.SrcEncryption,
+		TgtEncryption: v.TgtEncryption,
+		MatchIVSet:    v.MatchIVSet,
+		ResumeToken:   v.TgtReceiveResumeToken,
 	}
 	switch {
 	case v.Info == "up-to-date":
@@ -204,6 +219,7 @@ func planFilteredPair(v PairView, flags opt.SendRecv) ([]*Step, error) {
 			DSSuffix: v.DSSuffix, Info: v.Info, Match: v.Match,
 			SourceStart: start, SourceEnd: end, SrcName: v.SrcName,
 			TgtName: v.TgtName, SrcWritten: v.SrcWritten, SrcType: v.SrcType,
+			SrcEncryption: v.SrcEncryption, TgtEncryption: v.TgtEncryption, MatchIVSet: v.MatchIVSet,
 			Filtered: true,
 		}
 		if v.Info == "syncable (full)" && i == 0 && start == "" {
@@ -231,8 +247,14 @@ func buildCmds(st *Step, intermediate bool, flags opt.SendRecv) error {
 		return buildRecvCmd(st, flags)
 	}
 	srcSnap := st.SrcName + st.SourceEnd
+	sendFlags := flags.SendFlags()
+	if flags.SendOverride == "" {
+		var warning string
+		sendFlags, warning = compatibleSendFlags(st, sendFlags)
+		st.Warning = warning
+	}
 	vars := map[string]string{
-		"flags":   flags.SendFlags(),
+		"flags":   sendFlags,
 		"ds_snap": srcSnap,
 	}
 	if st.Kind == KindIncremental && st.SourceStart != "" {
@@ -350,7 +372,17 @@ func (p *Plan) ApplySourceSnap(savepoint string, intermediate bool) error {
 		}
 	}
 	p.recount()
+	p.refreshWarnings()
 	return nil
+}
+
+func (p *Plan) refreshWarnings() {
+	p.Warnings = nil
+	for _, st := range p.Steps {
+		if st.Warning != "" {
+			p.Warnings = append(p.Warnings, st.Warning)
+		}
+	}
 }
 
 func applySnapToStep(st *Step, savepoint string, intermediate bool, flags opt.SendRecv) error {

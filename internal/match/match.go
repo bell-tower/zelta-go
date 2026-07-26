@@ -47,8 +47,8 @@ var DefaultListProps = []string{"name", "guid", "written", "creation", "used"}
 // MinimalListProps when --no-written (or -p without written/size cols).
 var MinimalListProps = []string{"name", "guid"}
 
-// BackupListProps adds type so backup can choose RECV_FS vs RECV_VOL.
-var BackupListProps = []string{"name", "guid", "written", "creation", "used", "type", "receive_resume_token"}
+// BackupListProps adds encryption context and IV-set identity for send flags.
+var BackupListProps = []string{"name", "guid", "written", "creation", "used", "type", "encryption", "ivsetguid", "receive_resume_token"}
 
 // RotateListProps includes origin for clone-lineage classification.
 var RotateListProps = []string{"name", "guid", "origin", "written", "snapshots_changed", "creation", "used", "type"}

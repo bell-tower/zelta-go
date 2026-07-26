@@ -88,6 +88,77 @@ func TestPlanFullAndIncr(t *testing.T) {
 	}
 }
 
+func TestPlanEncryptionSendFallback(t *testing.T) {
+	cases := []struct {
+		name     string
+		src      string
+		tgt      string
+		ivset    string
+		wantE    bool
+		wantWarn bool
+	}{
+		{name: "both unencrypted", src: "off", tgt: "off", wantE: true},
+		{name: "encrypted target parent", src: "off", tgt: "aes-256-gcm", wantE: false},
+		{name: "plaintext target", src: "aes-256-gcm", tgt: "off", wantE: false, wantWarn: true},
+		{name: "different encrypted keys", src: "aes-256-gcm", tgt: "aes-256-gcm", wantE: false, wantWarn: true},
+		{name: "same encrypted key", src: "aes-256-gcm", tgt: "aes-256-gcm", ivset: "iv-1", wantE: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p, err := PlanFromMatch([]PairView{{
+				Info: "syncable (incremental)", Match: "@base", SrcLast: "@new",
+				SrcName: "tank/src", TgtName: "tank/tgt",
+				SrcEncryption: tc.src, TgtEncryption: tc.tgt, MatchIVSet: tc.ivset,
+			}}, true, defFlags())
+			if err != nil {
+				t.Fatal(err)
+			}
+			send := strings.Join(p.Steps[0].Send, " ")
+			if got := strings.Contains(send, "-e"); got != tc.wantE {
+				t.Fatalf("send=%q contains -e=%v want %v", send, got, tc.wantE)
+			}
+			if got := len(p.Warnings) > 0; got != tc.wantWarn {
+				t.Fatalf("warnings=%v want warning=%v", p.Warnings, tc.wantWarn)
+			}
+		})
+	}
+}
+
+func TestRemoveSendFeatureFromShortFlags(t *testing.T) {
+	if got := removeSendFeature("-L -c -e", "-e"); got != "-L -c" {
+		t.Fatalf("got %q", got)
+	}
+	if got := removeSendFeature("-Lce", "-e"); got != "-Lc" {
+		t.Fatalf("bundled flags got %q", got)
+	}
+}
+
+func TestRunEncryptionFallbackDropsEmbeddedDataFlag(t *testing.T) {
+	fake := &zfs.Fake{Lists: map[string]string{
+		"tank/src": "tank/src\tg1\t0\t1\t1M\tfilesystem\taes-256-gcm\t-\t-\n" +
+			"tank/src@new\tg3\t0\t3\t1K\tsnapshot\taes-256-gcm\tiv-new\t-\n" +
+			"tank/src@base\tg2\t0\t2\t1K\tsnapshot\taes-256-gcm\tiv-source\t-\n",
+		"tank/tgt": "tank/tgt\tg1\t0\t1\t1M\tfilesystem\taes-256-gcm\t-\t-\n" +
+			"tank/tgt@base\tg2\t0\t2\t1K\tsnapshot\taes-256-gcm\tiv-target\t-\n",
+	}}
+	res, err := Run(context.Background(), fake, Request{
+		Source: "tank/src", Target: "tank/tgt", SnapMode: SnapNever,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.Pipes) != 1 {
+		t.Fatalf("pipes=%d", len(fake.Pipes))
+	}
+	send := strings.Join(fake.Pipes[0].Left, " ")
+	if strings.Contains(send, "-e") {
+		t.Fatalf("send retained -e: %q", send)
+	}
+	if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "falling back to decrypted send") {
+		t.Fatalf("warnings=%v plan=%+v", res.Warnings, res.Plan.Steps[0])
+	}
+}
+
 func TestPlanResumeTokenUsesTokenSendOnly(t *testing.T) {
 	p, err := PlanFromMatch([]PairView{{
 		DSSuffix: "", Info: "syncable (resume)", SrcName: "tank/src", TgtName: "tank/tgt",

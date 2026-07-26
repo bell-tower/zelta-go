@@ -21,6 +21,16 @@ func ParseListLines(lines []string, props []string) ([]ListRow, error) {
 	for i, line := range lines {
 		fields := strings.Split(line, "\t")
 		if len(fields) < len(props) {
+			if len(fields) == len(props)-2 && hasProps(props, "encryption", "ivsetguid", "receive_resume_token") {
+				// Older fixtures predate the encryption columns but still have the token.
+				at := propIndex(props, "encryption")
+				fields = append(fields[:at], append([]string{"-", "-"}, fields[at:]...)...)
+			} else if len(fields) == len(props)-3 && hasProps(props, "encryption", "ivsetguid", "receive_resume_token") {
+				at := propIndex(props, "encryption")
+				fields = append(fields[:at], append([]string{"-", "-", "-"}, fields[at:]...)...)
+			}
+		}
+		if len(fields) < len(props) {
 			// Older callers and fixtures may omit the optional resume-token column.
 			token := -1
 			for j, prop := range props {
@@ -49,4 +59,22 @@ func ParseListLines(lines []string, props []string) ([]ListRow, error) {
 		out = append(out, row)
 	}
 	return out, nil
+}
+
+func hasProps(props []string, want ...string) bool {
+	for _, p := range want {
+		if propIndex(props, p) < 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func propIndex(props []string, want string) int {
+	for i, p := range props {
+		if p == want {
+			return i
+		}
+	}
+	return -1
 }

@@ -205,7 +205,7 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		Match:    mres,
 		Plan:     plan,
 		Output:   b.String(),
-		Warnings: append([]string(nil), mres.Warnings...),
+		Warnings: append(append([]string(nil), mres.Warnings...), plan.Warnings...),
 		Errors:   errors,
 	}, nil
 }

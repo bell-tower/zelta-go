@@ -20,6 +20,7 @@ const (
 type Snap struct {
 	Savepoint string // includes @ or #
 	GUID      string
+	IVSetGUID string
 	Written   string
 	Type      objType
 	Name      string
@@ -34,6 +35,7 @@ type Dataset struct {
 	Written            string
 	SnapshotsChanged   string
 	ReceiveResumeToken string
+	Encryption         string
 	Type               string // filesystem | volume (from zfs list type; empty if not listed)
 	Snaps              []Snap
 }
@@ -99,6 +101,7 @@ func (t *tree) addRow(row zfs.ListRow, filt *Filter, sourceSide, preserveSourceS
 		ds.Written = written
 		ds.SnapshotsChanged = row.Props["snapshots_changed"]
 		ds.ReceiveResumeToken = row.Props["receive_resume_token"]
+		ds.Encryption = row.Props["encryption"]
 		ds.Type = row.Props["type"]
 		return nil
 	}
@@ -106,6 +109,7 @@ func (t *tree) addRow(row zfs.ListRow, filt *Filter, sourceSide, preserveSourceS
 	sp := Snap{
 		Savepoint: savepoint,
 		GUID:      guid,
+		IVSetGUID: row.Props["ivsetguid"],
 		Written:   written,
 		Type:      typ,
 		Name:      name,

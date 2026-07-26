@@ -90,6 +90,29 @@ func TestCompareFake(t *testing.T) {
 	}
 }
 
+func TestCompareCapturesEncryptionAndIVSet(t *testing.T) {
+	fake := &zfs.Fake{Lists: map[string]string{
+		"tank/src": "tank/src\tg1\taes-256-gcm\t-\ntank/src@base\tg2\taes-256-gcm\tiv-1\n",
+		"tank/tgt": "tank/tgt\tg1\taes-256-gcm\t-\ntank/tgt@base\tg2\taes-256-gcm\tiv-1\n",
+	}}
+	res, err := Compare(context.Background(), fake, Request{
+		Source: "tank/src", Target: "tank/tgt",
+		Props: []string{"name", "guid", "encryption", "ivsetguid"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := res.Pairs[0].MatchIVSet; got != "iv-1" {
+		t.Fatalf("match ivset=%q", got)
+	}
+	if got := res.Pairs[0].SrcEncryption; got != "aes-256-gcm" {
+		t.Fatalf("source encryption=%q", got)
+	}
+	if got := res.Pairs[0].TgtEncryption; got != "aes-256-gcm" {
+		t.Fatalf("target encryption=%q", got)
+	}
+}
+
 func TestCompareBasicOracle(t *testing.T) {
 	src := strings.Join([]string{
 		"tank/src\t100\t0\t1000\t1M",
