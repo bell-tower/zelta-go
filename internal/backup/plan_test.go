@@ -622,6 +622,29 @@ func TestRunCreateParent(t *testing.T) {
 	}
 }
 
+func TestRunInheritsTargetParentEncryption(t *testing.T) {
+	src := "tank/src\t100\t0\t1\t1M\tfilesystem\toff\t-\t-\ntank/src@a\t101\t0\t2\t1K\tsnapshot\toff\t-\t-\n"
+	parent := "tank/new\t200\t0\t1\t1M\tfilesystem\taes-256-gcm\t-\t-\n"
+	fake := &zfs.Fake{Lists: map[string]string{
+		"tank/src": src,
+		"root@debian:tank/new/leaf/child:tank/new/leaf/child": "",
+		"tank/new": parent,
+	}}
+	res, err := Run(context.Background(), fake, Request{
+		Source:       "tank/src",
+		Target:       "root@debian:tank/new/leaf/child",
+		DryRun:       true,
+		Intermediate: true,
+		SnapMode:     SnapNever,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(res.Output, "-e tank/src@a") {
+		t.Fatalf("embedded-data flag retained for encrypted target parent:\n%s", res.Output)
+	}
+}
+
 func TestVolumeRecvFlags(t *testing.T) {
 	p, err := PlanFromMatch([]PairView{{
 		DSSuffix: "/vol1",

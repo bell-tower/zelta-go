@@ -88,6 +88,17 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 			return nil, err
 		}
 	}
+	for i := range views {
+		if views[i].TgtName != "" {
+			continue
+		}
+		targetDataset := joinTgt(tgtEp.Dataset, views[i].DSSuffix)
+		if encryption, err := targetParentEncryption(ctx, exec, req.Target, targetDataset, props, req.Depth); err != nil {
+			return nil, err
+		} else if encryption != "" {
+			views[i].TgtEncryption = encryption
+		}
+	}
 	var filteredFilter *match.Filter
 	if filteredIntermediate {
 		filter := match.ParseFilter(req.Include, req.Exclude)
@@ -208,6 +219,33 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		Warnings: append(append([]string(nil), mres.Warnings...), plan.Warnings...),
 		Errors:   errors,
 	}, nil
+}
+
+func targetParentEncryption(ctx context.Context, exec zfs.Executor, target, dataset string, props []string, depth int) (string, error) {
+	parent := parentDataset(dataset)
+	for parent != "" {
+		exists, err := exec.Exists(ctx, target, parent)
+		if err != nil {
+			return "", err
+		}
+		if exists {
+			lines, err := exec.List(ctx, target, parent, props, depth)
+			if err != nil {
+				return "", fmt.Errorf("target parent list: %w", err)
+			}
+			rows, err := zfs.ParseListLines(lines, props)
+			if err != nil {
+				return "", fmt.Errorf("target parent parse: %w", err)
+			}
+			for _, row := range rows {
+				if row.Name == parent {
+					return row.Props["encryption"], nil
+				}
+			}
+		}
+		parent = parentDataset(parent)
+	}
+	return "", nil
 }
 
 func configureTargetOrigin(ctx context.Context, exec zfs.Executor, targetOrigin string, mres *match.Result, views []PairView, props []string, depth int) error {

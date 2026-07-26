@@ -52,7 +52,8 @@ flags) unless `SEND_OVERRIDE` is explicit. An encrypted source in this fallback
 case emits a warning because the stream is decrypted and the encrypted side or
 sides must be unlocked; an unencrypted source to an encrypted target has no
 additional warning. Matching encrypted IV sets retain the normal `-L -c -e`
-flags.
+flags. For a missing target dataset, encryption is inherited from the nearest
+existing target ancestor before planning recursive child sends.
 
 ## Recv flags (oracle defaults)
 

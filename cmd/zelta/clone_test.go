@@ -30,6 +30,7 @@ case "$*" in
   *"name,guid,written,creation,used,type,encryption,ivsetguid,receive_resume_token,origin"*"tank/clone") cat %q ;;
   *"name,guid,written,creation,used,type,encryption,ivsetguid,receive_resume_token,origin"*"backup/source") cat %q ;;
   *"name,guid,written,creation,used,type,encryption,ivsetguid,receive_resume_token,origin"*"backup/clone") ;;
+  *"name backup") echo "cannot open 'backup': dataset does not exist" >&2; exit 1 ;;
   *) echo "unexpected zfs argv: $*" >&2; exit 1 ;;
 esac
 `, cloneList, backupSourceList, originList)

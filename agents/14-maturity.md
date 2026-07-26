@@ -27,10 +27,10 @@ execution safety. `RELEASE-APPROVED` is never inferred from green CI.
 | Endpoint parsing | `FAKE-VERIFIED` | broader production endpoint corpus |
 | Match planning/rendering | `GOLDEN-VERIFIED` | wider oracle parity, platform list behavior |
 | Backup dry-run planning | `GOLDEN-VERIFIED` | full edge-case oracle coverage |
-| Backup execution | `REAL-ZFS-VERIFIED` | broader platform and failure-mode corpus |
+| Backup execution | `REAL-ZFS-VERIFIED` | broader failure-mode corpus; encrypted normal paths now Linux/BSD verified |
 | Backup resume-token recovery | `REAL-ZFS-VERIFIED` | upstream fixture and BSD-target receive evidence |
 | Read-only prune | `GOLDEN-VERIFIED` | deferred clone-origin/send-range cases |
-| Clone/revert planning | `REAL-ZFS-VERIFIED` | collision, missing-snapshot, and remote lifecycle cases |
+| Clone/revert planning | `REAL-ZFS-VERIFIED` | remote lifecycle cases; local collision and missing-snapshot cases verified |
 | Rotate planning | `GOLDEN-VERIFIED` | broader lineage cases |
 | Rotate execution | `REAL-ZFS-VERIFIED` | interrupted receive, child failure/recovery lifecycle |
 | `zprune` destructive wrapper | `PLANNED` | implementation plus safety review |
@@ -371,6 +371,48 @@ source at `16212045387473677639`. The preserved target remained at
 `zlab/backup_inc1`. Together with the corrected direct case, this promotes
 normal direct and clone-origin rotation to `REAL-ZFS-VERIFIED`; interrupted
 receive, rollback, and child-recovery behavior remain unverified.
+
+## Real-ZFS Evidence: Encryption Compatibility
+
+This bounded matrix used fresh file-backed pools on Debian 12/OpenZFS 2.3.2
+and FreeBSD 15.1/OpenZFS 2.4.2 on 2026-07-26. Each source tree had a root and
+child dataset. The normal encrypted paths completed recursively with the
+following results on both platforms:
+
+- Encrypted source to plaintext target completed a full receive and emitted the
+  decrypted-send warning.
+- Plaintext source to an encrypted parent completed a full receive. Both root
+  and child target datasets inherited encryption from the existing ancestor.
+- Encrypted source to an encrypted target using a different key completed a
+  full and incremental receive, dropping `-e` and warning on both datasets.
+- A target seeded with `zfs send -w` so its snapshot GUID and IV-set GUID
+  matched the encrypted source retained `-e` for the recursive incremental
+  receive without warnings.
+
+For every completed incremental case, root and child snapshot GUIDs matched the
+source and file hashes matched. Both pools remained `ONLINE` with zero read,
+write, or checksum errors. The raw-send seed was test setup only; the product
+behavior verified here is the subsequent `zelta backup` planning and receive.
+
+## Real-ZFS Evidence: Clone/Revert Boundaries
+
+On Debian 12/OpenZFS 2.3.2, a fresh `zlife` file-backed pool was used on
+2026-07-26. A recursive clone of `zlife/source@base` produced writable root and
+child clones with origins `zlife/source@base` and
+`zlife/source/child@base`, while the source remained unchanged.
+
+- Clone to an existing target was rejected before mutation.
+- Clone from a missing snapshot was rejected before mutation.
+- Revert of the source to `@base` renamed the newer tree to
+  `zlife/source_base`, recursively cloned the selected root and child snapshot
+  back, and left the preserved newer data intact.
+- Revert preservation-name collision was rejected before mutation.
+
+These cases promote local clone/revert collision and missing-snapshot behavior
+to real evidence. Remote lifecycle cases and interrupted rotate receive remain
+unverified. Deterministic tests cover rotate child failure continuation and
+the no-send preservation/snapshot failure boundaries; no real rotate child
+failure was claimed from this run.
 
 ## Rules
 
