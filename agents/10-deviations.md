@@ -150,6 +150,10 @@ blocker, also update `agents/14-maturity.md`.
 - **zprune: no ipc-*** — upstream zprune uses `zelta ipc-env` + `zelta ipc-run` for env bootstrap and
   prune output. Go calls `prune.Run` in-process (same as `zelta prune`) and executes `zfs destroy`
   directly. No `ipc-env` or `ipc-run` verbs implemented.
+- **zprune destroy argv** — `zfs destroy ds@snap1,snap2` (comma form). Space-separated full names
+  are rejected by OpenZFS (“too many arguments”).
+- **zprune remote host** — list output is bare `dataset@snap`; destroy transport uses the **source
+  endpoint** host/user (`destroyCandidates(srcEp, …)`), not `endpoint.Parse(ds)`.
 - **argv[0] dispatch** — `zprune` binary/symlink detected by filename prefix (`zprune`, `zprune-freebsd`,
   etc.) and routed to the `zprune` verb. Also accepts `zelta zprune` directly.
 - **Usage() matches upstream** — all verbs listed including `lock`, `unlock`, `failover`, `propsync`;

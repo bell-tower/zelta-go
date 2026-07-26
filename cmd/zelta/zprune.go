@@ -83,7 +83,12 @@ func runZprune(args []string) int {
 		return 1
 	}
 
-	return destroyCandidates(candidates)
+	srcEp, err := endpoint.Parse(p.Operands[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zprune: source: %v\n", err)
+		return 1
+	}
+	return destroyCandidates(srcEp, candidates)
 }
 
 func confirmDestruction(candidates []string, force bool) bool {
@@ -105,21 +110,20 @@ func confirmDestruction(candidates []string, force bool) bool {
 	return true
 }
 
-func destroyCandidates(candidates []string) int {
+// destroyCandidates runs zfs destroy grouped by dataset. srcEp supplies the
+// transport host (list names are bare dataset paths, not user@host:ds).
+func destroyCandidates(srcEp endpoint.Endpoint, candidates []string) int {
 	groups := groupByDataset(candidates)
 	failed := false
 	for ds, snaps := range groups {
-		ep, err := endpoint.Parse(ds)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "zprune: invalid dataset %q: %v\n", ds, err)
-			failed = true
+		// zfs destroy ds@snap1,snap2 (comma form; space-separated full names fail)
+		target := destroyTarget(ds, snaps)
+		if target == "" {
 			continue
 		}
-		args := []string{"destroy"}
-		for _, s := range snaps {
-			args = append(args, ds+s)
+		if runDestroyCmd(srcEp, []string{"destroy", target}) != 0 {
+			failed = true
 		}
-		runDestroyCmd(ep, args)
 	}
 	if failed {
 		return 1
@@ -138,6 +142,21 @@ func groupByDataset(candidates []string) map[string][]string {
 		groups[ds] = append(groups[ds], c[i:])
 	}
 	return groups
+}
+
+// destroyTarget builds "ds@snap1,snap2" for one zfs destroy invocation.
+func destroyTarget(ds string, snaps []string) string {
+	if len(snaps) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(ds)
+	b.WriteString(snaps[0])
+	for _, s := range snaps[1:] {
+		b.WriteByte(',')
+		b.WriteString(strings.TrimPrefix(s, "@"))
+	}
+	return b.String()
 }
 
 func runDestroyCmd(ep endpoint.Endpoint, args []string) int {
