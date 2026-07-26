@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"git.belltower.it/djbell/zelta-go/internal/conf"
@@ -79,7 +80,12 @@ func runPolicy(args []string) int {
 		return 2
 	}
 
-	fmt.Print(policy.FormatTable(filtered, p.Env.Bool("NO_HEADER", false)))
+	logLevel, _ := strconv.Atoi(p.Env.Get("LOG_LEVEL"))
+	if logLevel >= 3 {
+		fmt.Print(policy.FormatCommands(filtered))
+	} else {
+		fmt.Print(policy.FormatTable(filtered, p.Env.Bool("NO_HEADER", false)))
+	}
 	return 0
 }
 

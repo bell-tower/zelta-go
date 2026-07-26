@@ -34,17 +34,25 @@ func Load(path string, override map[string]string) ([]Job, []string, error) {
 
 func parseLines(lines []line, override map[string]string) ([]Job, []string, error) {
 	global := map[string]string{}
+	ps := policyScopeSet()
 	blocked := map[string]bool{}
 	for k, v := range override {
 		ck, err := canonicalize(k)
 		if err != nil {
-			// Non-option env keys are ignored as overrides.
 			continue
 		}
 		blocked[ck] = true
-		if v != "" {
-			global[ck] = normalizeValue(ck, v)
+		if v == "" {
+			continue
 		}
+		// Only seed policy-scope keys (BACKUP_ROOT, ADD_HOST_PREFIX, etc.)
+		// into the conf-resolved option chain. Non-policy-scope CLI flags
+		// (DRYRUN, LOG_LEVEL, etc.) are inherited by child processes via
+		// the environment, not via conf options.
+		if !ps[ck] {
+			continue
+		}
+		global[ck] = normalizeValue(ck, v)
 	}
 	var siteOpt map[string]string
 	var hostOpt map[string]string

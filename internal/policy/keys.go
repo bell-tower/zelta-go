@@ -82,6 +82,20 @@ func normalizeValue(key, val string) string {
 	return val
 }
 
+// policyScopeSet returns the set of policy-only keys (not forwarded to backup).
+func policyScopeSet() map[string]bool {
+	if err := loadKeys(); err != nil {
+		return nil
+	}
+	out := map[string]bool{}
+	for k, info := range keys {
+		if info.scope {
+			out[k] = true
+		}
+	}
+	return out
+}
+
 type unknownOptionError string
 
 func (e unknownOptionError) Error() string { return "unknown option: " + string(e) }

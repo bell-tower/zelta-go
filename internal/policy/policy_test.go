@@ -216,6 +216,94 @@ func TestImportLoopAndDepth(t *testing.T) {
 	}
 }
 
+func TestFormatCommands(t *testing.T) {
+	dir := writeTree(t, map[string]string{
+		"zelta.yaml": `
+BACKUP_ROOT: tank/B
+SNAP_MODE: ALWAYS
+SEND_INTR: 0
+S:
+  h.example:
+  - pool/a/b
+`,
+	})
+	jobs, _, err := Load(filepath.Join(dir, "zelta.yaml"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := FormatCommands(jobs)
+	if !strings.HasPrefix(out, "+ ") {
+		t.Fatalf("prefix: %q", out)
+	}
+	if !strings.Contains(out, "zelta backup") {
+		t.Fatalf("command: %q", out)
+	}
+	if !strings.Contains(out, "ZELTA_SNAP_MODE") {
+		t.Fatalf("expected SNAP_MODE in prefix: %q", out)
+	}
+	if !strings.Contains(out, "ZELTA_SEND_INTR") {
+		t.Fatalf("expected SEND_INTR in prefix: %q", out)
+	}
+	if !strings.Contains(out, "'h.example:pool/a/b'") {
+		t.Fatalf("source ep quoting: %q", out)
+	}
+	if !strings.Contains(out, "'tank/B/b'") {
+		t.Fatalf("target path: %q", out)
+	}
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 line, got %d", len(lines))
+	}
+}
+
+func TestFormatCommandsSkipsPolicyScope(t *testing.T) {
+	dir := writeTree(t, map[string]string{
+		"zelta.yaml": `
+BACKUP_ROOT: tank/B
+JOBS: 4
+SEND_INTR: 1
+S:
+  h:
+  - p/q
+`,
+	})
+	jobs, _, err := Load(filepath.Join(dir, "zelta.yaml"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := FormatCommands(jobs)
+	if strings.Contains(out, "ZELTA_JOBS") {
+		t.Fatalf("JOBS should be skipped: %q", out)
+	}
+	if !strings.Contains(out, "ZELTA_SEND_INTR") {
+		t.Fatalf("SEND_INTR should be present: %q", out)
+	}
+}
+
+func TestDQEscape(t *testing.T) {
+	if dq(`a"b`) != `"a\"b"` {
+		t.Fatalf("dq quote: %q", dq(`a"b`))
+	}
+	if dq(`a$b`) != `"a\$b"` {
+		t.Fatalf("dq dollar: %q", dq(`a$b`))
+	}
+	if dq(`a\b`) != `"a\\b"` {
+		t.Fatalf("dq backslash: %q", dq(`a\b`))
+	}
+	if dq(`a`+"`"+"b") != `"a\`+"`"+`b"` {
+		t.Fatalf("dq backtick: %q", dq("a`b"))
+	}
+}
+
+func TestSHQEscape(t *testing.T) {
+	if shq(`hello`) != `'hello'` {
+		t.Fatalf("shq simple: %q", shq(`hello`))
+	}
+	if shq(`it's`) != `'it'\''s'` {
+		t.Fatalf("shq quote: %q", shq(`it's`))
+	}
+}
+
 func TestMissingTargetWarn(t *testing.T) {
 	dir := writeTree(t, map[string]string{
 		"zelta.yaml": "S:\n  h:\n  - p/q\n",
