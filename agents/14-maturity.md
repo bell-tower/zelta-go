@@ -27,11 +27,11 @@ execution safety. `RELEASE-APPROVED` is never inferred from green CI.
 | Endpoint parsing | `FAKE-VERIFIED` | broader production endpoint corpus |
 | Match planning/rendering | `GOLDEN-VERIFIED` | wider oracle parity, platform list behavior |
 | Backup dry-run planning | `GOLDEN-VERIFIED` | full edge-case oracle coverage |
-| Backup execution | `FAKE-VERIFIED` | disposable real ZFS, interrupted receive behavior |
+| Backup execution | `REAL-ZFS-VERIFIED` | interrupted receive behavior, resume tokens |
 | Read-only prune | `GOLDEN-VERIFIED` | deferred clone-origin/send-range cases |
-| Clone/revert planning | `GOLDEN-VERIFIED` | real disposable ZFS lifecycle |
+| Clone/revert planning | `REAL-ZFS-VERIFIED` | collision, missing-snapshot, and remote lifecycle cases |
 | Rotate planning | `GOLDEN-VERIFIED` | receive-token and rollback recovery |
-| Rotate execution | `FAKE-VERIFIED` | real failure/recovery lifecycle |
+| Rotate execution | `FAKE-VERIFIED` | direct-source receive defect, child failure/recovery lifecycle |
 | `zprune` destructive wrapper | `PLANNED` | implementation plus safety review |
 | Policy configuration | `PLANNED` | stable option/env contract |
 | Public Go library | `PLANNED` | curated facade and external-package tests |
@@ -202,6 +202,123 @@ ssh djbell@debian id
 Use `space@debian` when a non-root identity is preferable. The account
 bootstrap does not grant sudo and is only for ordinary CLI/configuration
 checks; root remains required for pool administration.
+
+## Real-ZFS Evidence: Debian Scratch Pool
+
+This bounded run used Debian 12/OpenZFS 2.3.2 on 2026-07-26 with a fresh
+file-backed pool:
+
+| Item | Value |
+|---|---|
+| Pool image | `/zfs-storage/zelta-go-lab.img` (512 MiB) |
+| Pool | `zlab` |
+| Source | `zlab/source` with `zlab/source/child` |
+| Backup target | `zlab/backup` |
+| Clone target | `zlab/clone` |
+| Initial source snapshots | `base1`, then `inc1`, then `inc2` |
+| Final pool health | `ONLINE`, zero read/write/checksum errors |
+
+The source fixture used `root.txt` and `child/child.txt`. The initial snapshot
+contained `v1-root` and `v1-child`; the incremental changed the root to
+`v1-root` plus `v2-root` and changed the child to `v2-child`.
+
+### Backup
+
+The dry-run emitted:
+
+```text
+would sync 2 datasets
++ ssh -n root@debian "{ zfs send -P -L -c -e zlab/source@base1 | zfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s zlab/backup ; }"
++ ssh -n root@debian "{ zfs send -P -L -c -e zlab/source/child@base1 | zfs recv -v -u -x mountpoint -o canmount=noauto -s zlab/backup/child ; }"
+```
+
+The full execution emitted exactly `2 full`. The target had matching `base1`
+GUID `12217196464836800807`; both target datasets had `readonly=on` and
+`canmount=noauto`.
+
+After creating source snapshot `inc1` (GUID `17668740559494353207`),
+`backup --no-snapshot` emitted exactly `2 incremental`. The target received
+the matching `inc1` GUID and retained the read-only/noauto properties.
+
+For divergence, the target received a target-only file and snapshot
+`diverged` (GUID `13622520561543807623`), while the source advanced to `inc2`
+(GUID `14682053338455067165`). The command:
+
+```text
+go run ./cmd/zelta backup --no-snapshot root@debian:zlab/source root@debian:zlab/backup
+```
+
+emitted exactly `1 incremental, 1 blocked` and exited 1. The target-only file
+remained present and no `inc2` snapshot was received. This promotes the normal
+full, incremental, and divergent-target refusal path to `REAL-ZFS-VERIFIED`;
+interrupted receive and resume-token recovery remain unverified.
+
+### Clone And Revert
+
+The clone dry-run emitted:
+
+```text
+ssh -n root@debian 'zfs clone -p -o readonly=off zlab/source@inc2 zlab/clone'
+ssh -n root@debian 'zfs clone -p -o readonly=off zlab/source/child@inc2 zlab/clone/child'
+```
+
+Execution succeeded with no output. Both clone roots were writable and had
+the expected origins:
+
+```text
+zlab/clone       origin zlab/source@inc2       readonly off
+zlab/clone/child origin zlab/source/child@inc2 readonly off
+```
+
+The clone accepted a write marker without changing the source. Revert was
+run against `source@inc1`. Its dry-run emitted rename, two clone operations,
+and a final recursive snapshot. Execution emitted exactly:
+
+```text
+to retain replica history, run: zelta rotate 'root@debian:zlab/source' 'TARGET'
+```
+
+The current source contained `v1-root` plus `v2-root` and `v2-child`; the
+preserved `zlab/source_inc1` retained `v3-root` and `v2-child`. The replacement
+source had origins `zlab/source_inc1@inc1` and
+`zlab/source_inc1/child@inc1`, with final snapshot
+`zlab/source@zelta_2026-07-26_03.07.19` (GUID
+`11226628764449256513`). This promotes the normal clone/revert lifecycle only.
+
+### Rotate
+
+The direct-source case used `zlab/source_inc1` (a non-clone source) and
+`zlab/backup`. The dry-run planned preservation at `zlab/backup_inc1` and an
+incremental receive. Execution preserved the target, then failed exactly with
+the following essential errors:
+
+```text
+zelta rotate: send: sync : zfs pipe on root@debian: exit status 1
+cannot receive incremental stream: destination 'zlab/backup' does not exist
+zelta rotate: send /child: sync /child: zfs pipe on root@debian: exit status 1
+cannot open 'zlab/source_inc1/child@zelta_2026-07-26_03.08.21': dataset does not exist
+zelta rotate: preserved target remains at zlab/backup_inc1; incomplete children require manual recovery
+```
+
+The preserved target was restored without destruction. This is a real
+execution defect: the direct path renames away the incremental receive
+destination and then attempts to receive into the absent name. Rotate remains
+`FAKE-VERIFIED`; do not infer direct-path safety from the successful clone-origin
+case.
+
+The clone-origin case used the reverted `zlab/source` and the restored
+`zlab/backup`. Execution succeeded and emitted exactly:
+
+```text
+to ensure target is up-to-date, run: zelta backup root@debian:zlab/source root@debian:zlab/backup
+```
+
+The received root and child had origins
+`zlab/source_inc1@inc1` and `zlab/source_inc1/child@inc1`; the received root
+snapshot GUID matched the source at `11226628764449256513`. The preserved
+divergent target remained at `zlab/backup_inc1`, including its `diverged`
+snapshot. This covers clone-origin rotation only, not the whole rotate
+capability.
 
 ## Rules
 
