@@ -6,13 +6,15 @@ Not public until documented. No man pages here; see `~/Code/zelta/doc/` (or inst
 
 ## Status
 
-Current checkpoint: match, read-only prune, and backup planning/execution are
-implemented with oracle-driven tests. `zprune` and policy configuration remain
-deferred.
+Match, backup, read-only prune, clone/revert, rotate, policy dry-run/exec,
+and `zprune` are implemented with deterministic tests; several paths have
+disposable real-ZFS evidence. Public SDK packages are importable; Sylve
+in-process integration is the next external step (`agents/16-sdk.md`).
+Private Gitea only.
 
 ## Library Status
 
-Curated public packages for ZFS remote-action SDK - stable CLI as consumer:
+Curated public packages (ZFS remote-action SDK); CLI is a thin consumer:
 
 | Package | Purpose |
 |---------|---------|

@@ -3,17 +3,16 @@
 This is the ordered backlog after checkpoint `069979f`. Keep implementation
 work in small commits and update this file when a contract changes.
 
-## Current phase: public SDK and Sylve-critical API gaps
+## Current phase: Sylve integration (Phase D PoC)
 
-`agents/16-sdk.md` contains the full plan. Summary: promote 8 packages out of
-`internal/`, add structured SSH config, typed outcomes, progress hooks, and an
-external-consumer smoke test. See that document for the target layout,
-principles, and phased work.
+Phases A–C done. Phase D **PoC on devhost**: Sylve `SYLVE_ZELTA_GO=1` gates
+`backup.Run` behind `backupWithEventProgressSnapshotNameRecursive`; default
+still embedded Awk. Details and verified smoke: `agents/16-sdk.md` Phase D.
+Transport: OpenSSH client only in zelta-go; Sylve cluster SSH server unchanged.
 
 ## Current library boundary
 
-The useful exported implementation symbols are **being promoted** out of
-`internal/`:
+Public packages at module root:
 
 - `match`: `Compare`, request/result/tree types, rendering and filters
 - `backup`: `Run`, request/result, planning and execution types
@@ -60,10 +59,10 @@ Stay internal: `cmdbuild`, `opt`, `conf`, `policy`.
    dispatch (AWK `should_xargs` parity), and `RETRY` retry loop. `--backup-command`
    and backup-flag forwarding remain deferred; keep precedence tests for conf
    vs env/CLI tight as execution lands.
-8. **In progress (see `agents/16-sdk.md`):** promote 8 packages from
-   `internal/` to top level, add structured SSH config, typed backup outcomes,
-   progress hooks, and an external-consumer smoke test (`sdk/`). Sylve drops
-   shell-out for in-process library calls.
+8. **Complete (A–C):** public SDK packages, `zfs.Remote`/`SSHConfig`/
+   `CommandRemote`, `backup.OnLine` + `ErrCode`, `sdk/` external smoke.
+   **Next (D, out of repo):** Sylve cutover — see drop-in map in
+   `agents/16-sdk.md`.
 9. **Complete:** `zprune` implemented as a direct Go verb (+ argv[0] dispatch
    for `zprune` binary/symlink). Uses in-process `prune.Run` (no ipc-*),
    prints candidate output, confirms (unless `--force`), and executes `zfs

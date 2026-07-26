@@ -21,21 +21,24 @@ structured SSH config, typed results/errors, progress hooks.
 
 | Aspect | Today |
 |--------|-------|
-| Useful APIs | All under `internal/` — **not importable** outside this module |
-| Verb shape | Already library-shaped: `backup.Run(ctx, exec, Request)`, `match.Compare`, `prune.Run` |
-| ZFS port | `zfs.Executor` + `Real` + `Fake` implemented |
-| CLI | Thin: `opt.Parse` → Request → Run → print |
-| Sylve today | Embeds Awk zelta, shells out via `runZeltaWithEnvStreaming`, scrapes lines/JSON |
-| Sylve SSH | `buildZeltaEnv` → `ZELTA_REMOTE_*` env strings (key/port/BatchMode overrides) |
-| Sylve progress | Callback per line → `AppendBackupEventOutput` |
+| Useful APIs | Public packages at module root (`backup/`, `match/`, `zfs/`, …) |
+| Verb shape | `backup.Run`, `match.Compare`, `prune.Run`, lineage/rotate |
+| ZFS port | `zfs.Executor` + `Real` + `Fake` + `Remote` (`SSHConfig`, `CommandRemote`) |
+| Sylve-critical | `SSHConfig`, `Request.OnLine`, `backup.ErrCode`, `JSONReport`, `Candidates()` |
+| External proof | `sdk/sdk_test.go` imports public packages only |
+| CLI | Thin: `opt.Parse` → Request → Run → print; `remoteFromEnv()` |
+| Sylve today (still) | Embeds Awk zelta, shells out, scrapes lines/JSON — **Phase D out of repo** |
+| Sylve SSH (still) | Backup client = OpenSSH argv; Awk path = `ZELTA_REMOTE_*` via thinner env |
+| Sylve progress | Callback per line → `AppendBackupEventOutput` → map to `OnLine` |
 
-**Sylve call sites** that must become library calls:
+**Phases A–C done** (promote + API + sdk smoke). **Phase D** = Sylve cutover PR.
 
-1. `backup --json --incremental --snapshot --snap-name N [--depth 1] SRC TGT`
-2. Restore pull = same backup path with custom `RECV` flags + no-snapshot
-3. `prune --no-ranges --keep-snap-num=N SRC TGT` → `Result.Candidates()`
-4. Custom SSH: key, port, host-key policy (Go `Real` already has
-   `BatchMode=yes`/`ConnectTimeout=30` but no `-i`/`-p` port yet)
+**Sylve call sites** → library:
+
+1. `backup --json --incremental --snapshot --snap-name N [--depth 1] SRC TGT` → `backup.Run`
+2. Restore pull = same backup path with custom `recv` flags + no-snapshot
+3. `prune --no-ranges --keep-snap-num=N SRC TGT` → `prune.Run` + `Candidates()`
+4. Custom SSH: `Real{SSH: SSHConfig{IdentityFile, Port, Options: …}}`
 
 ## Target layout
 
@@ -98,6 +101,38 @@ CLI: `cmd/zelta/remote.go` `remoteFromEnv()` → `CommandRemote` when
 
 Sylve drop-in: set `Real.SSH` (or `Remote: SSHConfig{…}`) — no env strings.
 
+### Transport decision (locked with Hayzam)
+
+| Component | Transport | Notes |
+|-----------|-----------|--------|
+| **zelta-go client** | OpenSSH **binary** via `SSHConfig` / `CommandRemote` | No `golang.org/x/crypto/ssh` client. Keeps `~/.ssh/config`, agent, ProxyJump, ControlMaster. |
+| **Sylve backup / ZFS client** | OpenSSH binary (`buildSSHArgs`) | On-disk keys `data/ssh/target-N_id`; BatchMode; StrictHostKeyChecking=accept-new; timeouts; **own** ControlMaster/Path/Persist under `/tmp/sylve-ssh-*.sock`; no ForwardAgent. |
+| **Sylve → Awk zelta** | `buildZeltaEnv` → `ZELTA_REMOTE_*` | Thinner: BatchMode / hostkey / `-p` / `-i` only — **no** ControlMaster today. |
+| **Sylve cluster peer exec** | `x/crypto/ssh` **server** only (`embedded_ssh.go`) | In-process listener, cluster ed25519 host key, pubkey from raft identities, `exec` → `/bin/sh -c`. Not used for backup streams. |
+
+**OpenSSH config is not disabled** (`-F` unused). CLI/library `-o`/`-i`/`-p` override those knobs only; Host blocks, ProxyJump, agent, and `SSH_AUTH_SOCK` still apply when the caller does not force a private key.
+
+Zero-value `SSHConfig{}` ≈ stock `ssh` + BatchMode + ConnectTimeout=30 — fine for operator CLI. Sylve should set explicit `IdentityFile`, `Port`, and `Options` (mux, hostkey policy) to match `buildSSHArgs`.
+
+Suggested Sylve `SSHConfig` mapping from `buildSSHArgs`:
+
+```go
+zfs.SSHConfig{
+    IdentityFile: keyPath, // data/ssh/target-N_id
+    Port:         port,    // if non-default
+    Options: []string{
+        "StrictHostKeyChecking=accept-new",
+        "ControlMaster=auto",
+        "ControlPath=/tmp/sylve-ssh-" + id + ".sock",
+        "ControlPersist=60",
+        // plus whatever timeouts Sylve already sets
+    },
+}
+// BatchMode=yes and ConnectTimeout=30 are defaults on SSHConfig
+```
+
+Bastion + agent-forward docs for human operators remain valid for CLI/`CommandRemote`; Sylve appliance path is keys+flags, not that model.
+
 ### 2. Progress / log callback
 
 Add optional hook on backup (and prune if cheap):
@@ -156,53 +191,94 @@ opt.Parse → build Request → backup.Run(ctx, &zfs.Real{}, req) → print
 
 ## Migration phases
 
-### Phase A — Mechanical promote
+### Phase A — Mechanical promote — **DONE** (`5a9a88a`)
 
-1. `git mv` each package: `endpoint`, `zfs`, `match`, `backup`, `prune`,
-   `lineage`, `rotate`, `report` out of `internal/`.
-2. Update all import paths across the module.
-3. `make test vet build shelltest` green.
-4. Update `AGENTS.md`, `agents/09-style-go.md`, `agents/11-roadmap.md`,
-   `agents/14-maturity.md`, `README.md`.
+Packages at root; imports fixed; agents/README layout updated.
 
-### Phase B — Sylve-critical API
+### Phase B — Sylve-critical API — **DONE** (`5a9a88a`, `8788f42`)
 
-1. `zfs.SSHConfig` + unit tests for argv shape.
-2. `Request.OnLine` on backup + test.
-3. Typed backup status (`ErrCode`) + test aligned with Sylve's
-   `backup_outcome.go` cases.
-4. Doc comments on every exported type/func (godoc is the contract).
-5. Ensure `JSONReport` populated in all paths (including skipped/up-to-date).
+`SSHConfig` + `Remote`/`CommandRemote`, `OnLine`, `ErrCode`, godoc examples,
+CLI `remoteFromEnv()`.
 
-### Phase C — External consumer proof
+### Phase C — External consumer proof — **DONE** (`sdk/sdk_test.go`)
 
-1. `sdk/example_test.go` as package `sdk_test` importing **only** public
-   packages (fails if something needs `internal`).
-2. Minimal example exercising backup + match + prune.
+Public-import-only smoke for backup + match + prune surface.
 
-### Phase D — Sylve integration (out of repo, this doc guides)
+### Phase D — Sylve integration (out of repo) — **PoC started**
 
-Drop-in map for Sylve:
+Drop-in map:
 
 | Sylve today | zelta-go SDK |
 |-------------|--------------|
 | `runZeltaWithEnvStreaming(…, backup …)` | `backup.Run` + `OnLine` |
-| `buildZeltaEnv` → `REMOTE_*` | `zfs.Real{SSH: …}` |
+| `buildSSHArgs` / `buildZeltaEnv` | `zfs.Real{SSH: SSHConfig{…}}` (see mapping above) |
 | `PruneCandidatesWithTarget` | `prune.Run` + `Candidates()` |
-| `classifyBackupOutput` | typed `Result.ErrCode` |
-| `EnsureZeltaInstalled` embed | **delete** (link library) |
+| `classifyBackupOutput` | `Result.ErrCode` (+ text hints for legacy classifier) |
+| `EnsureZeltaInstalled` embed | **keep for now** (flagged path only) |
 | Regex size/stream scrapers | `report.BackupResult` fields |
+| Cluster peer SSH server | stays `x/crypto/ssh` in Sylve — **not** zelta-go |
 
-Sylve keeps: DB, queues, jail/VM fences, HA, destroy, manifests.
+Sylve keeps: DB, queues, jail/VM fences, HA, destroy, manifests, embedded
+cluster SSH server.
+
+#### PoC status (2026-07-26, `devhost` / vault1)
+
+**Host layout**
+
+| Path | Role |
+|------|------|
+| `/root/zelta-go` | rsync of this module (private; not yet required on Gitea for build) |
+| `/root/Sylve` | Sylve master + PoC patches |
+| `rust07-scratch/zelta-go-poc/*` | disposable backup smoke (src→tgt) |
+| `apool/treetop` | present golden-like tree — **do not destroy** |
+| `bpool` | not imported on this host |
+
+**Sylve changes (gated, default off)**
+
+1. `go.mod`: `require git.belltower.it/djbell/zelta-go v0.0.0` +  
+   `replace … => /root/zelta-go`
+2. `internal/services/zelta/zelta_go_backup.go` — `useZeltaGo()`,  
+   `sshConfigFromTarget` (ControlMaster/Path/Persist + key/port),  
+   `backupWithZeltaGo` → `backup.Run` + JSON + `OnLine` → event log
+3. `backupWithEventProgressSnapshotNameRecursive` — if `SYLVE_ZELTA_GO=1|true|yes|on`,  
+   call Go path; else embedded Awk (unchanged)
+4. Unit: `zelta_go_backup_test.go` (`useZeltaGo`, `errCodeHint`)
+
+**Verified**
+
+- `go build ./internal/services/zelta` on FreeBSD/devhost
+- `go test ./internal/services/zelta -run 'TestUseZeltaGo|TestErrCodeHint'`
+- Real ZFS via library/CLI on `rust07-scratch/zelta-go-poc`: full + incremental JSON OK;  
+  standalone `backup.Run` + `OnLine` progress lines OK
+- **Not yet:** full Sylve job queue under `SYLVE_ZELTA_GO=1`, restore/prune cutover,  
+  remote SSH target via Sylve BackupTarget keys, delete embed
+
+**Enable**
+
+```sh
+export SYLVE_ZELTA_GO=1
+# Sylve process must see the env; replace path must resolve on that host
+```
+
+**Next PoC steps (still boring)**
+
+1. One real Sylve backup job with flag on (local source → `rust07-scratch/sylve/…` or poc tgt)
+2. Dual-run one job Awk vs Go and compare `classifyBackupOutput` / GUIDs
+3. Push zelta-go to Gitea when ready; drop `replace` for `GOPRIVATE` fetch
+4. Prune candidates second; restore third; keep embed until flag is default
+
+### Optional polish (this repo, not blocking D)
+
+- Godoc pass on every exported symbol if anything thin remains
+- README polish deferred until after first Sylve link or Daniel asks
+- Policy remains CLI-first (`internal/policy`); promote only if an integrator wants conf graphs
 
 ## Verification (stop conditions)
 
 | Phase | Check |
 |-------|-------|
-| A | `make test vet build shelltest` green; no imports of moved pkgs from wrong path |
-| B | Package tests for SSH argv, OnLine, typed errors; JSONReport in skip path |
-| C | `sdk/example_test.go` builds with only public imports |
-| D | (not in this repo) Sylve cutover PR |
+| A–C | Done — unit/sdk tests + public packages |
+| D | (not in this repo) Sylve cutover PR using `GOPRIVATE` + module path |
 
 ## Doc updates
 
