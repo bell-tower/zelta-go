@@ -88,6 +88,59 @@ func TestPlanFullAndIncr(t *testing.T) {
 	}
 }
 
+func TestPlanResumeTokenUsesTokenSendOnly(t *testing.T) {
+	p, err := PlanFromMatch([]PairView{{
+		DSSuffix: "", Info: "syncable (resume)", SrcName: "tank/src", TgtName: "tank/tgt",
+		TgtReceiveResumeToken: "token-123",
+	}}, true, defFlags())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Steps) != 1 || p.Steps[0].Kind != KindIncremental {
+		t.Fatalf("steps=%+v", p.Steps)
+	}
+	if got := strings.Join(p.Steps[0].Send, " "); got != "zfs send -t token-123" {
+		t.Fatalf("send=%q", got)
+	}
+	if strings.Contains(strings.Join(p.Steps[0].Send, " "), "-i") || strings.Contains(strings.Join(p.Steps[0].Send, " "), "-I") {
+		t.Fatalf("resume send used incremental flags: %v", p.Steps[0].Send)
+	}
+	if got := strings.Join(p.Steps[0].Recv, " "); !strings.Contains(got, "-s tank/tgt") {
+		t.Fatalf("recv=%q", got)
+	}
+}
+
+func TestRunResumesTargetToken(t *testing.T) {
+	fake := &zfs.Fake{Lists: map[string]string{
+		"tank/src": "tank/src\tg1\t0\t1\t1M\tfilesystem\t-\ntank/src@a\tg2\t0\t2\t1K\tsnapshot\t-\n",
+		"tank/tgt": "tank/tgt\tg1\t0\t1\t1M\tfilesystem\ttoken-123\n",
+	}}
+	_, err := Run(context.Background(), fake, Request{Source: "tank/src", Target: "tank/tgt", SnapMode: SnapNever})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.Pipes) != 1 || strings.Join(fake.Pipes[0].Left, " ") != "zfs send -t token-123" {
+		t.Fatalf("pipes=%v", fake.Pipes)
+	}
+}
+
+func TestRunResumeFailureDoesNotRetryNormalSend(t *testing.T) {
+	fake := &zfs.Fake{
+		Lists: map[string]string{
+			"tank/src": "tank/src\tg1\t0\t1\t1M\tfilesystem\t-\ntank/src@a\tg2\t0\t2\t1K\tsnapshot\t-\n",
+			"tank/tgt": "tank/tgt\tg1\t0\t1\t1M\tfilesystem\ttoken-123\n",
+		},
+		PipeErrors: map[string]error{"token-123": fmt.Errorf("interrupted receive")},
+	}
+	_, err := Run(context.Background(), fake, Request{Source: "tank/src", Target: "tank/tgt", SnapMode: SnapNever})
+	if err == nil {
+		t.Fatal("expected resume failure")
+	}
+	if len(fake.Pipes) != 1 {
+		t.Fatalf("resume failure retried: %v", fake.Pipes)
+	}
+}
+
 func TestRecvFlagsTopFull(t *testing.T) {
 	p, err := PlanFromMatch([]PairView{{
 		DSSuffix: "",

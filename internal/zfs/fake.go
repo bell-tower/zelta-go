@@ -23,6 +23,7 @@ type Fake struct {
 	Renames        []RenameCall
 	ListErrors     map[string]error
 	BookmarkErrors map[string]error
+	PipeErrors     map[string]error
 }
 
 type BookmarkCall struct{ Endpoint, SourceSnap, Bookmark string }
@@ -107,6 +108,11 @@ func (f *Fake) RunPipeDirection(_ context.Context, leftEp string, leftArgv []str
 		Right:     append([]string(nil), rightArgv...),
 		Direction: direction,
 	})
+	if len(leftArgv) > 0 {
+		if err := f.PipeErrors[leftArgv[len(leftArgv)-1]]; err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

@@ -28,6 +28,7 @@ execution safety. `RELEASE-APPROVED` is never inferred from green CI.
 | Match planning/rendering | `GOLDEN-VERIFIED` | wider oracle parity, platform list behavior |
 | Backup dry-run planning | `GOLDEN-VERIFIED` | full edge-case oracle coverage |
 | Backup execution | `REAL-ZFS-VERIFIED` | interrupted receive behavior, resume tokens |
+| Backup resume-token recovery | `FAKE-VERIFIED` | interrupted disposable-ZFS fixture and cross-platform evidence |
 | Read-only prune | `GOLDEN-VERIFIED` | deferred clone-origin/send-range cases |
 | Clone/revert planning | `REAL-ZFS-VERIFIED` | collision, missing-snapshot, and remote lifecycle cases |
 | Rotate planning | `GOLDEN-VERIFIED` | receive-token and rollback recovery |

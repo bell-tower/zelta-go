@@ -18,6 +18,14 @@ and captured by a test.
 
 This remains upstream-only work for now and must not block the Go line.
 
+## Interrupted receive fixture
+
+- Add a deterministic Bourne+AWK/integration fixture that interrupts a
+  recursive `zfs recv -s`, discovers `receive_resume_token` per dataset, and
+  resumes with `zfs send -t` without a blind ordinary retry.
+- Verify the fixture on disposable Linux and BSD ZFS before treating the Go
+  resume implementation as cross-lineage evidence.
+
 ## Rotate confirmation strictness
 
 - Upstream `zelta rotate` reloads source/target state after rotation and reports

@@ -21,7 +21,20 @@ func ParseListLines(lines []string, props []string) ([]ListRow, error) {
 	for i, line := range lines {
 		fields := strings.Split(line, "\t")
 		if len(fields) < len(props) {
-			return nil, fmt.Errorf("line %d: got %d fields, want %d", i+1, len(fields), len(props))
+			// Older callers and fixtures may omit the optional resume-token column.
+			token := -1
+			for j, prop := range props {
+				if prop == "receive_resume_token" {
+					token = j
+					break
+				}
+			}
+			if token < 0 || len(fields) != len(props)-1 {
+				return nil, fmt.Errorf("line %d: got %d fields, want %d", i+1, len(fields), len(props))
+			}
+			fields = append(fields, "")
+			copy(fields[token+1:], fields[token:])
+			fields[token] = ""
 		}
 		row := ListRow{Props: make(map[string]string, len(props))}
 		for j, p := range props {

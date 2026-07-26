@@ -51,8 +51,9 @@ making `internal` types part of a promised external contract.
    recovery remain manual, with no blind retry of interrupted receives.
 6. **Complete for planned filtered sends:** snapshot creation, final bookmarks,
    recursive filter precedence, and zero-eligible no-ops are covered;
-   receive-token discovery and `zfs send -t` recovery remain manual. Retain
-   the reusable planning abstraction rather than copying the Awk loop blindly.
+    receive-token discovery and `zfs send -t` recovery are implemented and
+    fake-verified; disposable interrupted-receive evidence remains. Retain the
+    reusable planning abstraction rather than copying the Awk loop blindly.
 7. Decide and document the public library facade. Only then move or re-export
    packages and add external-package tests.
 8. Implement `zprune` as a separate destructive wrapper with prompt, force,

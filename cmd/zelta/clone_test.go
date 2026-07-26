@@ -27,9 +27,9 @@ func TestRunCloneAndBackupDryRun(t *testing.T) {
 case "$*" in
   *"-o name,type"*"tank/source") cat %q ;;
   *"name tank/clone") echo "cannot open 'tank/clone': dataset does not exist" >&2; exit 1 ;;
-  *"name,guid,written,creation,used,type,origin"*"tank/clone") cat %q ;;
-  *"name,guid,written,creation,used,type,origin"*"backup/source") cat %q ;;
-  *"name,guid,written,creation,used,type,origin"*"backup/clone") ;;
+  *"name,guid,written,creation,used,type,receive_resume_token,origin"*"tank/clone") cat %q ;;
+  *"name,guid,written,creation,used,type,receive_resume_token,origin"*"backup/source") cat %q ;;
+  *"name,guid,written,creation,used,type,receive_resume_token,origin"*"backup/clone") ;;
   *) echo "unexpected zfs argv: $*" >&2; exit 1 ;;
 esac
 `, cloneList, backupSourceList, originList)

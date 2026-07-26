@@ -144,6 +144,14 @@ func SnapArgv(datasetSnap string) ([]string, error) {
 	return Build("SNAP", map[string]string{"ds_snap": datasetSnap})
 }
 
+// ResumeSendArgv builds zfs send -t TOKEN without normal send flags.
+func ResumeSendArgv(token string) ([]string, error) {
+	if token == "" {
+		return nil, fmt.Errorf("cmdbuild: SEND_RESUME empty token")
+	}
+	return Build("SEND_RESUME", map[string]string{"resume_token": token})
+}
+
 // CreateArgv builds CREATE (zfs create -vupo canmount=noauto) for parent datasets.
 func CreateArgv(dataset string) ([]string, error) {
 	if dataset == "" {

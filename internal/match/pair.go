@@ -17,34 +17,35 @@ const (
 
 // Pair is one source/target dataset comparison row.
 type Pair struct {
-	DSSuffix            string
-	Match               string
-	MatchIVSet          string
-	NumMatches          int
-	SrcName             string
-	TgtName             string
-	SrcOrigin           string
-	TgtOrigin           string
-	SrcFirst            string
-	TgtFirst            string
-	SrcLast             string
-	TgtLast             string
-	SrcNext             string
-	TgtNext             string
-	SrcWritten          string
-	TgtWritten          string
-	SrcSnapshotsChanged string
-	TgtSnapshotsChanged string
-	SrcType             string // filesystem | volume
-	TgtType             string
-	SrcSnaps            int
-	SrcSavepoints       []string
-	TgtSnaps            int
-	XferNum             int
-	XferSize            int64
-	NumBlocked          int
-	Info                string
-	status              pairStatus
+	DSSuffix              string
+	Match                 string
+	MatchIVSet            string
+	NumMatches            int
+	SrcName               string
+	TgtName               string
+	SrcOrigin             string
+	TgtOrigin             string
+	SrcFirst              string
+	TgtFirst              string
+	SrcLast               string
+	TgtLast               string
+	SrcNext               string
+	TgtNext               string
+	SrcWritten            string
+	TgtWritten            string
+	SrcSnapshotsChanged   string
+	TgtSnapshotsChanged   string
+	TgtReceiveResumeToken string
+	SrcType               string // filesystem | volume
+	TgtType               string
+	SrcSnaps              int
+	SrcSavepoints         []string
+	TgtSnaps              int
+	XferNum               int
+	XferSize              int64
+	NumBlocked            int
+	Info                  string
+	status                pairStatus
 }
 
 func pairTrees(src, tgt *tree) []*Pair {
@@ -121,6 +122,7 @@ func fillEnds(p *Pair, sds, tds *Dataset) {
 		p.TgtOrigin = tds.Origin
 		p.TgtWritten = tds.Written
 		p.TgtSnapshotsChanged = tds.SnapshotsChanged
+		p.TgtReceiveResumeToken = tds.ReceiveResumeToken
 		p.TgtType = tds.Type
 		p.TgtSnaps = len(tds.Snaps)
 		if n := len(tds.Snaps); n > 0 {
@@ -172,6 +174,10 @@ func setInfo(pairs []*Pair) {
 			continue
 		case pairSrcOnly:
 			p.Info = "syncable (full)"
+			continue
+		}
+		if p.TgtReceiveResumeToken != "" && p.TgtReceiveResumeToken != "-" {
+			p.Info = "syncable (resume)"
 			continue
 		}
 

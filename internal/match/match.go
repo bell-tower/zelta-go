@@ -48,7 +48,7 @@ var DefaultListProps = []string{"name", "guid", "written", "creation", "used"}
 var MinimalListProps = []string{"name", "guid"}
 
 // BackupListProps adds type so backup can choose RECV_FS vs RECV_VOL.
-var BackupListProps = []string{"name", "guid", "written", "creation", "used", "type"}
+var BackupListProps = []string{"name", "guid", "written", "creation", "used", "type", "receive_resume_token"}
 
 // RotateListProps includes origin for clone-lineage classification.
 var RotateListProps = []string{"name", "guid", "origin", "written", "snapshots_changed", "creation", "used", "type"}

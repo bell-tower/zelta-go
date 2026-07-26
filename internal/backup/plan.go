@@ -37,6 +37,7 @@ type Step struct {
 	Recv        []string
 	Notice      string
 	Filtered    bool
+	ResumeToken string
 }
 
 // Plan is the full backup plan from a match result.
@@ -65,22 +66,23 @@ type BookmarkPlan struct {
 
 // PairView is the match fields backup needs (decoupled for tests).
 type PairView struct {
-	DSSuffix            string
-	Info                string
-	Match               string
-	SrcLast             string
-	SrcNext             string
-	TgtLast             string
-	SrcName             string
-	TgtName             string
-	SrcWritten          string
-	SrcSnapshotsChanged string
-	SrcSavepoints       []string
-	SrcOrigin           string
-	TargetOrigin        string
-	FilteredEnds        []string
-	FilteredActive      bool
-	SrcType             string // filesystem | volume; empty → filesystem
+	DSSuffix              string
+	Info                  string
+	Match                 string
+	SrcLast               string
+	SrcNext               string
+	TgtLast               string
+	SrcName               string
+	TgtName               string
+	SrcWritten            string
+	SrcSnapshotsChanged   string
+	SrcSavepoints         []string
+	SrcOrigin             string
+	TargetOrigin          string
+	TgtReceiveResumeToken string
+	FilteredEnds          []string
+	FilteredActive        bool
+	SrcType               string // filesystem | volume; empty → filesystem
 }
 
 // ViewsFromMatch maps match.Pair → PairView.
@@ -88,19 +90,20 @@ func ViewsFromMatch(pairs []*match.Pair) []PairView {
 	out := make([]PairView, 0, len(pairs))
 	for _, p := range pairs {
 		out = append(out, PairView{
-			DSSuffix:            p.DSSuffix,
-			Info:                p.Info,
-			Match:               p.Match,
-			SrcLast:             p.SrcLast,
-			SrcNext:             p.SrcNext,
-			TgtLast:             p.TgtLast,
-			SrcName:             p.SrcName,
-			TgtName:             p.TgtName,
-			SrcWritten:          p.SrcWritten,
-			SrcSnapshotsChanged: p.SrcSnapshotsChanged,
-			SrcSavepoints:       append([]string(nil), p.SrcSavepoints...),
-			SrcOrigin:           p.SrcOrigin,
-			SrcType:             p.SrcType,
+			DSSuffix:              p.DSSuffix,
+			Info:                  p.Info,
+			Match:                 p.Match,
+			SrcLast:               p.SrcLast,
+			SrcNext:               p.SrcNext,
+			TgtLast:               p.TgtLast,
+			SrcName:               p.SrcName,
+			TgtName:               p.TgtName,
+			SrcWritten:            p.SrcWritten,
+			SrcSnapshotsChanged:   p.SrcSnapshotsChanged,
+			SrcSavepoints:         append([]string(nil), p.SrcSavepoints...),
+			SrcOrigin:             p.SrcOrigin,
+			TgtReceiveResumeToken: p.TgtReceiveResumeToken,
+			SrcType:               p.SrcType,
 		})
 	}
 	return out
@@ -132,13 +135,14 @@ func PlanFromMatch(pairs []PairView, intermediate bool, flags opt.SendRecv) (*Pl
 
 func planPair(v PairView, intermediate bool, flags opt.SendRecv) (*Step, error) {
 	st := &Step{
-		DSSuffix:   v.DSSuffix,
-		Info:       v.Info,
-		Match:      v.Match,
-		SrcName:    v.SrcName,
-		TgtName:    v.TgtName,
-		SrcWritten: v.SrcWritten,
-		SrcType:    v.SrcType,
+		DSSuffix:    v.DSSuffix,
+		Info:        v.Info,
+		Match:       v.Match,
+		SrcName:     v.SrcName,
+		TgtName:     v.TgtName,
+		SrcWritten:  v.SrcWritten,
+		SrcType:     v.SrcType,
+		ResumeToken: v.TgtReceiveResumeToken,
 	}
 	switch {
 	case v.Info == "up-to-date":
@@ -160,6 +164,8 @@ func planPair(v PairView, intermediate bool, flags opt.SendRecv) (*Step, error) 
 		st.Kind = KindIncremental
 		st.SourceStart = v.Match
 		st.SourceEnd = v.SrcLast
+	case v.Info == "syncable (resume)":
+		st.Kind = KindIncremental
 	case strings.HasPrefix(v.Info, "blocked") || v.Info == "no source (target only)":
 		st.Kind = KindBlocked
 		st.Notice = v.Info
@@ -179,7 +185,7 @@ func planPair(v PairView, intermediate bool, flags opt.SendRecv) (*Step, error) 
 		st.Origin = v.TargetOrigin
 	}
 
-	if st.SourceEnd == "" {
+	if st.ResumeToken == "" && st.SourceEnd == "" {
 		st.Kind = KindBlocked
 		st.Notice = "no source snapshot to send"
 		return st, nil
@@ -216,6 +222,14 @@ func planFilteredPair(v PairView, flags opt.SendRecv) ([]*Step, error) {
 }
 
 func buildCmds(st *Step, intermediate bool, flags opt.SendRecv) error {
+	if st.ResumeToken != "" {
+		send, err := cmdbuild.ResumeSendArgv(st.ResumeToken)
+		if err != nil {
+			return err
+		}
+		st.Send = send
+		return buildRecvCmd(st, flags)
+	}
 	srcSnap := st.SrcName + st.SourceEnd
 	vars := map[string]string{
 		"flags":   flags.SendFlags(),
@@ -238,13 +252,16 @@ func buildCmds(st *Step, intermediate bool, flags opt.SendRecv) error {
 	}
 	st.Send = send
 
-	tgt := st.TgtName
-	if tgt == "" {
+	return buildRecvCmd(st, flags)
+}
+
+func buildRecvCmd(st *Step, flags opt.SendRecv) error {
+	if st.TgtName == "" {
 		return fmt.Errorf("backup: empty target name for %q", st.DSSuffix)
 	}
 	recv, err := cmdbuild.Build("RECV", map[string]string{
 		"flags": recvFlags(st, flags),
-		"ds":    tgt,
+		"ds":    st.TgtName,
 	})
 	if err != nil {
 		return err

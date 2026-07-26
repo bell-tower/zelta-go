@@ -40,8 +40,10 @@ not combined with clone-origin backup.
 
 When filters retain no source snapshot for a dataset, filtered planning is a
 no-op for that dataset: it emits no invalid send range and creates no bookmark.
-Receive-token discovery and `zfs send -t` recovery are not automatic yet; an
-interrupted receive remains a manual recovery case.
+Target `receive_resume_token` is discovered per dataset. A token takes
+precedence over ordinary matching and resumes with `zfs send -t TOKEN`; failed
+resumes do not fall back to an ordinary send. Manual `zfs receive -A` remains
+the operator's abort path.
 
 ## Recv flags (oracle defaults)
 
