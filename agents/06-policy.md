@@ -67,6 +67,20 @@ Source endpoint is always `{source_remote}:{dataset}` (including `localhost:`).
 **Deviation:** Awk policy skips exporting defaults/`zelta.env` into AWK `Opt`, so
 conf effectively beats env-file there. Go follows `00-contracts` instead.
 
+## Deferred (lowest priority)
+
+These are defined in `opts.tsv` and the AWK source but are dead stubs — no
+runtime effect in either implementation. Implement only if upstream behavior
+changes or a specific use case demands them.
+
+- `BACKUP_COMMAND` / `--backup-command` — override the `zelta backup` command
+  binary. Stored but never consulted during command construction in AWK.
+- `ARCHIVE_ROOT` / `--archive-root` — relative target path for rotated clones.
+  Declared "NOT YET IMPLEMENTED" in the upstream man page.
+- Full backup-flag forwarding into live runs — currently only the env-var
+  prefix is forwarded. Remaining CLI-flag embedding (e.g. `--send-default`
+  translated into `-L -c -e` on the child argv) is deferred.
+
 ## Dry-run output
 
 - Default: header `SOURCE`/`TARGET`; width = max(6, longest source); two spaces.
