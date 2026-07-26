@@ -15,8 +15,11 @@ following the documented option hierarchy in `00-contracts.md`.
 - Dry-run table: `-n` / `--dryrun`, scripting `-H`
 - Operand filter (OR): site | host | source_remote | source ds | target | `host:ds` | source leaf
 
-**Defer:** job execution, `JOBS`/`RETRY`, `--backup-command`,
-full backup-flag forwarding into live runs, `ARCHIVE_ROOT`.
+**Implemented:** job execution (sequential `exec.Command` with env forwarding
+and per-job `LOG_PREFIX` injection). `BACKUP_COMMAND` and `ARCHIVE_ROOT` are
+dead stubs (same as AWK). `JOBS`/`RETRY` for parallel dispatch and retry are
+next; `--backup-command` and backup-flag forwarding into live runs are
+explicitly deferred.
 
 ## Config shape
 

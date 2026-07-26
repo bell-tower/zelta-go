@@ -75,18 +75,25 @@ func runPolicy(args []string) int {
 		return 1
 	}
 
-	if !p.Env.Bool("DRYRUN", false) {
-		fmt.Fprintf(os.Stderr, "error: policy execution not implemented; use -n/--dryrun\n")
-		return 2
+	if p.Env.Bool("DRYRUN", false) {
+		logLevel, _ := strconv.Atoi(p.Env.Get("LOG_LEVEL"))
+		if logLevel >= 3 {
+			fmt.Print(policy.FormatCommands(filtered))
+		} else {
+			fmt.Print(policy.FormatTable(filtered, p.Env.Bool("NO_HEADER", false)))
+		}
+		return 0
 	}
 
-	logLevel, _ := strconv.Atoi(p.Env.Get("LOG_LEVEL"))
-	if logLevel >= 3 {
-		fmt.Print(policy.FormatCommands(filtered))
-	} else {
-		fmt.Print(policy.FormatTable(filtered, p.Env.Bool("NO_HEADER", false)))
+	results := policy.Run(filtered)
+	exitCode := 0
+	for _, r := range results {
+		if r.Err != nil {
+			fmt.Fprintf(os.Stderr, "error: backup failed for %s: %v\n", r.Job.SourceEP(), r.Err)
+			exitCode = 1
+		}
 	}
-	return 0
+	return exitCode
 }
 
 var builtInDefaults = map[string]string{

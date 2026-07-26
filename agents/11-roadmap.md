@@ -57,9 +57,11 @@ making `internal` types part of a promised external contract.
    over remote root and child interruptions. Retain the reusable planning
    abstraction rather than copying the Awk loop blindly.
 7. **MVP complete:** policy dry-run (`-n`/`-H`/`-C`, import, fan-out, operand
-   filter, prefix resolution) matches the centralized example oracle. Next:
-   job execution with `JOBS`/`RETRY`, `-n -v` command dump, and backup-flag
-   forwarding; keep precedence tests for conf vs env/CLI tight as execution lands.
+   filter, prefix resolution, `-n -v` command dump) matches the centralized
+   example oracle. **Complete:** sequential job execution with env forwarding
+   and per-job `LOG_PREFIX` injection. Next: `JOBS`/`RETRY` for parallel
+   dispatch and retry; `--backup-command` and backup-flag forwarding remain
+   deferred; keep precedence tests for conf vs env/CLI tight as execution lands.
 8. Stabilize the practical work-alike CLI and its cross-platform evidence
    before committing to the public Go library facade. Keep the facade decision
    explicit, then promote or re-export packages and add external-package tests.
