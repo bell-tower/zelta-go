@@ -69,6 +69,15 @@ conf effectively beats env-file there. Go follows `00-contracts` instead.
 - `-H`: no header; single space.
 - No ZFS/SSH.
 
+## Test fixtures
+
+Golden fixture directory: `testdata/golden/policy/` (gitignored `.out` files).
+Config YAML files are tracked. Generate golden outputs locally by running the
+tool against the config and saving to `*.out` files. Current fixture:
+
+- `centralized/` — AWK oracle parity (93 jobs, 6 sites). Runs `FormatTable` in
+  four variants: header/no-header, all-jobs, filtered (AWS0, AWS0+CLIENT0).
+
 ## Known option keys
 
 Any `opts.tsv` key whose VERBS column contains `policy` or `all`. Unknown conf
