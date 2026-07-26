@@ -32,10 +32,11 @@ making `internal` types part of a promised external contract.
 
 ## Ordered work
 
-1. **In progress:** documentation reconciliation and the smallest disposable
-   real-ZFS verification set are complete on Debian. Backup and normal
-   clone/revert passed; clone-origin rotate passed; direct-source rotate still
-   exposes an execution defect and must be fixed before rotate can advance.
+1. **Complete for normal paths:** documentation reconciliation and the
+   smallest disposable real-ZFS verification set are complete on Debian.
+   Backup, clone/revert, direct-source rotate, and clone-origin rotate passed.
+   Interrupted receive, resume-token, rollback, and child-recovery cases remain
+   explicit manual gaps.
 2. **Complete:** prune golden fixtures and CLI integration coverage now cover
    the current read-only analysis; keep clone-origin and send-range cases
    deferred with zprune.
@@ -44,11 +45,10 @@ making `internal` types part of a promised external contract.
 4. **Complete:** the four-endpoint clone-and-backup workflow composes ordinary
    `clone` with `backup --target-origin`; orchestration remains separate from
    lineage primitives.
-5. **Complete for planned/failure-safe paths:** Rotate planning and failure
-   reporting are covered, and clone-origin execution passed disposable-ZFS
-   evidence; direct-source execution still has the documented receive defect.
-   Exact receive-token and rollback recovery remain manual, with no blind retry
-   of interrupted receives.
+5. **Complete for normal planned/execution paths:** Rotate planning, direct and
+   clone-origin execution, and failure reporting are covered by deterministic
+   and disposable-ZFS evidence. Exact receive-token, rollback, and child
+   recovery remain manual, with no blind retry of interrupted receives.
 6. **Complete for planned filtered sends:** snapshot creation, final bookmarks,
    recursive filter precedence, and zero-eligible no-ops are covered;
    receive-token discovery and `zfs send -t` recovery remain manual. Retain

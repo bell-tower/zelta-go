@@ -22,7 +22,9 @@ decisions differ.
 2. If the target diverged, preserve it with `zfs rename -fp` to a name tied to
    the matching snapshot.
 3. Receive the source incrementally against the preserved target when a direct
-   common snapshot exists.
+   common snapshot exists. The direct path first seeds the new target with a
+   full receive of the common source snapshot so the incremental stream has a
+   matching snapshot GUID; the preserved target remains the divergence record.
 4. If there is no direct match, inspect the source dataset's ZFS `origin` and
    verify the corresponding target origin snapshot exists.
 5. Use `zfs recv -o origin=<preserved-target>@<origin-snapshot>` for the
@@ -39,7 +41,9 @@ from planning and remains covered by dry-run goldens and injected-failure tests.
 Origin data now flows through `match.RotateListProps`, and direct-match plus
 verified source-origin dry-run plans emit per-child send/receive lineage.
 Source snapshot-if-needed/always planning, target preservation collision checks
-are present in the planner/CLI. Execution is available through
+are present in the planner/CLI. Direct execution seeds the common snapshot
+before its incremental stream; clone-origin execution receives against the
+verified preserved origin. Execution is available through
 `internal/rotate.ExecuteResult`; it re-runs match and reports remaining
 divergence. Preservation and source-snapshot failures stop before any receive;
 independent child failures continue with structured progress. Exact

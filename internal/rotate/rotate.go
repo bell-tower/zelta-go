@@ -146,15 +146,38 @@ func planPair(sourceRoot, targetRoot, preserved string, pair *match.Pair, req Tr
 		return nil, nil
 	}
 	sourceStart := ""
+	fromOrigin := false
 	if matchName != "" {
 		sourceStart = sourceDataset + matchName
 	} else if originDS, originSnap, ok := splitOrigin(pair.SrcOrigin); ok && hasSnapshot(req.TargetRows, targetDataset+originSnap) {
 		matchName = originSnap
 		sourceStart = originDS + originSnap
+		fromOrigin = true
 	}
 	origin := ""
-	if matchName != "" {
+	if fromOrigin {
 		origin = preserved + pair.DSSuffix + matchName
+	}
+	steps := make([]Step, 0, 4)
+	if matchName != "" && !fromOrigin {
+		seed, err := cmdbuild.Build("SEND", map[string]string{
+			"flags":   req.Flags.SendFlags(),
+			"ds_snap": sourceDataset + matchName,
+		})
+		if err != nil {
+			return nil, err
+		}
+		seedRecv, err := cmdbuild.Build("RECV", map[string]string{
+			"flags": recvFlags(req.Flags, pair.SrcType, "", pair.DSSuffix == ""),
+			"ds":    targetDataset,
+		})
+		if err != nil {
+			return nil, err
+		}
+		steps = append(steps,
+			Step{Kind: "send", Argv: seed, DSSuffix: pair.DSSuffix},
+			Step{Kind: "recv", Argv: seedRecv, DSSuffix: pair.DSSuffix},
+		)
 	}
 	vars := map[string]string{
 		"flags":   req.Flags.SendFlags(),
@@ -174,10 +197,10 @@ func planPair(sourceRoot, targetRoot, preserved string, pair *match.Pair, req Tr
 	if err != nil {
 		return nil, err
 	}
-	return []Step{
-		{Kind: "send", Argv: send, DSSuffix: pair.DSSuffix},
-		{Kind: "recv", Argv: recv, DSSuffix: pair.DSSuffix},
-	}, nil
+	return append(steps,
+		Step{Kind: "send", Argv: send, DSSuffix: pair.DSSuffix},
+		Step{Kind: "recv", Argv: recv, DSSuffix: pair.DSSuffix},
+	), nil
 }
 
 func joinDataset(root, suffix string) string {
@@ -383,10 +406,16 @@ func ExecuteResult(ctx context.Context, exec zfs.Executor, req TreeRequest, step
 			recv := steps[i+1]
 			if err := exec.RunPipeDirection(ctx, req.Source, step.Argv, req.Target, recv.Argv, req.SyncDirection); err != nil {
 				result.Failures = append(result.Failures, Failure{Kind: step.Kind, DSSuffix: step.DSSuffix, Err: fmt.Errorf("sync %s: %w", step.DSSuffix, err)})
-				i++
+				if i+2 < len(steps) && steps[i+2].Kind == "send" && steps[i+2].DSSuffix == step.DSSuffix {
+					i += 3
+				} else {
+					i++
+				}
 				continue
 			}
-			result.Completed = append(result.Completed, step.DSSuffix)
+			if i+2 >= len(steps) || steps[i+2].Kind != "send" || steps[i+2].DSSuffix != step.DSSuffix {
+				result.Completed = append(result.Completed, step.DSSuffix)
+			}
 			i++
 		case "recv":
 			return nil, fmt.Errorf("rotate: receive without send for %q", step.DSSuffix)

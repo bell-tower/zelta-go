@@ -18,7 +18,7 @@ func TestDirectDivergencePlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_base\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s -o origin=tank/target_base@base tank/target\n" {
+	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_base\nzfs send -P -L -c -e tank/src@base\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\n" {
 		t.Fatalf("format=%q", got)
 	}
 }
@@ -45,7 +45,7 @@ func TestPlanUsesNextSourceSnapshotForOneRotateStep(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := steps[1].Argv[len(steps[1].Argv)-1]; got != "tank/src@next" {
+	if got := steps[3].Argv[len(steps[3].Argv)-1]; got != "tank/src@next" {
 		t.Fatalf("send end=%q", got)
 	}
 }
@@ -58,7 +58,7 @@ func TestPlanAllowsTargetAtTheCommonMatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(steps) != 3 {
+	if len(steps) != 5 {
 		t.Fatalf("steps=%v", steps)
 	}
 }
@@ -91,7 +91,7 @@ func TestPlanTreeAddsFullSourceOnlyChild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_base\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s -o origin=tank/target_base@base tank/target\nzfs send -P -L -c -e tank/src/child@child\nzfs recv -v -u -x mountpoint -o canmount=noauto -s tank/target/child\n" {
+	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_base\nzfs send -P -L -c -e tank/src@base\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e tank/src/child@child\nzfs recv -v -u -x mountpoint -o canmount=noauto -s tank/target/child\n" {
 		t.Fatalf("format=%q", got)
 	}
 }
@@ -108,7 +108,7 @@ func TestPlanTreeUsesVerifiedChildOrigin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_base\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s -o origin=tank/target_base@base tank/target\nzfs send -P -L -c -e -I tank/original/child@child-base tank/src/child@child-new\nzfs recv -v -u -x mountpoint -o canmount=noauto -s -o origin=tank/target_base/child@child-base tank/target/child\n" {
+	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_base\nzfs send -P -L -c -e tank/src@base\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/original/child@child-base tank/src/child@child-new\nzfs recv -v -u -x mountpoint -o canmount=noauto -s -o origin=tank/target_base/child@child-base tank/target/child\n" {
 		t.Fatalf("format=%q", got)
 	}
 }
@@ -128,7 +128,7 @@ func TestExecuteRenamesThenPipesInPlanOrder(t *testing.T) {
 	if len(fake.Renames) != 1 || fake.Renames[0].OldDataset != "tank/target" || fake.Renames[0].NewDataset != "tank/target_base" {
 		t.Fatalf("renames=%v", fake.Renames)
 	}
-	if len(fake.Pipes) != 1 || fake.Pipes[0].Direction != "PULL" {
+	if len(fake.Pipes) != 2 || fake.Pipes[0].Direction != "PULL" || fake.Pipes[1].Direction != "PULL" {
 		t.Fatalf("pipes=%v", fake.Pipes)
 	}
 }
@@ -192,7 +192,7 @@ func TestExecuteResultContinuesAfterChildFailure(t *testing.T) {
 	if len(result.Failures) != 1 || result.Failures[0].DSSuffix != "/child" {
 		t.Fatalf("failures=%+v", result.Failures)
 	}
-	if len(fake.Pipes) != 2 {
+	if len(fake.Pipes) != 5 {
 		t.Fatalf("pipes=%v", fake.Pipes)
 	}
 }

@@ -31,7 +31,7 @@ execution safety. `RELEASE-APPROVED` is never inferred from green CI.
 | Read-only prune | `GOLDEN-VERIFIED` | deferred clone-origin/send-range cases |
 | Clone/revert planning | `REAL-ZFS-VERIFIED` | collision, missing-snapshot, and remote lifecycle cases |
 | Rotate planning | `GOLDEN-VERIFIED` | receive-token and rollback recovery |
-| Rotate execution | `FAKE-VERIFIED` | direct-source receive defect, child failure/recovery lifecycle |
+| Rotate execution | `REAL-ZFS-VERIFIED` | interrupted receive, child failure/recovery lifecycle |
 | `zprune` destructive wrapper | `PLANNED` | implementation plus safety review |
 | Policy configuration | `PLANNED` | stable option/env contract |
 | Public Go library | `PLANNED` | curated facade and external-package tests |
@@ -287,10 +287,8 @@ source had origins `zlab/source_inc1@inc1` and
 
 ### Rotate
 
-The direct-source case used `zlab/source_inc1` (a non-clone source) and
-`zlab/backup`. The dry-run planned preservation at `zlab/backup_inc1` and an
-incremental receive. Execution preserved the target, then failed exactly with
-the following essential errors:
+The first direct-source attempt used `zlab/source_inc1` (a non-clone source)
+and `zlab/backup`. It exposed this defect before the fix:
 
 ```text
 zelta rotate: send: sync : zfs pipe on root@debian: exit status 1
@@ -300,25 +298,41 @@ cannot open 'zlab/source_inc1/child@zelta_2026-07-26_03.08.21': dataset does not
 zelta rotate: preserved target remains at zlab/backup_inc1; incomplete children require manual recovery
 ```
 
-The preserved target was restored without destruction. This is a real
-execution defect: the direct path renames away the incremental receive
-destination and then attempts to receive into the absent name. Rotate remains
-`FAKE-VERIFIED`; do not infer direct-path safety from the successful clone-origin
-case.
+The preserved target was restored without destruction. The fix makes direct
+rotation seed the common source snapshot into the new target, then apply the
+incremental stream. The corrected dry-run emitted, in order:
 
-The clone-origin case used the reverted `zlab/source` and the restored
-`zlab/backup`. Execution succeeded and emitted exactly:
+```text
+ssh -n root@debian "{ zfs send -P -L -c -e zlab/source@base1 | zfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s zlab/backup ; }"
+ssh -n root@debian "{ zfs send -P -L -c -e -I zlab/source@base1 zlab/source@inc1 | zfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s zlab/backup ; }"
+ssh -n root@debian "{ zfs send -P -L -c -e zlab/source/child@base1 | zfs recv -v -u -x mountpoint -o canmount=noauto -s zlab/backup/child ; }"
+ssh -n root@debian "{ zfs send -P -L -c -e -I zlab/source/child@base1 zlab/source/child@inc1 | zfs recv -v -u -x mountpoint -o canmount=noauto -s zlab/backup/child ; }"
+```
+
+Execution emitted exactly:
 
 ```text
 to ensure target is up-to-date, run: zelta backup root@debian:zlab/source root@debian:zlab/backup
 ```
 
-The received root and child had origins
-`zlab/source_inc1@inc1` and `zlab/source_inc1/child@inc1`; the received root
-snapshot GUID matched the source at `11226628764449256513`. The preserved
-divergent target remained at `zlab/backup_inc1`, including its `diverged`
-snapshot. This covers clone-origin rotation only, not the whole rotate
-capability.
+The received `base1` and `inc1` GUIDs matched the source for both root and
+child. The target contained `v1-root` plus `v2-root` and `v2-child`, while the
+preserved divergent target remained at `zlab/backup_base1` with its target-only
+snapshot. The pool remained `ONLINE` with zero errors.
+
+The clone-origin regression used `zlab/clonesrc` (originating at
+`zlab/source@inc1`) and `zlab/backup`. Execution succeeded and emitted exactly:
+
+```text
+to ensure target is up-to-date, run: zelta backup root@debian:zlab/source root@debian:zlab/backup
+```
+
+The received root and child had origins `zlab/backup_inc1@inc1` and
+`zlab/backup_inc1/child@inc1`; the received `clone1` snapshot GUID matched the
+source at `16212045387473677639`. The preserved target remained at
+`zlab/backup_inc1`. Together with the corrected direct case, this promotes
+normal direct and clone-origin rotation to `REAL-ZFS-VERIFIED`; interrupted
+receive, rollback, and child-recovery behavior remain unverified.
 
 ## Rules
 
