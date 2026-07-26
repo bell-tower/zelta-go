@@ -304,6 +304,108 @@ func TestSHQEscape(t *testing.T) {
 	}
 }
 
+func TestTabAfterDash(t *testing.T) {
+	dir := writeTree(t, map[string]string{
+		"zelta.yaml": "BACKUP_ROOT: tank/B\nS:\n  h:\n  -\tpool/a\n",
+	})
+	jobs, _, err := Load(filepath.Join(dir, "zelta.yaml"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(jobs) != 1 {
+		t.Fatalf("jobs=%d", len(jobs))
+	}
+	if jobs[0].Source != "pool/a" {
+		t.Fatalf("source=%q", jobs[0].Source)
+	}
+}
+
+func TestMixedCaseOption(t *testing.T) {
+	dir := writeTree(t, map[string]string{
+		"zelta.yaml": "backup_root: tank/B\nsnap_time: 4h\nS:\n  h:\n  - pool/a\n",
+	})
+	jobs, _, err := Load(filepath.Join(dir, "zelta.yaml"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(jobs) != 1 || jobs[0].Target != "tank/B/a" {
+		t.Fatalf("mixed case: %q", jobs[0].Target)
+	}
+}
+
+func TestTabIndentRejected(t *testing.T) {
+	// AWK also uses explicit space indentation; tabs are not accepted.
+	dir := writeTree(t, map[string]string{
+		"zelta.yaml": "BACKUP_ROOT: tank/B\nS:\n\th.example:\n\t- pool/a/b\n",
+	})
+	_, _, err := Load(filepath.Join(dir, "zelta.yaml"), nil)
+	if err == nil || !strings.Contains(err.Error(), "configuration parse error") {
+		t.Fatalf("expected parse error, got %v", err)
+	}
+}
+
+func TestEmptyJobLists(t *testing.T) {
+	if got := FormatTable(nil, true); got != "" {
+		t.Fatalf("nil table: %q", got)
+	}
+	if got := FormatCommands(nil); got != "" {
+		t.Fatalf("nil cmds: %q", got)
+	}
+}
+
+func TestOptValWhitespace(t *testing.T) {
+	dir := writeTree(t, map[string]string{
+		"zelta.yaml": "BACKUP_ROOT:  tank/B  \nSNAP_MODE:  ALWAYS  \nS:\n  h:\n  - pool/a\n",
+	})
+	jobs, _, err := Load(filepath.Join(dir, "zelta.yaml"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(jobs) != 1 || jobs[0].Target != "tank/B/a" {
+		t.Fatalf("whitespace target: %q", jobs[0].Target)
+	}
+	out := FormatCommands(jobs)
+	if !strings.Contains(out, "ZELTA_SNAP_MODE") {
+		t.Fatalf("expected SNAP_MODE with trimmed val: %q", out)
+	}
+}
+
+func TestHyphenatedSourceEP(t *testing.T) {
+	dir := writeTree(t, map[string]string{
+		"zelta.yaml": "BACKUP_ROOT: tank/B\nS:\n  h:\n  - pool/a: user@remote:tank/X\n",
+	})
+	jobs, _, err := Load(filepath.Join(dir, "zelta.yaml"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(jobs) != 1 {
+		t.Fatalf("jobs=%d", len(jobs))
+	}
+	if jobs[0].Source != "pool/a" {
+		t.Fatalf("source=%q", jobs[0].Source)
+	}
+	if jobs[0].Target != "user@remote:tank/X" {
+		t.Fatalf("target=%q", jobs[0].Target)
+	}
+}
+
+func TestColonWithoutSpaceNoTarget(t *testing.T) {
+	dir := writeTree(t, map[string]string{
+		"zelta.yaml": "BACKUP_ROOT: tank/B\nS:\n  h:\n  - host:path\n",
+	})
+	jobs, _, err := Load(filepath.Join(dir, "zelta.yaml"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(jobs) != 1 {
+		t.Fatalf("jobs=%d", len(jobs))
+	}
+	// "host:path" — internal colon, no space after, should not split as target
+	if jobs[0].Source != "host:path" {
+		t.Fatalf("source=%q", jobs[0].Source)
+	}
+}
+
 func TestMissingTargetWarn(t *testing.T) {
 	dir := writeTree(t, map[string]string{
 		"zelta.yaml": "S:\n  h:\n  - p/q\n",
