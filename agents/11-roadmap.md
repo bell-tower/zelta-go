@@ -35,8 +35,9 @@ making `internal` types part of a promised external contract.
 1. **Complete for normal paths:** documentation reconciliation and the
    smallest disposable real-ZFS verification set are complete on Debian.
    Backup, clone/revert, direct-source rotate, and clone-origin rotate passed.
-   Interrupted receive, resume-token, rollback, and child-recovery cases remain
-   explicit manual gaps.
+   Interrupted receive, resume-token, and child-recovery behavior are now
+    real-ZFS verified over a remote stream. Native rollback is covered by the
+    divergent-target rotate continuity contract rather than a separate test.
 2. **Complete:** prune golden fixtures and CLI integration coverage now cover
    the current read-only analysis; keep clone-origin and send-range cases
    deferred with zprune.
@@ -47,13 +48,14 @@ making `internal` types part of a promised external contract.
    lineage primitives.
 5. **Complete for normal planned/execution paths:** Rotate planning, direct and
    clone-origin execution, and failure reporting are covered by deterministic
-   and disposable-ZFS evidence. Exact receive-token, rollback, and child
-   recovery remain manual, with no blind retry of interrupted receives.
+   and disposable-ZFS evidence. Native rollback is covered by divergent-target
+    continuity; interrupted receive and child recovery are verified in backup
+    execution.
 6. **Complete for planned filtered sends:** snapshot creation, final bookmarks,
    recursive filter precedence, and zero-eligible no-ops are covered;
-    receive-token discovery and `zfs send -t` recovery are implemented and
-    fake-verified; disposable interrupted-receive evidence remains. Retain the
-    reusable planning abstraction rather than copying the Awk loop blindly.
+   receive-token discovery and `zfs send -t` recovery are real-ZFS verified
+   over remote root and child interruptions. Retain the reusable planning
+   abstraction rather than copying the Awk loop blindly.
 7. Decide and document the public library facade. Only then move or re-export
    packages and add external-package tests.
 8. Implement `zprune` as a separate destructive wrapper with prompt, force,

@@ -27,11 +27,11 @@ execution safety. `RELEASE-APPROVED` is never inferred from green CI.
 | Endpoint parsing | `FAKE-VERIFIED` | broader production endpoint corpus |
 | Match planning/rendering | `GOLDEN-VERIFIED` | wider oracle parity, platform list behavior |
 | Backup dry-run planning | `GOLDEN-VERIFIED` | full edge-case oracle coverage |
-| Backup execution | `REAL-ZFS-VERIFIED` | interrupted receive behavior, resume tokens |
-| Backup resume-token recovery | `FAKE-VERIFIED` | interrupted disposable-ZFS fixture and cross-platform evidence |
+| Backup execution | `REAL-ZFS-VERIFIED` | broader platform and failure-mode corpus |
+| Backup resume-token recovery | `REAL-ZFS-VERIFIED` | upstream fixture and BSD-target receive evidence |
 | Read-only prune | `GOLDEN-VERIFIED` | deferred clone-origin/send-range cases |
 | Clone/revert planning | `REAL-ZFS-VERIFIED` | collision, missing-snapshot, and remote lifecycle cases |
-| Rotate planning | `GOLDEN-VERIFIED` | receive-token and rollback recovery |
+| Rotate planning | `GOLDEN-VERIFIED` | broader lineage cases |
 | Rotate execution | `REAL-ZFS-VERIFIED` | interrupted receive, child failure/recovery lifecycle |
 | `zprune` destructive wrapper | `PLANNED` | implementation plus safety review |
 | Policy configuration | `PLANNED` | stable option/env contract |
@@ -51,8 +51,9 @@ The minimum disposable-ZFS check for promoting backup execution beyond
    and verify execution refuses to overwrite it.
 
 These checks establish normal full, incremental, and divergence safety only.
-Interrupted receive recovery, resume tokens, and rollback behavior remain
-manual evidence gaps and must not be inferred from this set.
+Remote interrupted-receive and resume-token evidence is recorded below. Native
+`zfs rollback` is not a separate gap: divergent-target rotate already
+exercises the continuity-preserving recovery contract.
 
 ## Smallest Clone/Revert Evidence Set
 
@@ -86,8 +87,44 @@ the clone/revert check:
    retrying an interrupted receive.
 
 These checks establish normal direct and source-origin rotation behavior only.
-Receive-token discovery, `zfs send -t`, and rollback recovery remain manual
-evidence gaps.
+Receive-token recovery belongs to backup execution and is covered separately;
+native rollback is intentionally not treated as a separate rotate contract.
+
+## Real-ZFS Evidence: Remote Resume
+
+This bounded run used a remote stream between disposable hosts on 2026-07-25:
+
+| Item | Value |
+|---|---|
+| Source | `root@dev2.bts.djb0:cpool/zelta_resume_source` |
+| Target | `root@debian:zres/target` and `zres/target_child` |
+| Source ZFS | FreeBSD 15.1/OpenZFS 2.4.2 |
+| Target ZFS | Debian 12/OpenZFS 2.3.2 |
+| Data | 250 MiB incompressible random data in each root and child |
+| Target pool | File-backed `zres` at `/zfs-storage/zelta-resume.img` |
+
+The first run interrupted the root receive after the remote target had created
+the dataset. `receive_resume_token` was non-empty and the partial root held
+119 MiB. After the remote send/receive processes were terminated, rerunning
+backup completed with `1 full, 1 incremental`.
+
+The source and target snapshot GUIDs matched:
+
+```text
+root:  5799551512374381403
+child: 10626060680250662850
+```
+
+The root and child file hashes matched the source, and `zpool status` remained
+`ONLINE` with zero read, write, or checksum errors. A second run interrupted
+specifically during the child receive; the child retained a non-empty resume
+token while the root was complete. Rerunning completed with `1 incremental,
+1 skipped`, cleared the child token, and preserved the matching root and child
+snapshot GUIDs.
+
+The controller-side SSH process must not be assumed to terminate the remote
+pipeline. The evidence run explicitly identified and terminated the remote
+send/receive processes after confirming the target token.
 
 ## Golden Pool Lab
 
