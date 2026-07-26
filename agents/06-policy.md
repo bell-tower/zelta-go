@@ -15,7 +15,7 @@ following the documented option hierarchy in `00-contracts.md`.
 - Dry-run table: `-n` / `--dryrun`, scripting `-H`
 - Operand filter (OR): site | host | source_remote | source ds | target | `host:ds` | source leaf
 
-**Defer:** job execution, `JOBS`/`RETRY`, `-n -v` command dump, `--backup-command`,
+**Defer:** job execution, `JOBS`/`RETRY`, `--backup-command`,
 full backup-flag forwarding into live runs, `ARCHIVE_ROOT`.
 
 ## Config shape
