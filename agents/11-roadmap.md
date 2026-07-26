@@ -1,6 +1,6 @@
 # Roadmap
 
-This is the ordered backlog after checkpoint `bf37bb1`. Keep implementation
+This is the ordered backlog after checkpoint `069979f`. Keep implementation
 work in small commits and update this file when a contract changes.
 
 ## Current phase: hardening and evidence
@@ -22,6 +22,8 @@ The useful exported implementation symbols are currently internal:
 - `internal/cmdbuild`: data-driven command construction
 - `internal/endpoint`: endpoint parsing and dataset suffix handling
 - `internal/opt`: defaults, environment resolution, and opts.tsv parsing
+- `internal/lineage`: clone and revert planning/execution
+- `internal/rotate`: rotate planning/execution and failure reporting
 
 The Go module is therefore not yet a public library. The next API decision is
 to promote a curated facade, likely under top-level packages, or explicitly
@@ -30,9 +32,9 @@ making `internal` types part of a promised external contract.
 
 ## Ordered work
 
-1. Complete the hardening pass: keep `AGENTS.md`, this roadmap,
-   `agents/10-deviations.md`, and `agents/14-maturity.md` consistent; identify
-   the smallest real-ZFS verification set for backup, clone/revert, and rotate.
+1. **In progress:** documentation reconciliation and the backup evidence plan
+   are complete. Define and, with explicit approval, run the smallest
+   disposable real-ZFS verification sets for clone/revert and rotate.
 2. **Complete:** prune golden fixtures and CLI integration coverage now cover
    the current read-only analysis; keep clone-origin and send-range cases
    deferred with zprune.

@@ -14,7 +14,7 @@ Sibling reference tree (read only when extracting a contract): `~/Code/zelta/`.
 2. Read **`AGENTS-Persona.md`** if present (gitignored local persona + human context).
 3. Query **Memory Palace MCP** for cross-repo / business / session intelligence (see Persona).
 4. Read `agents/11-roadmap.md` for current strategy and maturity boundaries.
-5. Open **one** package/operation-specific `agents/NN-*.md` file.
+5. Open package/operation-specific `agents/NN-*.md` file before other referenced files.
 6. Prefer `testdata/golden/**` + contracts over reading AWK source.
 
 ---
@@ -26,14 +26,13 @@ Sibling reference tree (read only when extracting a contract): `~/Code/zelta/`.
 3. Behavior truth = `testdata/golden/**` + `agents/00-contracts.md`, not AWK.
 4. When porting: extract **one** contract note into the relevant `agents/` file, then implement from that.
 5. Cheap loop: `go test ./internal/<pkg>/...` — no ZFS, no sudo.
-6. Expensive loop (OK with frontier models): golden regen from real `zelta match`, integration tags.
-7. Do not invent S3/blob here; that waits for Ruby product line.
-8. Passing tests does not authorize adjacent feature work.
-9. Never start work beyond the explicitly specified bounded loops.
+6. Expensive loop when approved: golden regen from real `zelta match`, integration tags.
+7. Passing tests does not authorize adjacent feature work.
+8. Never start work beyond the specified bounded loops, but you are encouraged to suggest efficiency wins by grouping tasks by feature and workflow.
 
 ### Model and task fit
 
-- **Tight-loop model:** one package, one contract, one failing test or golden mismatch.
+- **Tight-loops:** one package, one contract, one failing test or golden mismatch.
 - **High-context model:** bounded architecture review, contract extraction, risk review, or test-matrix design. It must return a short decision/contract before implementation.
 - No model may ingest the whole sibling Awk tree and then autonomously broaden scope.
 - Every implementation session has explicit stop conditions for each specified bounded loop: focused test, relevant full test, vet/build as appropriate, diff review, status review, report, stop.
@@ -50,6 +49,20 @@ Use Task/subagents **proactively** when work would otherwise stuff the main thre
 | Parallel research (cols + shellspec + list props) | Trivial one-shot answers |
 
 **How:** narrow prompt; demand a short return (contract bullets, file paths, expected I/O) — not a dump of source. Main agent implements from that summary. Explore for search; general for multi-step extract+fixture. Do not fan out subagents for work that fits in one cheap test cycle.
+
+### Collaboration loop
+
+For a substantial batch, propose a few related features, tests, configurations,
+or evidence steps before implementation. Incorporate Daniel's ZFS/Zelta nuance
+and access arrangements, then execute the approved batch end to end: implement,
+check, test, document, commit, and report. Use subagents for expensive
+cross-repo exploration or parallel research; do not burn long unattended loops
+without an explicit batch boundary. Ask questions only for real ambiguity,
+missing access, or a safety decision; do not stop for trivial confirmations.
+
+Multiple bounded loops may be completed in one approved batch. Each loop still
+needs its own scope, stop condition, focused verification, and diff/status
+review. Do not select additional work after the approved batch closes.
 
 ---
 
@@ -140,6 +153,29 @@ Before reporting completion, the editor must:
 4. Record a contract/deviation only if behavior actually changed.
 5. Report verified behavior and unverified assumptions.
 6. Stop after the specified bounded loops. Do not select additional roadmap work automatically.
+
+---
+
+## Disposable lab hosts
+
+The following hosts are explicitly disposable test infrastructure. Destructive
+ZFS operations, pool recreation, file-backed pool setup, and crash/recovery
+experiments are authorized there without additional per-command approval:
+
+- `dev2` — disposable development host
+- `debian` — disposable Linux test VM
+- `netbsd` — disposable compatibility host; expect the known `-Lu` receive
+  requirement and related platform failures
+
+A crash or damaged test pool on these hosts may be irritating but is not a
+production incident. Still use explicit pool and vdev validation, isolate
+file-backed images, preserve reproducible reset steps, and never assume a
+same-named pool is disposable without checking the host assignment.
+
+`devhost` may be used for approved tests on its named `apool` and `bpool`, but
+it is not covered by the blanket destructive authorization above. Production
+hosts such as `vault1.djb0` remain protected; use only explicitly named safe
+pools there and prefer the lower-privilege account.
 
 ---
 
