@@ -86,6 +86,13 @@ func TestEtcDirEnvOverride(t *testing.T) {
 	}
 }
 
+func TestConfigPathOverride(t *testing.T) {
+	t.Setenv("ZELTA_CONFIG", "/tmp/custom-zelta.conf")
+	if ConfigPath() != "/tmp/custom-zelta.conf" {
+		t.Fatalf("ConfigPath = %s", ConfigPath())
+	}
+}
+
 func TestEnvPathOverride(t *testing.T) {
 	t.Setenv("ZELTA_ENV", "/dev/null")
 	if EnvPath() != "/dev/null" {

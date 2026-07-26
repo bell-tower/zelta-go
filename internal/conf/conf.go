@@ -30,6 +30,14 @@ func EnvPath() string {
 	return filepath.Join(EtcDir(), "zelta.env")
 }
 
+// ConfigPath resolves ZELTA_CONFIG: env → $ZELTA_ETC/zelta.conf.
+func ConfigPath() string {
+	if v := os.Getenv("ZELTA_CONFIG"); v != "" {
+		return v
+	}
+	return filepath.Join(EtcDir(), "zelta.conf")
+}
+
 // Keys the oracle refuses to honor from zelta.env (must be exported prior).
 var rejectedKeys = map[string]bool{
 	"AWK": true, "ETC": true, "ENV": true, // compared bare; stored ZELTA_-prefixed

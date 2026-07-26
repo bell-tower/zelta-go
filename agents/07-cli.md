@@ -30,6 +30,7 @@ Paths (oracle): `ZELTA_ETC` = env → `~/.config/zelta` (if dir) →
 - `match [-Hp] [-d depth] [-o field[,...]] [-X pat] [--include pat] [--written|--no-written] [--time] SOURCE TARGET`
 - `backup [-n|--dryrun] [-I|-i] [--snapshot|--no-snapshot|--snapshot-skip] [--push|--pull|--no-pull] [-d depth] [-X pat] [--include pat] [send/recv passthrough: -L -c -e --raw …] SOURCE TARGET`
 - `prune [--prune-num N] [--prune-time T] [--prune-grid G] [--prune-size N] [--match-endpoint EP] [--prune-guard latest|unsynced|none] [--no-ranges] [--visual] [-v] ENDPOINT`
+- `policy [-n|--dryrun] [-H] [-C|--config FILE] [site|host|dataset]...` — dry-run lists resolved SOURCE/TARGET pairs; execution not implemented
 - Option introspection: oracle `zelta ipc-env VERB [OPTS] OPERANDS` explodes
   parsed env/opts (use when unsure how flags map)
 - others: explicit not-implemented

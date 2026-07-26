@@ -16,7 +16,7 @@ Open this for safety, terminology, env hierarchy, and multi-impl notes. Keep sho
 
 1. Built-in defaults (`opt/defaults.go`)
 2. `zelta.env` (`KEY=value`; `ZELTA_` prefix optional inside file) — **`conf` + main injection, done**
-3. `zelta.conf` (policy only; YAML-like `KEY: value`) — *not implemented*
+3. `zelta.conf` (policy only; YAML-like `KEY: value`) — **dry-run load/resolve done**; execution deferred
 4. Process env `ZELTA_*` (empty export = unset, oracle `:=`)
 5. CLI flags (highest) — **`opt.Parse` from `data/opts.tsv`, done**
 

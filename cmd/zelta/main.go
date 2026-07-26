@@ -37,6 +37,8 @@ func main() {
 		os.Exit(runRevert(os.Args[2:]))
 	case "rotate":
 		os.Exit(runRotate(os.Args[2:]))
+	case "policy", "zp":
+		os.Exit(runPolicy(os.Args[2:]))
 	default:
 		fmt.Fprintf(os.Stderr, "unrecognized command: %q\n", os.Args[1])
 		usage()
@@ -68,6 +70,7 @@ Commands:
   clone       Clone a snapshot tree (use -n to print commands)
   revert      Preserve current state and clone an explicit snapshot back
   rotate      Preserve a divergent target and print the safe receive plan
+  policy      List or run backup jobs from zelta.conf (-n dry-run)
   version     Show version
 
 Private experimental Go port. Docs: ~/Code/zelta/doc/ and AGENTS.md

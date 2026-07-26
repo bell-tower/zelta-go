@@ -120,7 +120,7 @@ internal/backup/         # replication planning/execution; lifecycle gaps remain
 internal/prune/          # read-only retention analysis
 internal/lineage/        # clone/revert lineage operations
 internal/rotate/         # rotate planning/execution; recovery gaps remain
-internal/policy/         # intentionally deferred
+internal/policy/         # conf load + dry-run resolve; execution deferred
 cmd/zelta/            # thin dispatcher
 cmd/zprune/           # later
 testdata/golden/      # oracle fixtures

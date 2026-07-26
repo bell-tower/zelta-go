@@ -25,7 +25,9 @@ blocker, also update `agents/14-maturity.md`.
 - **REMOTE_* roles vs env strings** — Awk `REMOTE_SEND="ssh -n"`, `REMOTE_RECV="ssh"` (full override strings) → Go uses cmds.tsv role column + `cmdbuild.StdinNull` (`RECV` keeps stdin; else `-n`). Env override of the whole prefix string **not wired** yet (`opt`).
 - **Embed data** — Awk `ZELTA_SHARE`/on-disk TSV → Go `//go:embed data/*`. Man pages stay in main tree / `ZELTA_DOC`.
 - **Fake executor** — Awk always real zfs/ssh → Go unit/golden path uses `zfs.Fake` canned lists; no ZFS on the Mac.
-- **Policy YAML** — Awk loose YAML-like conf → Go will standardize later (`06-policy`); not a match/backup blocker.
+- **Policy conf** — Go keeps Awk common-layout parse (repeated `options:`/`datasets:` fan-out, textual `import:` indent splice) rather than strict single-document YAML; production multi-target files depend on duplicate keys.
+- **Policy precedence** — Awk policy skips exporting defaults/`zelta.env` into AWK `Opt`, so conf effectively beats env-file. Go follows `00-contracts` (env-file < conf < process env < CLI); CLI overrides seed global and block conf.
+- **ADD_DATASET_PREFIX -1** — docs say “full path under pool”; Awk/Go append nothing (`n - (-1)` starts past last segment). Use a large positive PREFIX for full path.
 
 ---
 
