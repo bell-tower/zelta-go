@@ -7,8 +7,8 @@ import (
 	"strconv"
 
 	"git.belltower.it/djbell/zelta-go/internal/opt"
-	"git.belltower.it/djbell/zelta-go/internal/prune"
-	"git.belltower.it/djbell/zelta-go/internal/zfs"
+	"git.belltower.it/djbell/zelta-go/prune"
+	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
 func runPrune(args []string) int {

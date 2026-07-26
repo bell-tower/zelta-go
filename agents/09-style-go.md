@@ -4,7 +4,7 @@ Daniel is not a Go expert — keep code boring and readable.
 
 ## Conventions
 
-- `internal/` private library code; `cmd/` thin  
+- Public SDK packages at module root (`backup`, `match`, `zfs`, …); `internal/` for CLI/implementation detail (`opt`, `cmdbuild`, `conf`, `policy`); `cmd/` thin consumer only. See `agents/16-sdk.md`.
 - Interfaces: prefer small ports; OK on provider (`zfs.Executor`) when multiple consumers share them — don’t churn just to match the proverb
 - Errors: wrap with `%w`; map exit codes at CLI boundary  
 - Tabs for Go (gofmt)  

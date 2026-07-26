@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
-	"git.belltower.it/djbell/zelta-go/internal/match"
+	"git.belltower.it/djbell/zelta-go/match"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
-	"git.belltower.it/djbell/zelta-go/internal/report"
-	"git.belltower.it/djbell/zelta-go/internal/zfs"
+	"git.belltower.it/djbell/zelta-go/report"
+	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
 func runMatch(args []string) int {
@@ -22,6 +23,29 @@ func runMatch(args []string) int {
 		matchUsage()
 		return 0
 	}
+
+	dryRun := p.Env.Bool("DRYRUN", false)
+
+	if dryRun {
+		if len(p.Operands) < 1 || len(p.Operands) > 2 {
+			matchUsage()
+			return 2
+		}
+		depth, code := depthFrom(p.Env, "match")
+		if code != 0 {
+			return code
+		}
+		props := match.DefaultListProps
+		noWritten := p.Env.Get("WRITTEN") == "0" && !p.Changed["LIST_WRITTEN"]
+		if noWritten {
+			props = match.MinimalListProps
+		}
+		for _, op := range p.Operands {
+			fmt.Fprintln(os.Stdout, formatListCmd(op, props, depth))
+		}
+		return 0
+	}
+
 	if len(p.Operands) != 2 {
 		matchUsage()
 		return 2
@@ -62,6 +86,19 @@ func runMatch(args []string) int {
 	printWarns(res.Warnings)
 	fmt.Print(res.Output)
 	return 0
+}
+
+// formatListCmd builds the oracle dry-run "+ zfs list ..." line for an endpoint.
+func formatListCmd(endpoint string, props []string, depth int) string {
+	var b strings.Builder
+	b.WriteString("+ zfs list -H -t snapshot -o ")
+	b.WriteString(strings.Join(props, ","))
+	if depth > 0 {
+		fmt.Fprintf(&b, " -r -d %d", depth)
+	}
+	b.WriteString(" ")
+	b.WriteString(endpoint)
+	return b.String()
 }
 
 func matchUsage() {

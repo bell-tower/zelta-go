@@ -30,6 +30,17 @@ func EnvPath() string {
 	return filepath.Join(EtcDir(), "zelta.env")
 }
 
+// DocDir resolves ZELTA_DOC: env → ~/.local/share/zelta/doc → "".
+func DocDir() string {
+	if v := os.Getenv("ZELTA_DOC"); v != "" {
+		return v
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".local", "share", "zelta", "doc")
+	}
+	return ""
+}
+
 // ConfigPath resolves ZELTA_CONFIG: env → $ZELTA_ETC/zelta.conf.
 func ConfigPath() string {
 	if v := os.Getenv("ZELTA_CONFIG"); v != "" {

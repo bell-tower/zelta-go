@@ -6,13 +6,13 @@ import (
 	"os"
 	"strings"
 
-	"git.belltower.it/djbell/zelta-go/internal/backup"
+	"git.belltower.it/djbell/zelta-go/backup"
 	"git.belltower.it/djbell/zelta-go/internal/cmdbuild"
-	"git.belltower.it/djbell/zelta-go/internal/endpoint"
-	"git.belltower.it/djbell/zelta-go/internal/match"
+	"git.belltower.it/djbell/zelta-go/endpoint"
+	"git.belltower.it/djbell/zelta-go/match"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
-	"git.belltower.it/djbell/zelta-go/internal/rotate"
-	"git.belltower.it/djbell/zelta-go/internal/zfs"
+	"git.belltower.it/djbell/zelta-go/rotate"
+	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
 func runRotate(args []string) int {

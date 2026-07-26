@@ -3,32 +3,29 @@
 This is the ordered backlog after checkpoint `069979f`. Keep implementation
 work in small commits and update this file when a contract changes.
 
-## Current phase: hardening and evidence
+## Current phase: public SDK and Sylve-critical API gaps
 
-Pause feature breadth while the current experimental surface is classified and
-verified. The immediate work is to reconcile docs, establish capability
-maturity, and run bounded disposable-ZFS checks. Do not add a new verb,
-implement `zprune`, or design the public facade inside an unrelated bug-fix
-session.
+`agents/16-sdk.md` contains the full plan. Summary: promote 8 packages out of
+`internal/`, add structured SSH config, typed outcomes, progress hooks, and an
+external-consumer smoke test. See that document for the target layout,
+principles, and phased work.
 
 ## Current library boundary
 
-The useful exported implementation symbols are currently internal:
+The useful exported implementation symbols are **being promoted** out of
+`internal/`:
 
-- `internal/match`: `Compare`, request/result/tree types, rendering and filters
-- `internal/backup`: `Run`, request/result, planning and execution types
-- `internal/prune`: `Run`, retention analysis and formatting
-- `internal/zfs`: `Executor`, `Real`, `Fake`, and pipe support
-- `internal/cmdbuild`: data-driven command construction
-- `internal/endpoint`: endpoint parsing and dataset suffix handling
-- `internal/opt`: defaults, environment resolution, and opts.tsv parsing
-- `internal/lineage`: clone and revert planning/execution
-- `internal/rotate`: rotate planning/execution and failure reporting
+- `match`: `Compare`, request/result/tree types, rendering and filters
+- `backup`: `Run`, request/result, planning and execution types
+- `prune`: `Run`, retention analysis and formatting
+- `zfs`: `Executor`, `Real`, `Fake`, SSHConfig, and pipe support
+- `endpoint`: endpoint parsing and dataset suffix handling
+- `report`: column expansion (`cols.tsv`), byte formatting, and
+  JSON output structures (`json.go`, `BackupResult`)
+- `lineage`: clone and revert planning/execution
+- `rotate`: rotate planning/execution and failure reporting
 
-The Go module is therefore not yet a public library. The next API decision is
-to promote a curated facade, likely under top-level packages, or explicitly
-keep this repository as a private CLI. Until that decision is made, avoid
-making `internal` types part of a promised external contract.
+Stay internal: `cmdbuild`, `opt`, `conf`, `policy`.
 
 ## Ordered work
 
@@ -63,17 +60,37 @@ making `internal` types part of a promised external contract.
    dispatch (AWK `should_xargs` parity), and `RETRY` retry loop. `--backup-command`
    and backup-flag forwarding remain deferred; keep precedence tests for conf
    vs env/CLI tight as execution lands.
-8. Stabilize the practical work-alike CLI and its cross-platform evidence
-   before committing to the public Go library facade. Keep the facade decision
-   explicit, then promote or re-export packages and add external-package tests.
-9. Use the upstream Bourne `zprune` for feature-parity testing for now. Defer a
-   new Go `zprune` wrapper until the CLI and policy surfaces justify it; when
-   implemented, keep destructive operations separate from core `zelta prune`.
-10. Polish README and public API documentation after Zelta Policy and the API
-    behavior are stable.
+8. **In progress (see `agents/16-sdk.md`):** promote 8 packages from
+   `internal/` to top level, add structured SSH config, typed backup outcomes,
+   progress hooks, and an external-consumer smoke test (`sdk/`). Sylve drops
+   shell-out for in-process library calls.
+9. **Complete:** `zprune` implemented as a direct Go verb (+ argv[0] dispatch
+   for `zprune` binary/symlink). Uses in-process `prune.Run` (no ipc-*),
+   prints candidate output, confirms (unless `--force`), and executes `zfs
+   destroy` grouped by dataset. Dry-run behavior matches `zelta prune`.
+10. **Complete:** `install.sh` workalike with `PRE_RUN='make'` at top; gracefully
+    skips `share/` when absent (embedded in Go binary). Closely mirrors
+    upstream structure.
+11. **Complete:** cross-platform `make shelltest` (POSIX smoke tests) and
+    Shellspec proof-of-concept (8/8 no-op tests pass); covered in
+    `test/shell/basic_test.sh`.
+12. **Complete:** `zelta backup --json` produces JSON output matching upstream
+    Awk schema: `output_version`, flat fields, `sentStreams`, `errorMessages`.
+    Populates source/target endpoints and stream counts from Plan; tracks
+    startTime/endTime/runTime in execution path. `zelta policy --json` outputs
+    JSON job table in dry-run mode and forwards `LOG_MODE=json` to child backup
+    processes in execution mode.
+13. **Deferred until SDK stabilized:** polish README and public API
+    documentation. The README Library Status section and agents/ docs will be
+    updated as part of the SDK promotion in item 8.
 
 ## Explicit non-goals
 
 - Do not add S3/blob support to this Go line.
 - Do not make `zprune` silently destructive.
-- Do not treat the current exported `internal` symbols as a public API.
+- SDK promotion happens from `internal/` to top-level packages; do not expose
+  `internal/cmdbuild`, `internal/opt`, `internal/conf`, or `internal/policy`
+  as public API in v1. See `agents/16-sdk.md` for the curated boundary.
+- Do not wire `data/json.tsv` into a TSV-driven JSON field loader. The Go
+  `report.BackupResult` struct statically mirrors the same schema; the orphaned
+  TSV is kept for reference but not parsed.

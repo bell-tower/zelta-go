@@ -42,6 +42,16 @@ blocker, also update `agents/14-maturity.md`.
 
 ---
 
+## Match dry-run
+
+- **dry-run mode** — Go `runMatch` accepts 1-2 operands in `--dryrun` mode and
+  prints `+ zfs list -H -t snapshot -o … [ -r -d N] ENDPOINT` lines (upstream behavior).
+  Non-dry-run still requires exactly 2 operands (SOURCE TARGET).
+- **No JSON output for match** — match uses `match.Result.Output` plain text;
+  `--json` not defined for match verb in opts.tsv (only policy, backup, etc.).
+
+---
+
 ## Backup / send-recv
 
 - **Dry-run intermediate full = first pass only** — Awk `run_backup`: dry-run skips second `run_zfs_sync`; execute runs full@`src_next` then incr→`src_last`. Go same: dry-run one `+` line @earliest; execute two `RunPipe`s when `FinalEnd` set. *Example:* `-I` full dry-run shows `@snap1` only; after execute tgt has full snap history.
@@ -69,12 +79,56 @@ blocker, also update `agents/14-maturity.md`.
 
 ---
 
+## Policy
+
+- **FormatCommands quoting** — Go uses `dq()` for env values (double-quote with
+  `\$` ``\` ` `\"` `\\` escaping) and `shq()` for endpoints (single-quote with
+  `'\''` escape). Awk constructs strings via shell cat heredocs. Same tokens,
+  different quote mechanics; golden fixtures verified byte-for-byte.
+- **JSON output (implemented)** — `zelta backup --json` and `zelta policy
+  --json` now produce JSON output matching the upstream Awk schema:
+  - backup: single JSON object with `output_version` (command, vers_major,
+    vers_minor), flat fields (startTime, endTime, runTime, sourceUser,
+    sourceHost, sourceDataset, sourceSnapshot, sourceEndpoint, targetUser,
+    targetHost, targetDataset, targetSnapshot, targetEndpoint,
+    replicationStreamsSent, replicationStreamsReceived, replicationErrorCode),
+    `sentStreams` array, and `errorMessages` array. Uses `encoding/json` via
+    `internal/report.BackupResult` struct.
+  - policy: dry-run `--json` outputs a `[{site, source, target, host}]` array
+    from `filteredJobsJSON()`; execution mode forwards `LOG_MODE=json` to child
+    backup processes via `execEnv()`.
+  - *Known gaps:* sourceListTime, targetListTime, sourceWritten, targetsCloned,
+    targetsResumed, replicationSize, replicationTime not yet populated (not
+    tracked in execution path). Fields omitted via `omitempty`.
+
+---
+
 ## Prune
 
 - **`--prune-guard=unsynced` prunes nothing** — Awk 1.2.0 `synced_allows_prune` never fires against the guard target in prune mode (verified against full/partial/empty/missing guards). Go matches: unsynced keeps every snap. Likely an oracle bug; re-check when oracle moves.
 - **Visual prefix** — Awk prints `Source[ID]` (`root@debian:apool/…`) before ❌/🔹 lines; Go prints the bare dataset name.
 - **`listing source/target` noise** — Awk `-v` prints these LOG_INFO lines; Go `-v` prints only `keeping: …` (matches LOG_INFO keeping content).
 - **Bookmarks** — Awk tracks bookmarks in rows but skips in analysis; Go skips them at load (same net effect).
+
+---
+
+## Report / JSON rendering
+
+- **data/json.tsv unused** — embedded via `//go:embed *.tsv` but not read by
+  any Go code. The upstream `zelta-common.awk` parses its equivalent
+  `zelta-json.tsv` in `load_summary_data()` to map field names to Opt/Summary
+  array keys. Go uses a static `report.BackupResult` struct instead (hardcoded
+  field mapping in `NewBackupResult`).
+- **Awk JSON pipeline** — upstream builds JSON as flat token array
+  (`JsonOutput[]`), then `json_write()` inserts commas and line breaks. Go uses
+  `encoding/json` standard library. Both produce equivalent output shapes.
+- **JSON envelope** (upstream Awk):
+  ```json
+  {"output_version":{"command":"zelta backup","vers_major":1,"vers_minor":1},
+   "startTime":"...", ..., "replicationErrorCode":"0",
+   "sentStreams":["..."],"errorMessages":["..."]}
+  ```
+  Go `BackupResult` produces this same structure.
 
 ---
 
@@ -88,11 +142,26 @@ blocker, also update `agents/14-maturity.md`.
 
 ## CLI / product surface
 
-- **No man pages in-repo** — point at `~/Code/zelta/doc` / `ZELTA_DOC`.
-- **Verbs** — Go currently exposes `match`, `backup`, `prune`, root `clone`, root
-  `revert`, and root direct-divergence `rotate`; recursive and clone-origin
-  variants remain intentionally incomplete.
+- **No man pages in-repo** — `zelta help [topic]` routes to `man` via `ZELTA_DOC` or system path.
+- **Verbs** — Go currently exposes `match`, `backup`, `prune`, `zprune` (argv[0] + verb), root
+  `clone`, root `revert`, and root direct-divergence `rotate`; recursive and
+  clone-origin variants remain intentionally incomplete.
 - **Private Gitea** — not public until Daniel says docs are real.
+- **zprune: no ipc-*** — upstream zprune uses `zelta ipc-env` + `zelta ipc-run` for env bootstrap and
+  prune output. Go calls `prune.Run` in-process (same as `zelta prune`) and executes `zfs destroy`
+  directly. No `ipc-env` or `ipc-run` verbs implemented.
+- **argv[0] dispatch** — `zprune` binary/symlink detected by filename prefix (`zprune`, `zprune-freebsd`,
+  etc.) and routed to the `zprune` verb. Also accepts `zelta zprune` directly.
+- **Usage() matches upstream** — all verbs listed including `lock`, `unlock`, `failover`, `propsync`;
+  endpoint format hint and `zelta help` hints included. `--help`/`-h`/`-?` show usage; `help` runs man.
+
+---
+
+## Version string
+
+- **`Zelta 1.2.0 (Go)`** — upstream `Zelta 1.2.0`. Suffixed `(Go)` to distinguish
+  the port without conflicting with the upstream `zelta version` in PATH.
+  Upstream `01_no_op_spec.sh` test checks for `Zelta` in output (passes).
 
 ---
 

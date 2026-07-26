@@ -12,16 +12,23 @@ deferred.
 
 ## Library Status
 
-The current implementation is a command-oriented prototype. Useful exported
-APIs exist in `internal/`, including `match.Compare`, `backup.Run`,
-`prune.Run`, `zfs.Executor`/`Real`/`Fake`, command construction, endpoint
-parsing, and option parsing. Because these packages are below Go's
-`internal/` barrier, they are not importable by external modules yet.
+Curated public packages for ZFS remote-action SDK - stable CLI as consumer:
 
-Before publishing a library contract, choose whether to promote a curated API
-to top-level packages or keep the module CLI-only. Do not move individual
-packages opportunistically; the package boundary should follow the documented
-contract in `agents/11-roadmap.md`.
+| Package | Purpose |
+|---------|---------|
+| `endpoint` | Parse/user@host:dataset[@snap] |
+| `zfs` | Executor, Real (SSH), Fake, pipe support |
+| `match` | Compare two dataset trees |
+| `backup` | Plan and run ZFS send/recv |
+| `prune` | Read-only retention analysis |
+| `lineage` | Clone/revert planning |
+| `rotate` | Rotate lifecycle for divergent targets |
+| `report` | JSON output schema, col expansion |
+
+Import path: `git.belltower.it/djbell/zelta-go/<package>`. Production:
+`&zfs.Real{ZFS: "zfs", SSH: zfs.SSHConfig{...}}`; tests: `&zfs.Fake{}`.
+
+See `agents/16-sdk.md` for the full plan and Sylve drop-in guide.
 
 ## Build
 

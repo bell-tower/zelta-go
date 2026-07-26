@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"git.belltower.it/djbell/zelta-go/internal/match"
+	"git.belltower.it/djbell/zelta-go/match"
 )
 
 func TestPrepareRotateSnapshotWhenSourceIsAtMatch(t *testing.T) {

@@ -3,13 +3,33 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"git.belltower.it/djbell/zelta-go/internal/conf"
 )
 
-const version = "zelta-go 0.0.1-dev"
+const version = "Zelta 1.2.0 (Go)"
 
 func main() {
+	// argv[0] dispatch: zprune binary/symlink acts as "zelta zprune"
+	if len(os.Args) > 0 {
+		switch filepath.Base(os.Args[0]) {
+		case "zprune":
+			args := []string{os.Args[0], "zprune"}
+			args = append(args, os.Args[1:]...)
+			os.Args = args
+		default:
+			// Accept "zprune-*" variants (zprune-freebsd, zprune-linux, …)
+			if bn := filepath.Base(os.Args[0]); strings.HasPrefix(bn, "zprune") && bn != "zprune" {
+				args := []string{os.Args[0], "zprune"}
+				args = append(args, os.Args[1:]...)
+				os.Args = args
+			}
+		}
+	}
+
 	// Oracle := semantics: zelta.env sets only unset-or-empty ZELTA_* vars,
 	// so process env always wins. Injection keeps every opt.Lookup path
 	// (library defaults included) file-aware.
@@ -23,8 +43,10 @@ func main() {
 	switch os.Args[1] {
 	case "version", "--version", "-V":
 		fmt.Println(version)
-	case "help", "--help", "-h":
+	case "--help", "-h", "-?":
 		usage()
+	case "help":
+		os.Exit(commandHelp(os.Args[2:]))
 	case "match":
 		os.Exit(runMatch(os.Args[2:]))
 	case "backup":
@@ -39,6 +61,8 @@ func main() {
 		os.Exit(runRotate(os.Args[2:]))
 	case "policy", "zp":
 		os.Exit(runPolicy(os.Args[2:]))
+	case "zprune":
+		os.Exit(runZprune(os.Args[2:]))
 	default:
 		fmt.Fprintf(os.Stderr, "unrecognized command: %q\n", os.Args[1])
 		usage()
@@ -60,19 +84,71 @@ func injectEnvFile() []string {
 	return warns
 }
 
+// commandHelp implements upstream zelta_man: routes zelta help to man pages.
+// topicless → zelta(8); "options" → zelta-options(7); any verb → zelta-VERB(8).
+// Returns 0 on success, 1 if man failed.
+func commandHelp(args []string) int {
+	section := "8"
+	page := "zelta"
+	if len(args) > 0 {
+		switch args[0] {
+		case "options":
+			page = "zelta-options"
+			section = "7"
+		case "zprune":
+			page = "zprune"
+		default:
+			page = "zelta-" + args[0]
+		}
+	}
+	docDir := conf.DocDir()
+	var cmd *exec.Cmd
+	if docDir != "" {
+		if st, err := os.Stat(docDir); err == nil && st.IsDir() {
+			cmd = exec.Command("man", "-M", docDir, section, page)
+		}
+	}
+	if cmd == nil {
+		cmd = exec.Command("man", section, page)
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "error: man page not available; see ~/Code/zelta/doc/\n")
+		return 1
+	}
+	return 0
+}
+
 func usage() {
-	fmt.Fprintf(os.Stderr, `usage: zelta command [OPTIONS]
-
-Commands:
-  match       Compare dataset trees
-  backup      Sync dataset trees (snap-if-needed; -n dry-run)
-  prune       Report snapshot prune candidates (read-only)
-  clone       Clone a snapshot tree (use -n to print commands)
-  revert      Preserve current state and clone an explicit snapshot back
-  rotate      Preserve a divergent target and print the safe receive plan
-  policy      List or run backup jobs from zelta.conf (-n dry-run)
-  version     Show version
-
-Private experimental Go port. Docs: ~/Code/zelta/doc/ and AGENTS.md
-`)
+	exec := os.Stderr
+	fmt.Fprintf(exec, "usage: zelta command [OPTIONS]\n\n")
+	fmt.Fprintf(exec, "Where 'command' is one of the following:\n\n")
+	for _, c := range []struct {
+		name, desc string
+	}{
+		{"match", "Compare dataset trees"},
+		{"backup", "Sync ZFS datasets"},
+		{"policy", "Run configured replication jobs"},
+		{"clone", "Clone ZFS datasets"},
+		{"revert", "Rename and clone a dataset in-place"},
+		{"rotate", "Recover sync continuity"},
+		{"prune", "Report snapshot prune candidates (read-only)"},
+		{"lock", "Make datasets read-only and unmount them"},
+		{"unlock", "Inherit readonly and mount datasets"},
+		{"failover", "Promote a target dataset tree"},
+		{"propsync", "Sync local ZFS properties between trees"},
+		{"", ""},
+		{"version", "Show version information"},
+	} {
+		if c.name == "" {
+			fmt.Fprintln(exec)
+			continue
+		}
+		fmt.Fprintf(exec, "  %-8s   %s\n", c.name, c.desc)
+	}
+	fmt.Fprintf(exec, "\nEach endpoint is in the form: [user@host:]pool[/dataset/][@snap]\n")
+	fmt.Fprintf(exec, "\nFor complete documentation:  zelta help\n")
+	fmt.Fprintf(exec, "                             zelta help [<topic>]\n")
+	fmt.Fprintf(exec, "                             zelta help options\n")
 }

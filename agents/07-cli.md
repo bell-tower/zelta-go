@@ -9,7 +9,12 @@
   stdlib `flag`, no per-verb hand-rolled options. New flags = new opts.tsv rows.
 - `version` always works
 - Unknown verbs: clear error; point at main zelta docs
-- Help: no man pages here; `ZELTA_DOC` or `~/Code/zelta/doc` handoff later
+- `zelta help [topic]` routes to man pages via `commandHelp()` (upstream `zelta_man` parity):
+  - no topic → `man 8 zelta`
+  - `options` → `man 7 zelta-options`
+  - verb → `man 8 zelta-VERB`
+  - Uses `ZELTA_DOC` when set/directory, otherwise system `man` path
+- `--help`, `-h`, `-?` show usage() (quick reference, not man page)
 
 ## Resolution chain (oracle parity)
 
@@ -27,10 +32,12 @@ Paths (oracle): `ZELTA_ETC` = env → `~/.config/zelta` (if dir) →
 ## Verbs
 
 - `version`
+- `help [topic]` — man page routing (topic → `man 8 zelta-VERB`; `options` → `man 7 zelta-options`)
 - `match [-Hp] [-d depth] [-o field[,...]] [-X pat] [--include pat] [--written|--no-written] [--time] SOURCE TARGET`
 - `backup [-n|--dryrun] [-I|-i] [--snapshot|--no-snapshot|--snapshot-skip] [--push|--pull|--no-pull] [-d depth] [-X pat] [--include pat] [send/recv passthrough: -L -c -e --raw …] SOURCE TARGET`
 - `prune [--prune-num N] [--prune-time T] [--prune-grid G] [--prune-size N] [--match-endpoint EP] [--prune-guard latest|unsynced|none] [--no-ranges] [--visual] [-v] ENDPOINT`
-- `policy [-n|--dryrun] [-H] [-C|--config FILE] [site|host|dataset]...` — dry-run lists resolved SOURCE/TARGET pairs; execution not implemented
+- `policy [-n|--dryrun] [-H] [-C|--config FILE] [site|host|dataset]...` — list or run backup jobs from zelta.conf
+- `clone, revert, rotate, lock, unlock, failover, propsync` — additional verbs listed in usage()
 - Option introspection: oracle `zelta ipc-env VERB [OPTS] OPERANDS` explodes
   parsed env/opts (use when unsure how flags map)
 - others: explicit not-implemented

@@ -33,9 +33,9 @@ execution safety. `RELEASE-APPROVED` is never inferred from green CI.
 | Clone/revert planning | `REAL-ZFS-VERIFIED` | remote lifecycle cases; local collision and missing-snapshot cases verified |
 | Rotate planning | `GOLDEN-VERIFIED` | broader lineage cases |
 | Rotate execution | `REAL-ZFS-VERIFIED` | interrupted receive, child failure/recovery lifecycle |
-| `zprune` destructive wrapper | `PLANNED` | implementation plus safety review |
+| `zprune` destructive wrapper | `IMPLEMENTED` | argv[0]+verb; confirm unless `--force`; real destroy still needs disposable-host safety review |
 | Policy configuration | `PLANNED` | stable option/env contract |
-| Public Go library | `PLANNED` | curated facade and external-package tests |
+| Public Go library | `IMPLEMENTED` | external-consumer smoke test in `sdk/` plus Sylve drop-in guide (`agents/16-sdk.md`). Promote step done; SSHConfig, typed errors, progress hooks, and sdk test verify the public surface. |
 | Release binary | `IMPLEMENTED` | release reproducibility and platform verification |
 
 ## Smallest Backup Evidence Set

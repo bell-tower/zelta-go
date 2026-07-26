@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -76,6 +77,16 @@ func runPolicy(args []string) int {
 	}
 
 	if p.Env.Bool("DRYRUN", false) {
+		jsonMode := p.Env.Get("LOG_MODE") == "json"
+		if jsonMode {
+			out, err := json.Marshal(filteredJobsJSON(filtered))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return 1
+			}
+			fmt.Println(string(out))
+			return 0
+		}
 		logLevel, _ := strconv.Atoi(p.Env.Get("LOG_LEVEL"))
 		if logLevel >= 3 {
 			fmt.Print(policy.FormatCommands(filtered))
@@ -130,6 +141,26 @@ var builtInDefaults = map[string]string{
 	"CREATE_PARENT":   "1",
 	"LIST_WRITTEN":    "1",
 	"REMOTE_COMMAND":  "ssh",
+}
+
+func filteredJobsJSON(jobs []policy.Job) []policyJobJSON {
+	out := make([]policyJobJSON, 0, len(jobs))
+	for _, j := range jobs {
+		out = append(out, policyJobJSON{
+			Site:   j.Site,
+			Source: j.SourceEP(),
+			Target: j.Target,
+			Host:   j.Host,
+		})
+	}
+	return out
+}
+
+type policyJobJSON struct {
+	Site   string `json:"site"`
+	Source string `json:"source"`
+	Target string `json:"target"`
+	Host   string `json:"host,omitempty"`
 }
 
 func policyUsage() {

@@ -25,7 +25,7 @@ Sibling reference tree (read only when extracting a contract): `~/Code/zelta/`.
 2. Never load full `~/Code/zelta/share/zelta/*.awk` into context.
 3. Behavior truth = `testdata/golden/**` + `agents/00-contracts.md`, not AWK.
 4. When porting: extract **one** contract note into the relevant `agents/` file, then implement from that.
-5. Cheap loop: `go test ./internal/<pkg>/...` — no ZFS, no sudo.
+5. Cheap loop: `go test ./<pkg>/...` — no ZFS, no sudo.
 6. Expensive loop when approved: golden regen from real `zelta match`, integration tags.
 7. Passing tests does not authorize adjacent feature work.
 8. Never start work beyond the specified bounded loops, but you are encouraged to suggest efficiency wins by grouping tasks by feature and workflow.
@@ -102,6 +102,7 @@ Acceptable deviations: YAML policy → standardize; no recursive self-calls; emb
 | `agents/13-lineage.md` | Clone, revert, and four-endpoint lineage contract |
 | `agents/14-maturity.md` | Capability states and release/readiness matrix |
 | `agents/15-session-protocol.md` | Model selection, bounded loops, stop conditions |
+| `agents/16-sdk.md` | Public SDK packages, Sylve drop-in map |
 
 ---
 
@@ -109,21 +110,22 @@ Acceptable deviations: YAML policy → standardize; no recursive self-calls; emb
 
 ```
 data/                 # Owned TSV (Go source of truth); //go:embed into binary
-internal/endpoint/    # user@host:pool/ds@snap
-internal/opt/         # opts.tsv + env hierarchy
-internal/cmdbuild/    # cmds.tsv → argv (no shell recursion)
-internal/zfs/         # Executor, Real, Fake, list parse
-internal/match/       # Phase 1
-internal/report/      # cols.tsv + json.tsv render
-internal/conf/        # zelta.env paths + KEY=value
-internal/backup/         # replication planning/execution; lifecycle gaps remain
-internal/prune/          # read-only retention analysis
-internal/lineage/        # clone/revert lineage operations
-internal/rotate/         # rotate planning/execution; recovery gaps remain
-internal/policy/         # conf load + dry-run resolve; execution deferred
-cmd/zelta/            # thin dispatcher
-cmd/zprune/           # later
+endpoint/             # user@host:pool/ds@snap (public SDK)
+zfs/                  # Executor, Real, Fake, SSHConfig (public SDK)
+match/                # Compare engine (public SDK)
+backup/               # send/recv plan + Run (public SDK)
+prune/                # read-only retention analysis (public SDK)
+lineage/              # clone/revert (public SDK)
+rotate/               # rotate lifecycle (public SDK)
+report/               # cols + BackupResult JSON (public SDK)
+internal/opt/         # opts.tsv + env hierarchy (CLI)
+internal/cmdbuild/    # cmds.tsv → argv (impl detail)
+internal/conf/        # zelta.env paths + KEY=value (CLI)
+internal/policy/      # conf load + job dispatch (CLI-first)
+cmd/zelta/            # thin dispatcher (+ argv[0] zprune)
+sdk/                  # external-consumer smoke tests
 testdata/golden/      # oracle fixtures
+test/shell/           # POSIX smoke tests
 agents/               # split agent docs
 ```
 
@@ -136,7 +138,7 @@ External docs (do not copy wholesale): `~/Code/zelta/doc/` especially `zelta-opt
 ```sh
 make test          # unit + golden
 make build         # bin/zelta
-go test ./internal/match/...
+go test ./match/...
 go test -tags=integration ./...   # real ZFS; rare
 ```
 

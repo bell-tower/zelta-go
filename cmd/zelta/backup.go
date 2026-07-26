@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 
-	"git.belltower.it/djbell/zelta-go/internal/backup"
+	"git.belltower.it/djbell/zelta-go/backup"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
-	"git.belltower.it/djbell/zelta-go/internal/zfs"
+	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
 func runBackup(args []string) int {
@@ -37,13 +38,13 @@ func runBackup(args []string) int {
 	case "ALWAYS":
 		snapMode = backup.SnapAlways
 	}
+	jsonMode := p.Env.Get("LOG_MODE") == "json"
 	flags := opt.SendRecvFrom(p.Env)
 	createParent := p.Env.Bool("CREATE_PARENT", true)
 
 	res, err := backup.Run(context.Background(), &zfs.Real{}, backup.Request{
 		Source:        p.Operands[0],
 		Target:        p.Operands[1],
-		TargetOrigin:  p.Env.Get("ORIGIN_ID"),
 		DryRun:        p.Env.Bool("DRYRUN", false),
 		Intermediate:  p.Env.Bool("SEND_INTR", true),
 		SnapMode:      snapMode,
@@ -55,13 +56,24 @@ func runBackup(args []string) int {
 		SyncDirection: p.Env.Get("SYNC_DIRECTION"),
 		Flags:         &flags,
 		CreateParent:  &createParent,
+		TargetOrigin:  p.Env.Get("ORIGIN_ID"),
+		JSON:          jsonMode,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta backup: %v\n", err)
 		return 1
 	}
 	printWarns(res.Warnings)
-	fmt.Print(res.Output)
+	if jsonMode && res.JSONReport != nil {
+		data, err := json.Marshal(res.JSONReport)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "zelta backup: JSON marshal: %v\n", err)
+			return 1
+		}
+		fmt.Println(string(data))
+	} else {
+		fmt.Print(res.Output)
+	}
 	for _, msg := range res.Errors {
 		fmt.Fprintf(os.Stderr, "zelta backup: %s\n", msg)
 	}
