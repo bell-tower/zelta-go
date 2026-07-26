@@ -85,7 +85,15 @@ func runPolicy(args []string) int {
 		return 0
 	}
 
-	results := policy.Run(filtered)
+	var results []policy.RunResult
+	jobsStr := p.Env.Get("JOBS")
+	jobsVal, _ := strconv.Atoi(jobsStr)
+	sites := countSites(filtered)
+	if jobsVal > 1 && len(p.Operands) > 1 && sites > 1 {
+		results = policy.RunParallel(filtered, jobsVal)
+	} else {
+		results = policy.Run(filtered)
+	}
 	exitCode := 0
 	for _, r := range results {
 		if r.Err != nil {
@@ -94,6 +102,14 @@ func runPolicy(args []string) int {
 		}
 	}
 	return exitCode
+}
+
+func countSites(jobs []policy.Job) int {
+	m := map[string]bool{}
+	for _, j := range jobs {
+		m[j.Site] = true
+	}
+	return len(m)
 }
 
 var builtInDefaults = map[string]string{
