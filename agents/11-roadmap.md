@@ -56,16 +56,17 @@ making `internal` types part of a promised external contract.
    receive-token discovery and `zfs send -t` recovery are real-ZFS verified
    over remote root and child interruptions. Retain the reusable planning
    abstraction rather than copying the Awk loop blindly.
-7. Decide and document the public library facade. Only then move or re-export
-   packages and add external-package tests.
-8. Implement `zprune` as a separate destructive wrapper with prompt, force,
-   guard, and send-range semantics. Keep destructive operations out of core
-   `zelta prune`.
-9. Implement policy configuration (`zelta.conf`) after the option/env contract
-   is stable; add precedence tests against `zelta.env`, process environment,
-   and CLI flags.
-10. Polish README and public API documentation after the API and behavior are
-   stable.
+7. Implement policy configuration (`zelta.conf`) next; the option/environment
+   contract is sufficiently established to add precedence tests against
+   `zelta.env`, process environment, and CLI flags.
+8. Stabilize the practical work-alike CLI and its cross-platform evidence
+   before committing to the public Go library facade. Keep the facade decision
+   explicit, then promote or re-export packages and add external-package tests.
+9. Use the upstream Bourne `zprune` for feature-parity testing for now. Defer a
+   new Go `zprune` wrapper until the CLI and policy surfaces justify it; when
+   implemented, keep destructive operations separate from core `zelta prune`.
+10. Polish README and public API documentation after Zelta Policy and the API
+    behavior are stable.
 
 ## Explicit non-goals
 
