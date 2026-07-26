@@ -35,7 +35,7 @@ execution safety. `RELEASE-APPROVED` is never inferred from green CI.
 | Rotate execution | `REAL-ZFS-VERIFIED` | interrupted receive, child failure/recovery lifecycle |
 | `zprune` destructive wrapper | `CROSS-PLATFORM-VERIFIED` | scratch destroy on `dev2`+`debian` (local+remote); Fake CLI tests; golden pools untouched |
 | Policy configuration | `PLANNED` | stable option/env contract |
-| Public Go library | `FAKE-VERIFIED` | `sdk/` + package tests. Phase D PoC: Sylve gated path compiles on FreeBSD; library `backup.Run` real-ZFS smoked on `rust07-scratch/zelta-go-poc` (devhost). Full Sylve job-path under flag not yet claimed. See `agents/16-sdk.md`. |
+| Public Go library | `FAKE-VERIFIED` (+ Sylve PoC real-ZFS) | `sdk/` + package tests. Phase D: Sylve `runBackupJob` under `SYLVE_ZELTA_GO=1` and Awk/Go dual-run GUID parity on devhost (`apool/zelta-go-poc`→`rust07-scratch/…`); module fetched from Gitea. Not RELEASE-APPROVED; restore/prune still Awk. See `agents/16-sdk.md`. |
 | Release binary | `IMPLEMENTED` | release reproducibility and platform verification |
 
 ## Smallest Backup Evidence Set

@@ -221,51 +221,60 @@ Drop-in map:
 Sylve keeps: DB, queues, jail/VM fences, HA, destroy, manifests, embedded
 cluster SSH server.
 
-#### PoC status (2026-07-26, `devhost` / vault1)
+#### PoC status (2026-07-26, `devhost` / vault1) — **three boring wins done**
 
 **Host layout**
 
 | Path | Role |
 |------|------|
-| `/root/zelta-go` | rsync of this module (private; not yet required on Gitea for build) |
-| `/root/Sylve` | Sylve master + PoC patches |
-| `rust07-scratch/zelta-go-poc/*` | disposable backup smoke (src→tgt) |
-| `apool/treetop` | present golden-like tree — **do not destroy** |
+| `/root/Sylve` | Sylve + PoC patches (not pushed upstream) |
+| Gitea `djbell/zelta-go@294e570` | module source (`GOPRIVATE` + SSH `insteadOf`) |
+| `apool/zelta-go-poc/src` | disposable source (**not** `apool/treetop`) |
+| `rust07-scratch/zelta-go-poc/*` | disposable targets (cross-pool; same-pool blocked by Sylve) |
+| `apool/treetop` | golden-like — **do not destroy** |
 | `bpool` | not imported on this host |
 
 **Sylve changes (gated, default off)**
 
-1. `go.mod`: `require git.belltower.it/djbell/zelta-go v0.0.0` +  
-   `replace … => /root/zelta-go`
+1. `go.mod`: `require git.belltower.it/djbell/zelta-go v0.0.0-20260726214018-294e570afb73`  
+   — **no `replace`**; needs  
+   `git config --global url."git@git.belltower.it:".insteadOf "https://git.belltower.it/"`  
+   and `GOPRIVATE=git.belltower.it`
 2. `internal/services/zelta/zelta_go_backup.go` — `useZeltaGo()`,  
-   `sshConfigFromTarget` (ControlMaster/Path/Persist + key/port),  
-   `backupWithZeltaGo` → `backup.Run` + JSON + `OnLine` → event log
-3. `backupWithEventProgressSnapshotNameRecursive` — if `SYLVE_ZELTA_GO=1|true|yes|on`,  
-   call Go path; else embedded Awk (unchanged)
-4. Unit: `zelta_go_backup_test.go` (`useZeltaGo`, `errCodeHint`)
+   `sshConfigFromTarget`, `backupWithZeltaGo` → `backup.Run` + JSON + `OnLine`
+3. `backupWithEventProgressSnapshotNameRecursive` — `SYLVE_ZELTA_GO=1|true|yes|on` → Go; else Awk
+4. Tests: `zelta_go_backup_test.go`; real-ZFS  
+   `zelta_go_poc_integration_test.go` (`//go:build sylve_zelta_go_poc`)
 
 **Verified**
 
-- `go build ./internal/services/zelta` on FreeBSD/devhost
-- `go test ./internal/services/zelta -run 'TestUseZeltaGo|TestErrCodeHint'`
-- Real ZFS via library/CLI on `rust07-scratch/zelta-go-poc`: full + incremental JSON OK;  
-  standalone `backup.Run` + `OnLine` progress lines OK
-- **Not yet:** full Sylve job queue under `SYLVE_ZELTA_GO=1`, restore/prune cutover,  
-  remote SSH target via Sylve BackupTarget keys, delete embed
-
-**Enable**
+| Check | Result |
+|-------|--------|
+| Unit `TestUseZeltaGo` / `TestErrCodeHint` | PASS |
+| `TestPhaseD_RunBackupJob_ZeltaGo` (`runBackupJob` + flag) | PASS — event `success`, GUID match |
+| `TestPhaseD_DualRun_AwkVsGo` | PASS — per-path GUIDs + content parity (mount noauto) |
+| Module from Gitea without `replace` | PASS (re-ran Phase D tests) |
 
 ```sh
-export SYLVE_ZELTA_GO=1
-# Sylve process must see the env; replace path must resolve on that host
+# on builder with Gitea SSH access:
+export GOPRIVATE=git.belltower.it GONOSUMDB=git.belltower.it
+git config --global url."git@git.belltower.it:".insteadOf "https://git.belltower.it/"
+cd /root/Sylve
+go test -tags=sylve_zelta_go_poc ./internal/services/zelta -run TestPhaseD -count=1 -v -timeout 10m
 ```
 
-**Next PoC steps (still boring)**
+**Notes**
 
-1. One real Sylve backup job with flag on (local source → `rust07-scratch/sylve/…` or poc tgt)
-2. Dual-run one job Awk vs Go and compare `classifyBackupOutput` / GUIDs
-3. Push zelta-go to Gitea when ready; drop `replace` for `GOPRIVATE` fetch
-4. Prune candidates second; restore third; keep embed until flag is default
+- Same-pool source/target refused by `validateBackupScopesDoNotOverlapTarget` — use apool→rust07-scratch.
+- Awk fails if snap name already exists; dual-run uses separate snap names.
+- Successful runs classify as `unknown` (no failure/up-to-date substrings) — expected; GUID is the oracle.
+- **Not yet:** restore/prune cutover, delete embed, default-on flag, Hayzam PR.
+
+**Enable in a running Sylve**
+
+```sh
+export SYLVE_ZELTA_GO=1   # process env for the Sylve daemon
+```
 
 ### Optional polish (this repo, not blocking D)
 
