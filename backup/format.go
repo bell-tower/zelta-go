@@ -45,6 +45,13 @@ func FormatDryRunDirection(p *Plan, srcEp, tgtEp, direction string) (string, err
 		b.WriteString(body)
 		b.WriteByte('\n')
 	}
+	for _, st := range p.Steps {
+		if st.Kind != KindBlocked || st.Notice == "" {
+			continue
+		}
+		b.WriteString(st.Notice)
+		b.WriteByte('\n')
+	}
 	for _, bm := range p.Bookmarks {
 		verify, err := zfs.CommandShell(bm.VerifyEndpoint, bm.Verify)
 		if err != nil {

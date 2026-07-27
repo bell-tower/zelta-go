@@ -1,0 +1,73 @@
+name: ShellSpec
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # No-ZFS install + CLI no-op + cleanup
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - name: Install ShellSpec
+        run: curl -fsSL https://git.io/shellspec | sudo sh -s -- --yes --prefix /usr/local
+      - name: Build
+        run: make build
+      - name: ShellSpec install + no-op + cleanup
+        run: |
+          export SANDBOX_ZELTA_TMP_SUFFIX=ci
+          shellspec --tag install,cleanup
+
+  # Full standard scenario with file-backed ZFS pools
+  standard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zfsutils-linux man-db jq
+
+      - name: Install ShellSpec
+        run: curl -fsSL https://git.io/shellspec | sudo sh -s -- --yes --prefix /usr/local
+
+      - name: Create test user
+        run: |
+          sudo useradd -m -s /bin/bash testuser
+          echo 'testuser ALL=(ALL) NOPASSWD: /usr/bin/dd *, /usr/bin/rm *, /usr/bin/mkdir *, /usr/bin/truncate *, /usr/sbin/zpool *, /usr/sbin/zfs *' \
+            | sudo tee /etc/sudoers.d/testuser
+          sudo chown root:root /etc/sudoers.d/testuser
+          sudo chmod 0440 /etc/sudoers.d/testuser
+          sudo visudo -cf /etc/sudoers.d/testuser
+
+      - name: Copy repo for test user
+        run: |
+          sudo cp -a "$GITHUB_WORKSPACE" /home/testuser/zelta-go
+          sudo chown -R testuser:testuser /home/testuser/zelta-go
+
+      - name: Run standard ShellSpec scenario
+        run: |
+          GO_BIN_DIR="$(dirname "$(command -v go)")"
+          GOROOT_VAL="$(go env GOROOT)"
+          sudo -u testuser env \
+            HOME=/home/testuser \
+            PATH="${GO_BIN_DIR}:/usr/local/bin:/usr/bin:/bin" \
+            GOROOT="${GOROOT_VAL}" \
+            GOCACHE=/home/testuser/zelta-go/tmp/go-cache \
+            GOMODCACHE=/home/testuser/zelta-go/tmp/go-mod \
+            SANDBOX_ZELTA_TMP_SUFFIX=ci \
+            SANDBOX_ZELTA_SRC_POOL=apool \
+            SANDBOX_ZELTA_TGT_POOL=bpool \
+            SANDBOX_ZELTA_SRC_DS=apool/treetop \
+            SANDBOX_ZELTA_TGT_DS=bpool/backups \
+            bash -lc 'cd /home/testuser/zelta-go && mkdir -p tmp && make build && ./test/run_tests.sh standard'

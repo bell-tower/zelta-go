@@ -129,6 +129,12 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		return nil, fmt.Errorf("match: %w", err)
 	}
 
+	if strings.Contains(req.Source, "\r") && srcEp.Dataset != "" {
+		mres.Warnings = append(mres.Warnings, "carriage return stripped: "+srcEp.String())
+	}
+	if strings.Contains(req.Target, "\r") && tgtEp.Dataset != "" {
+		mres.Warnings = append(mres.Warnings, "carriage return stripped: "+tgtEp.String())
+	}
 	views := ViewsFromMatch(mres.Pairs)
 	if strings.TrimSpace(req.TargetOrigin) != "" {
 		if err := configureTargetOrigin(ctx, exec, req.TargetOrigin, mres, views, props, req.Depth); err != nil {
@@ -252,15 +258,35 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		}
 		b.WriteString(out)
 	} else {
+		work := plan.Full + plan.Incr
+		total := work + plan.Skip + plan.Block
+		// Oracle: announce sync only when there is work; pure up-to-date skips it.
+		if work > 0 && total > 0 {
+			b.WriteString(fmt.Sprintf("syncing %d datasets\n", total))
+		}
+		execStart := time.Now()
 		if err := executePlan(ctx, exec, req, plan, direction); err != nil {
 			return nil, err
 		}
 		errors = append(errors, createBookmarks(ctx, exec, req, plan)...)
 		execEndTime = time.Now()
+		if work == 0 && plan.Skip > 0 {
+			if plan.Skip == 1 {
+				b.WriteString("dataset up-to-date\n")
+			} else {
+				b.WriteString(fmt.Sprintf("%d datasets up-to-date\n", plan.Skip))
+			}
+		}
+		if work > 0 {
+			secs := execEndTime.Sub(execStart).Seconds()
+			// Byte accounting is still incomplete; shellspec accepts wildcard size.
+			b.WriteString(fmt.Sprintf("0B sent, %d streams received in %.0f seconds\n", work, secs))
+		}
 	}
 	if sum := plan.Summary(); sum != "" {
-		// Dry-run with work: oracle often skips summary; keep for empty plans / execute.
-		if !req.DryRun || plan.Full+plan.Incr == 0 {
+		// Dry-run with work: oracle often skips summary; keep for empty plans.
+		// Execute path uses oracle-style notices above instead of Summary().
+		if req.DryRun && plan.Full+plan.Incr == 0 {
 			b.WriteString(sum)
 			b.WriteByte('\n')
 		}

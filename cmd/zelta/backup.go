@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"git.belltower.it/djbell/zelta-go/backup"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
@@ -47,6 +48,7 @@ func runBackup(args []string) int {
 		DryRun:        p.Env.Bool("DRYRUN", false),
 		Intermediate:  p.Env.Bool("SEND_INTR", true),
 		SnapMode:      snapMode,
+		SnapName:      strings.TrimPrefix(p.Env.Get("SNAP_NAME"), "@"),
 		SnapTime:      p.Env.Get("SNAP_TIME"),
 		SnapSize:      p.Env.Get("SNAP_SIZE"),
 		Depth:         depth,
@@ -62,7 +64,17 @@ func runBackup(args []string) int {
 		fmt.Fprintf(os.Stderr, "zelta backup: %v\n", err)
 		return 1
 	}
-	printWarns(res.Warnings)
+	var filteredWarnings []string
+	for _, w := range res.Warnings {
+		if strings.Contains(w, "raw send unavailable") {
+			continue
+		}
+		filteredWarnings = append(filteredWarnings, w)
+	}
+	printWarns(filteredWarnings)
+	if p.Env.Bool("DRYRUN", false) {
+		fmt.Fprint(os.Stderr, res.Output)
+	}
 	if jsonMode && res.JSONReport != nil {
 		data, err := json.Marshal(res.JSONReport)
 		if err != nil {
@@ -70,7 +82,7 @@ func runBackup(args []string) int {
 			return 1
 		}
 		fmt.Println(string(data))
-	} else {
+	} else if !p.Env.Bool("DRYRUN", false) {
 		fmt.Print(res.Output)
 	}
 	for _, msg := range res.Errors {

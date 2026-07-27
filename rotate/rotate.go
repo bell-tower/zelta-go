@@ -168,7 +168,7 @@ func planPair(sourceRoot, targetRoot, preserved string, pair *match.Pair, req Tr
 			return nil, err
 		}
 		seedRecv, err := cmdbuild.Build("RECV", map[string]string{
-			"flags": recvFlags(req.Flags, pair.SrcType, "", pair.DSSuffix == ""),
+			"flags": recvFlags(req.Flags, pair.SrcType, pair.DSSuffix == ""),
 			"ds":    targetDataset,
 		})
 		if err != nil {
@@ -191,11 +191,15 @@ func planPair(sourceRoot, targetRoot, preserved string, pair *match.Pair, req Tr
 		return nil, err
 	}
 	recv, err := cmdbuild.Build("RECV", map[string]string{
-		"flags": recvFlags(req.Flags, pair.SrcType, origin, pair.DSSuffix == ""),
-		"ds":    targetDataset,
+		"flags":  recvFlags(req.Flags, pair.SrcType, pair.DSSuffix == ""),
+		"ds":     targetDataset,
 	})
 	if err != nil {
 		return nil, err
+	}
+	if origin != "" {
+		end := len(recv) - 1
+		recv = append(recv[:end], append([]string{"-o", "origin=" + origin}, recv[end:]...)...)
 	}
 	return append(steps,
 		Step{Kind: "send", Argv: send, DSSuffix: pair.DSSuffix},
@@ -264,7 +268,7 @@ func incrFlag(intermediate bool) string {
 	return "-i"
 }
 
-func recvFlags(f opt.SendRecv, sourceType, origin string, root bool) string {
+func recvFlags(f opt.SendRecv, sourceType string, root bool) string {
 	if f.RecvOverride != "" {
 		return f.RecvOverride
 	}
@@ -294,9 +298,6 @@ func recvFlags(f opt.SendRecv, sourceType, origin string, root bool) string {
 	}
 	if f.Resume && f.RecvPartial != "" {
 		parts = append(parts, f.RecvPartial)
-	}
-	if origin != "" {
-		parts = append(parts, "-o origin="+origin)
 	}
 	return strings.Join(parts, " ")
 }

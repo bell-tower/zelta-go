@@ -22,7 +22,7 @@ func Parse(ep string) (Endpoint, error) {
 		return out, fmt.Errorf("empty endpoint")
 	}
 
-	rest := ep
+	rest := strings.ReplaceAll(ep, "\r", "")
 	// user@host: or user@[ipv6]:
 	if at := strings.Index(rest, "@"); at >= 0 {
 		// Only treat as user if @ appears before the dataset path colon rules.

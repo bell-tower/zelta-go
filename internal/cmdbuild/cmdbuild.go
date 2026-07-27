@@ -99,7 +99,11 @@ func StdinNull(role string) bool {
 }
 
 // Build expands a template with vars into argv (no remote/ssh wrapping).
-// Empty var values are skipped. Var values may contain spaces (split into fields).
+// Empty var values are skipped.
+//
+// flags/props are split on whitespace into multiple argv elements.
+// intr_snap is "-i|-I" plus a single snapshot/bookmark token (may contain spaces).
+// All other vars (ds, ds_snap, old_ds, …) are one argv element even with spaces.
 func Build(action string, vars map[string]string) ([]string, error) {
 	t, err := Get(action)
 	if err != nil {
@@ -115,9 +119,25 @@ func Build(action string, vars map[string]string) ([]string, error) {
 		if v == "" {
 			continue
 		}
-		out = append(out, strings.Fields(v)...)
+		out = append(out, expandVar(k, v)...)
 	}
 	return out, nil
+}
+
+func expandVar(key, val string) []string {
+	switch key {
+	case "flags", "props":
+		return strings.Fields(val)
+	case "intr_snap":
+		// "-i pool/ds with space@snap" → ["-i", "pool/ds with space@snap"]
+		parts := strings.SplitN(strings.TrimSpace(val), " ", 2)
+		if len(parts) == 2 && (parts[0] == "-i" || parts[0] == "-I") {
+			return parts
+		}
+		return strings.Fields(val)
+	default:
+		return []string{val}
+	}
 }
 
 // ListArgv builds LIST from cmds.tsv (match flags: -t all -S createtxg, optional -d).

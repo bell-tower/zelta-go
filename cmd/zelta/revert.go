@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"git.belltower.it/djbell/zelta-go/backup"
@@ -102,7 +103,10 @@ func runRevert(args []string) int {
 		}
 		return 1
 	}
-	fmt.Fprintf(os.Stdout, "to retain replica history, run: zelta rotate '%s' 'TARGET'\n", current.String())
+	logLevel, _ := strconv.Atoi(p.Env.Get("LOG_LEVEL"))
+	if logLevel >= 1 {
+		fmt.Fprintf(os.Stdout, "to retain replica history, run: zelta rotate '%s' 'TARGET'\n", current.String())
+	}
 	return 0
 }
 

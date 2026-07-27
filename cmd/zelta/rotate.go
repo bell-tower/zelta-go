@@ -98,6 +98,32 @@ func runRotate(args []string) int {
 		fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
 		return 1
 	}
+	// Re-plan above drops the snapshot prefix; re-apply when needed.
+	if shouldSnapshot {
+		source, err := endpoint.Parse(p.Operands[0])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "zelta rotate: source: %v\n", err)
+			return 1
+		}
+		argv, err := cmdbuild.SnapArgv(source.Dataset + savepoint)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
+			return 1
+		}
+		steps = append([]rotate.Step{{Kind: "snapshot", Argv: argv}}, steps...)
+	}
+	if shouldSnapshot {
+		fmt.Fprintf(os.Stdout, "source is written; snapshotting: %s\n", savepoint)
+	}
+	var fullCount int
+	for _, pair := range m.Pairs {
+		if pair.SrcName != "" && pair.Match == "" {
+			fullCount++
+		}
+	}
+	if fullCount > 0 {
+		fmt.Fprintf(os.Stderr, "warning: insufficient snapshots; performing full backup for %d datasets\n", fullCount)
+	}
 	if p.Env.Bool("DRYRUN", false) {
 		out, err := rotate.FormatRemote(steps, p.Operands[0], p.Operands[1], request.SyncDirection)
 		if err != nil {
@@ -116,17 +142,16 @@ func runRotate(args []string) int {
 		printRotateFailures(execution.Failures)
 		return 1
 	}
-	post, err := match.Compare(context.Background(), exec, match.Request{
+	if execution.Preserved {
+		fmt.Fprintf(os.Stdout, "renaming '%s' to '%s'\n", p.Operands[1], preserved)
+	}
+	_, err = match.Compare(context.Background(), exec, match.Request{
 		Source: p.Operands[0], Target: p.Operands[1], Props: match.RotateListProps,
 		Scripting: true, Parsable: true,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: rotate confirmation: %v\n", err)
 	} else {
-		if rotate.NeedsPreservation(post) {
-			preservedEP := preservationEndpoint(p.Operands[1], preserved)
-			fmt.Fprintf(os.Stdout, "ensure preservation of diverged replica with: zelta backup %s %s\n", p.Operands[0], preservedEP)
-		}
 		fmt.Fprintf(os.Stdout, "to ensure target is up-to-date, run: zelta backup %s %s\n", p.Operands[0], p.Operands[1])
 	}
 	if len(execution.Failures) > 0 {

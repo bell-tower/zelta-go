@@ -35,7 +35,8 @@ printf '%s\n' 'apool/treetop@new	90	0	1000000	0	1000	-' 'apool/treetop@old	70	10
 
 func TestRunPruneRejectsMissingOperand(t *testing.T) {
 	stdout, stderr, code := captureOutput(func() int { return runPrune(nil) })
-	if code != 2 || stdout != "" || stderr != "usage: zelta prune [OPTIONS] ENDPOINT\nReports snapshot prune candidates on ENDPOINT.\n" {
+	want := "usage: zelta prune [OPTIONS] ENDPOINT [MATCH_ENDPOINT]\nReports snapshot prune candidates on ENDPOINT.\nOptional MATCH_ENDPOINT guards against unsynced snapshots.\n"
+	if code != 2 || stdout != "" || stderr != want {
 		t.Fatalf("stdout=%q stderr=%q exit=%d", stdout, stderr, code)
 	}
 }

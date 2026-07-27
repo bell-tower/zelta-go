@@ -1,0 +1,5 @@
+--helperdir test/spec/helpers
+--require spec_helper
+--default-path test/spec
+--shell sh
+--format tap

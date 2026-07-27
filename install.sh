@@ -60,36 +60,52 @@ for f in share/zelta/zelta-*; do
 	copy_file "$f" "$ZELTA_SHARE/${f#share/zelta/}"
 done
 
-# Install man pages
+# Install man pages (repo root doc/ or embedded cmd/zelta/doc/)
 if [ -n "$ZELTA_DOC" ]; then
 	mkdir -p "${ZELTA_DOC}/man7" 2>/dev/null
 	mkdir -p "${ZELTA_DOC}/man8" 2>/dev/null
 
+	_man7_src=""
+	_man8_src=""
 	if [ -d doc/man7 ]; then
-		for f in doc/man7/*.7; do
-			[ -f "$f" ] || continue
-			copy_file "$f" "${ZELTA_DOC}/man7/${f#doc/man7/}"
-		done
+		_man7_src=doc/man7
+	elif [ -d cmd/zelta/doc/man7 ]; then
+		_man7_src=cmd/zelta/doc/man7
+	fi
+	if [ -d doc/man8 ]; then
+		_man8_src=doc/man8
+	elif [ -d cmd/zelta/doc/man8 ]; then
+		_man8_src=cmd/zelta/doc/man8
 	fi
 
-	if [ -d doc/man8 ]; then
-		for f in doc/man8/*.8; do
+	if [ -n "$_man7_src" ]; then
+		for f in "$_man7_src"/*.7; do
 			[ -f "$f" ] || continue
-			copy_file "$f" "${ZELTA_DOC}/man8/${f#doc/man8/}"
+			copy_file "$f" "${ZELTA_DOC}/man7/${f##*/}"
+		done
+	fi
+	if [ -n "$_man8_src" ]; then
+		for f in "$_man8_src"/*.8; do
+			[ -f "$f" ] || continue
+			copy_file "$f" "${ZELTA_DOC}/man8/${f##*/}"
 		done
 	fi
 fi
 
 # Install environment file (always .example; only as default if missing or empty)
-copy_file zelta.env "$ZELTA_ENV.example"
-[ ! -s "$ZELTA_ENV" ] && copy_file zelta.env "$ZELTA_ENV"
+if [ -f zelta.env ]; then
+	copy_file zelta.env "$ZELTA_ENV.example"
+	[ ! -s "$ZELTA_ENV" ] && copy_file zelta.env "$ZELTA_ENV"
+fi
 
 # Install configuration file (always .example; only as default if missing or empty)
-copy_file zelta.conf "$ZELTA_CONFIG.example"
-[ ! -s "$ZELTA_CONFIG" ] && copy_file zelta.conf "$ZELTA_CONFIG"
+if [ -f zelta.conf ]; then
+	copy_file zelta.conf "$ZELTA_CONFIG.example"
+	[ ! -s "$ZELTA_CONFIG" ] && copy_file zelta.conf "$ZELTA_CONFIG"
+fi
 
 # Up-to-date check
-[ -z "$ZELTA_UPDATED" ] && echo "up-to-date"
+[ -z "$ZELTA_UPDATED" ] && echo "Zelta is up to date."
 
 # PATH conflict warning
 if [ -n "$ZELTA_BIN" ]; then

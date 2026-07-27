@@ -1,55 +1,75 @@
 # zelta-go
 
-**Private / experimental.** Go library and single binary for [Zelta](https://zelta.space) — a data-driven ZFS composer.
+[![Go](https://github.com/bell-tower/zelta-go/actions/workflows/go.yml/badge.svg)](https://github.com/bell-tower/zelta-go/actions/workflows/go.yml)
+[![Shell](https://github.com/bell-tower/zelta-go/actions/workflows/shell.yml/badge.svg)](https://github.com/bell-tower/zelta-go/actions/workflows/shell.yml)
+[![ShellSpec](https://github.com/bell-tower/zelta-go/actions/workflows/shellspec.yml/badge.svg)](https://github.com/bell-tower/zelta-go/actions/workflows/shellspec.yml)
 
-Not public until documented. No man pages here; see `~/Code/zelta/doc/` (or installed Zelta docs).
+Go library and CLI for [Zelta](https://zelta.space) — a data-driven ZFS composer.
+
+**Docs:** [zelta.space](https://zelta.space)
 
 ## Status
 
-Match, backup, read-only prune, clone/revert, rotate, policy dry-run/exec,
-and `zprune` are implemented with deterministic tests; several paths have
-disposable real-ZFS evidence. Public SDK packages are importable; Sylve
-in-process integration is the next external step (`agents/16-sdk.md`).
-Private Gitea only.
+Match, backup, read-only prune, clone/revert, rotate, policy dry-run/exec, and
+`zprune` are implemented with deterministic unit and golden tests. Several
+paths also have disposable real-ZFS evidence. Public SDK packages are
+importable for in-process use (e.g. orchestration platforms).
 
-## Library Status
+## Install / build
 
-Curated public packages (ZFS remote-action SDK); CLI is a thin consumer:
+```sh
+git clone https://github.com/bell-tower/zelta-go.git
+cd zelta-go
+make build
+./bin/zelta version
+```
+
+```sh
+make test                 # go test ./...
+make shelltest            # binary smoke (no ZFS)
+make shellspec            # ShellSpec install + no-op + cleanup
+make shellspec-standard   # full Richard suite (needs sudo ZFS)
+```
+
+## Library
+
+Import path: `github.com/bell-tower/zelta-go/<package>`
 
 | Package | Purpose |
 |---------|---------|
-| `endpoint` | Parse/user@host:dataset[@snap] |
+| `endpoint` | Parse `user@host:dataset[@snap]` |
 | `zfs` | Executor, Real (SSH), Fake, pipe support |
 | `match` | Compare two dataset trees |
 | `backup` | Plan and run ZFS send/recv |
 | `prune` | Read-only retention analysis |
 | `lineage` | Clone/revert planning |
 | `rotate` | Rotate lifecycle for divergent targets |
-| `report` | JSON output schema, col expansion |
-
-Import path: `git.belltower.it/djbell/zelta-go/<package>`.
+| `report` | JSON output schema, column expansion |
 
 ```go
-// Structured SSH (library / Sylve):
+// Structured SSH (library consumers):
 &zfs.Real{SSH: zfs.SSHConfig{IdentityFile: key, Port: 22}}
 
-// Raw remote prefixes (Awk REMOTE_*, mbuffer, socat, …):
+// Raw remote prefixes (mbuffer, socat, custom ssh, …):
 &zfs.Real{Remote: zfs.CommandRemote{Command: "ssh -p 2202"}}
 
 // Tests:
 &zfs.Fake{}
 ```
 
-See `agents/16-sdk.md`. Runnable samples: `go test ./backup -run Example`.
+Runnable samples: `go test ./backup -run Example`.
 
-## Build
+## CLI
 
 ```sh
-make build
-./bin/zelta version
-make test
+./bin/zelta match …
+./bin/zelta backup …
+./bin/zelta policy …
+./bin/zprune …
 ```
 
-## Agents
+`./bin/zelta --help` and `./bin/zelta help <topic>` use embedded man pages.
 
-Read `AGENTS.md` first. Local persona: `AGENTS-Persona.md` (gitignored).
+## License
+
+See [LICENSE](LICENSE).

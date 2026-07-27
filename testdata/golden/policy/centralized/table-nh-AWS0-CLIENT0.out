@@ -1,0 +1,6 @@
+app2.cloud0:zroot vault1.den0:data1/Backups/app2.cloud0/zroot
+app2.cloud0:zroot vault1.nyc1:rust12/Backups/app2.cloud0/zroot
+disco.client0:client0root/vm/files.client0 vault1.den0:data1/Backups/files.client0
+disco.client0:client0root/vm/files.client0 vault1.nyc1:rust12/Backups/files.client0
+host1.client0:zroot/jail/dc.client0 vault1.den0:data1/Backups/dc.client0
+host1.client0:zroot/jail/dc.client0 vault1.nyc1:rust12/Backups/dc.client0

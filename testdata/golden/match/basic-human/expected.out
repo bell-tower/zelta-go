@@ -1,0 +1,5 @@
+DS_SUFFIX  MATCH  SRC_LAST  TGT_LAST  INFO           
+[src]      @b     @b        @b        up-to-date     
+/child     -      @a        -         syncable (full)
+1 up-to-date, 1 syncable
+2 total datasets compared

@@ -21,7 +21,7 @@ func runPrune(args []string) int {
 		pruneUsage()
 		return 0
 	}
-	if len(p.Operands) != 1 {
+	if len(p.Operands) < 1 || len(p.Operands) > 2 {
 		pruneUsage()
 		return 2
 	}
@@ -40,9 +40,15 @@ func runPrune(args []string) int {
 		pruneNum = n
 	}
 
+	// Optional second operand is the guard/match endpoint (oracle CLI form).
+	guard := p.Env.Get("MATCH_ENDPOINT")
+	if len(p.Operands) == 2 && guard == "" {
+		guard = p.Operands[1]
+	}
+
 	res, err := prune.Run(context.Background(), newReal(), prune.Request{
 		Source:      p.Operands[0],
-		GuardTarget: p.Env.Get("MATCH_ENDPOINT"),
+		GuardTarget: guard,
 		PruneGuard:  p.Env.Get("PRUNE_GUARD"),
 		PruneNum:    pruneNum,
 		PruneTime:   p.Env.Get("PRUNE_TIME"),
@@ -67,6 +73,7 @@ func runPrune(args []string) int {
 }
 
 func pruneUsage() {
-	fmt.Fprintln(os.Stderr, "usage: zelta prune [OPTIONS] ENDPOINT")
+	fmt.Fprintln(os.Stderr, "usage: zelta prune [OPTIONS] ENDPOINT [MATCH_ENDPOINT]")
 	fmt.Fprintln(os.Stderr, "Reports snapshot prune candidates on ENDPOINT.")
+	fmt.Fprintln(os.Stderr, "Optional MATCH_ENDPOINT guards against unsynced snapshots.")
 }

@@ -195,6 +195,11 @@ func (r *Real) Clone(ctx context.Context, epStr, sourceSnap, dataset string) err
 		return err
 	}
 	if _, err := r.output(ctx, epStr, r.rewriteBin(argv)); err != nil {
+		// OpenZFS may create the clone then fail mount when non-root:
+		// "filesystem successfully created, but it may only be mounted by root"
+		if strings.Contains(err.Error(), "successfully created") {
+			return nil
+		}
 		return fmt.Errorf("zfs clone %s: %w", dataset, err)
 	}
 	return nil

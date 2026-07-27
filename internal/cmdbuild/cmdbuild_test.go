@@ -52,6 +52,31 @@ func TestBuildFullSend(t *testing.T) {
 	}
 }
 
+func TestBuildPreservesSpacesInDatasetNames(t *testing.T) {
+	send, err := Build("SEND", map[string]string{
+		"intr_snap": "-i tank/src/space name@start",
+		"ds_snap":   "tank/src/space name@two",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantSend := []string{"zfs", "send", "-P", "-i", "tank/src/space name@start", "tank/src/space name@two"}
+	if !reflect.DeepEqual(send, wantSend) {
+		t.Fatalf("send=%q want %q", send, wantSend)
+	}
+	recv, err := Build("RECV", map[string]string{
+		"flags": "-o readonly=on",
+		"ds":    "tank/tgt/space name",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantRecv := []string{"zfs", "recv", "-v", "-o", "readonly=on", "tank/tgt/space name"}
+	if !reflect.DeepEqual(recv, wantRecv) {
+		t.Fatalf("recv=%q want %q", recv, wantRecv)
+	}
+}
+
 func TestRemoteRoles(t *testing.T) {
 	for _, tc := range []struct {
 		action, role string

@@ -41,12 +41,12 @@ case "$out" in
 	*) xfail "no args: usage text" ;;
 esac
 
-# --help -> usage to stderr, exit 0
+# --help -> man page or usage, exit 0
 out=$(_run --help); rc=$?
 [ $rc -eq 0 ] && pass "--help: exit 0" || xfail "--help: exit 0 (got $rc)"
 case "$out" in
-	"usage: zelta command"*) pass "--help: usage text" ;;
-	*) xfail "--help: usage text" ;;
+	"usage: zelta command"*|"zelta("*"System Manager"*) pass "--help: shows help" ;;
+	*) xfail "--help: unexpected output: $out" ;;
 esac
 
 # -h -> usage to stderr, exit 0 (same as --help)
@@ -119,7 +119,7 @@ if _has_man; then
 	out=$(_run help nonexistent); rc=$?
 	[ $rc -eq 1 ] && pass "help nonexistent: exit 1" || xfail "help nonexistent: exit 1 (got $rc)"
 	case "$out" in
-		*"No manual entry"*|*"man page not available"*) pass "help nonexistent: error message" ;;
+		*"No manual entry"*|*"man page not available"*|*"see https://zelta.space"*) pass "help nonexistent: error message" ;;
 		*) xfail "help nonexistent: unexpected output: $out" ;;
 	esac
 else

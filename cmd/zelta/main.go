@@ -43,9 +43,9 @@ func main() {
 	switch os.Args[1] {
 	case "version", "--version", "-V":
 		fmt.Println(version)
-	case "--help", "-h", "-?":
+	case "-h", "-?":
 		usage()
-	case "help":
+	case "help", "--help":
 		os.Exit(commandHelp(os.Args[2:]))
 	case "match":
 		os.Exit(runMatch(os.Args[2:]))
@@ -59,6 +59,8 @@ func main() {
 		os.Exit(runRevert(os.Args[2:]))
 	case "rotate":
 		os.Exit(runRotate(os.Args[2:]))
+	case "snapshot":
+		os.Exit(runSnapshot(os.Args[2:]))
 	case "policy", "zp":
 		os.Exit(runPolicy(os.Args[2:]))
 	case "zprune":
@@ -84,9 +86,8 @@ func injectEnvFile() []string {
 	return warns
 }
 
-// commandHelp implements upstream zelta_man: routes zelta help to man pages.
+// commandHelp routes zelta help to man pages.
 // topicless → zelta(8); "options" → zelta-options(7); any verb → zelta-VERB(8).
-// Returns 0 on success, 1 if man failed.
 func commandHelp(args []string) int {
 	section := "8"
 	page := "zelta"
@@ -101,6 +102,27 @@ func commandHelp(args []string) int {
 			page = "zelta-" + args[0]
 		}
 	}
+
+	// Embedded man pages — always available, no filesystem dependency.
+	if content, err := manPages.ReadFile("doc/man" + section + "/" + page + "." + section); err == nil {
+		tmpDir, err := os.MkdirTemp("", "zelta-man-*")
+		if err == nil {
+			defer os.RemoveAll(tmpDir)
+			manDir := filepath.Join(tmpDir, "man"+section)
+			if err := os.MkdirAll(manDir, 0755); err == nil {
+				if err := os.WriteFile(filepath.Join(manDir, page+"."+section), content, 0644); err == nil {
+					cmd := exec.Command("man", "-M", tmpDir, section, page)
+					cmd.Stdout = os.Stdout
+					cmd.Stderr = os.Stderr
+					if cmd.Run() == nil {
+						return 0
+					}
+				}
+			}
+		}
+	}
+
+	// System man fallback
 	docDir := conf.DocDir()
 	var cmd *exec.Cmd
 	if docDir != "" {
@@ -114,8 +136,11 @@ func commandHelp(args []string) int {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "error: man page not available; see ~/Code/zelta/doc/\n")
-		return 1
+		if len(args) > 0 {
+			fmt.Fprintf(os.Stderr, "zelta %s — see https://zelta.space\n", args[0])
+			return 1
+		}
+		usage()
 	}
 	return 0
 }
@@ -133,6 +158,7 @@ func usage() {
 		{"clone", "Clone ZFS datasets"},
 		{"revert", "Rename and clone a dataset in-place"},
 		{"rotate", "Recover sync continuity"},
+		{"snapshot", "Create a recursive snapshot"},
 		{"prune", "Report snapshot prune candidates (read-only)"},
 		{"lock", "Make datasets read-only and unmount them"},
 		{"unlock", "Inherit readonly and mount datasets"},
