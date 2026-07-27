@@ -4,6 +4,7 @@
 *.exe
 *.test
 *.out
+!testdata/**/*.out
 /zelta
 /zprune
 
