@@ -1,4 +1,4 @@
-zfs rename -fp tank/target tank/target_base
+zfs rename -fp tank/target tank/target_other
 zfs send -P -L -c -e tank/src@base
 zfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target
 zfs send -P -L -c -e -I tank/src@base tank/src@new

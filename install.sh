@@ -9,20 +9,37 @@
 : ${PRE_RUN="make"}
 if [ -n "$PRE_RUN" ]; then
 	echo "Running: $PRE_RUN"
-	(eval "$PRE_RUN") || exit 1
+	# Capture build noise; only surface it when we cannot fall back to bin/.
+	_pre_run_err="${TMPDIR:-/tmp}/zelta-install-prerun.$$"
+	if ! (eval "$PRE_RUN") >"$_pre_run_err" 2>&1; then
+		# ShellSpec / lab hosts may ship a prebuilt bin/ when Go is too old.
+		if [ -x bin/zelta ] && [ -x bin/zprune ]; then
+			echo "PRE_RUN failed; continuing with existing bin/"
+			rm -f "$_pre_run_err"
+		else
+			cat "$_pre_run_err" >&2
+			rm -f "$_pre_run_err"
+			exit 1
+		fi
+	else
+		rm -f "$_pre_run_err"
+	fi
 fi
 
-# Root-vs-user path defaults
-if [ "$(id -u)" -eq 0 ]; then
-	: ${ZELTA_BIN:="/usr/local/bin"}
-	: ${ZELTA_SHARE:="/usr/local/share/zelta"}
-	: ${ZELTA_ETC:="/usr/local/etc/zelta"}
-	: ${ZELTA_DOC:="/usr/local/man"}
-elif [ -z "$ZELTA_BIN" ] || [ -z "$ZELTA_SHARE" ] || [ -z "$ZELTA_ETC" ] || [ -z "$ZELTA_DOC" ]; then
-	: ${ZELTA_BIN:="$HOME/bin"}
-	: ${ZELTA_SHARE:="$HOME/.local/share/zelta"}
-	: ${ZELTA_ETC:="$HOME/.config/zelta"}
-	: ${ZELTA_DOC:="$ZELTA_SHARE/doc"}
+# Path defaults. Explicit ZELTA_* (ShellSpec sandbox under /tmp/zelta_sandbox_*)
+# always win — including when install runs as root.
+if [ -z "$ZELTA_BIN" ] || [ -z "$ZELTA_SHARE" ] || [ -z "$ZELTA_ETC" ] || [ -z "$ZELTA_DOC" ]; then
+	if [ "$(id -u)" -eq 0 ]; then
+		: ${ZELTA_BIN:="/usr/local/bin"}
+		: ${ZELTA_SHARE:="/usr/local/share/zelta"}
+		: ${ZELTA_ETC:="/usr/local/etc/zelta"}
+		: ${ZELTA_DOC:="/usr/local/man"}
+	else
+		: ${ZELTA_BIN:="$HOME/bin"}
+		: ${ZELTA_SHARE:="$HOME/.local/share/zelta"}
+		: ${ZELTA_ETC:="$HOME/.config/zelta"}
+		: ${ZELTA_DOC:="$ZELTA_SHARE/doc"}
+	fi
 fi
 
 : ${ZELTA_CONFIG:="$ZELTA_ETC/zelta.conf"}

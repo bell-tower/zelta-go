@@ -26,8 +26,8 @@ tags, helpers, and scenario layout; install check adapted for the Go binary
 
 ### Scratch paths
 
-Sandboxes live under **repo-local `./tmp/`** (not `/tmp/`). Override base with
-`SANDBOX_ZELTA_TMP_BASE` if needed.
+Sandboxes live under **`/tmp/zelta_sandbox_*`** (Awk parity). Override parent
+with `SANDBOX_ZELTA_TMP_BASE` if needed.
 
 ### Quick start (local)
 
@@ -36,7 +36,7 @@ Sandboxes live under **repo-local `./tmp/`** (not `/tmp/`). Override base with
 export SANDBOX_ZELTA_TMP_SUFFIX="$LOGNAME"
 shellspec --tag install,cleanup
 
-# full standard scenario (file-backed pools under ./tmp/)
+# full standard scenario (file-backed pools under /tmp/zelta_sandbox_*)
 export SANDBOX_ZELTA_SRC_POOL=apool
 export SANDBOX_ZELTA_TGT_POOL=bpool
 export SANDBOX_ZELTA_SRC_DS=apool/treetop

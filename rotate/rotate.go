@@ -60,6 +60,42 @@ func NeedsPreservation(result *match.Result) bool {
 	return false
 }
 
+// FullSendCount returns how many source pairs will be planned as true full
+// sends (no direct match and no verified clone-origin base). Used for the
+// "insufficient snapshots; performing full backup" warning — origin-backed
+// pairs must not be counted.
+func FullSendCount(pairs []*match.Pair, targetRoot string, targetRows []zfs.ListRow) int {
+	n := 0
+	for _, pair := range pairs {
+		if pair == nil || pair.SrcName == "" || pair.SrcLast == "" {
+			continue
+		}
+		if pair.Match != "" {
+			continue
+		}
+		if _, originSnap, ok := splitOrigin(pair.SrcOrigin); ok {
+			tgtDS := joinDataset(targetRoot, pair.DSSuffix)
+			if hasSnapshot(targetRows, tgtDS+originSnap) {
+				continue
+			}
+		}
+		n++
+	}
+	return n
+}
+
+// StreamCount returns how many send/recv pairs are in a plan (excludes rename
+// and snapshot steps).
+func StreamCount(steps []Step) int {
+	n := 0
+	for _, step := range steps {
+		if step.Kind == "send" {
+			n++
+		}
+	}
+	return n
+}
+
 // TreeRequest plans a complete dataset tree. TargetRows are used to verify
 // source clone origins before they are used as incremental bases.
 type TreeRequest struct {
@@ -90,20 +126,24 @@ func PlanTree(req TreeRequest) ([]Step, error) {
 	if root.TgtName == "" {
 		return nil, fmt.Errorf("rotate target root is missing")
 	}
-	matchName := root.Match
-	if matchName == "" {
+	// Lineage base for send planning (direct GUID match or verified clone origin).
+	lineageSnap := root.Match
+	if lineageSnap == "" {
 		_, originSnap, ok := splitOrigin(root.SrcOrigin)
 		if !ok || !hasSnapshot(req.TargetRows, joinDataset(tgt.Dataset, root.DSSuffix)+originSnap) {
 			return nil, fmt.Errorf("rotate has no verified common snapshot or source origin")
 		}
-		matchName = originSnap
-	} else if root.TgtLast == "" {
-		return nil, fmt.Errorf("rotate target has no usable snapshot")
+		lineageSnap = originSnap
 	}
-	if root.SrcLast == "" || root.SrcLast == matchName {
+	if root.SrcLast == "" || root.SrcLast == lineageSnap {
 		return nil, fmt.Errorf("rotate source is up-to-date or has no new snapshot")
 	}
-	preserved := tgt.Dataset + "_" + strings.TrimPrefix(matchName, "@")
+	// Awk rename_dataset: preserve name from target latest snapshot (not match/origin).
+	preserveSnap := root.TgtLast
+	if preserveSnap == "" {
+		preserveSnap = lineageSnap
+	}
+	preserved := tgt.Dataset + "_" + strings.TrimPrefix(preserveSnap, "@")
 	if req.PreservationExists {
 		return nil, fmt.Errorf("rotate preservation target already exists: %s", preserved)
 	}

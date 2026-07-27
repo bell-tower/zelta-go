@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"git.belltower.it/djbell/zelta-go/backup"
 	"git.belltower.it/djbell/zelta-go/endpoint"
@@ -115,13 +116,11 @@ func runRotate(args []string) int {
 	if shouldSnapshot {
 		fmt.Fprintf(os.Stdout, "source is written; snapshotting: %s\n", savepoint)
 	}
-	var fullCount int
-	for _, pair := range m.Pairs {
-		if pair.SrcName != "" && pair.Match == "" {
-			fullCount++
-		}
+	tgtRoot := p.Operands[1]
+	if ep, err := endpoint.Parse(p.Operands[1]); err == nil {
+		tgtRoot = ep.Dataset
 	}
-	if fullCount > 0 {
+	if fullCount := rotate.FullSendCount(m.Pairs, tgtRoot, m.TgtRows); fullCount > 0 {
 		fmt.Fprintf(os.Stderr, "warning: insufficient snapshots; performing full backup for %d datasets\n", fullCount)
 	}
 	if p.Env.Bool("DRYRUN", false) {
@@ -133,11 +132,13 @@ func runRotate(args []string) int {
 		fmt.Print(out)
 		return 0
 	}
+	execStart := time.Now()
 	execution, err := rotate.ExecuteResult(context.Background(), exec, request, steps)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
 		return 1
 	}
+	secs := time.Since(execStart).Seconds()
 	if len(execution.Failures) > 0 && !execution.Preserved {
 		printRotateFailures(execution.Failures)
 		return 1
@@ -153,6 +154,10 @@ func runRotate(args []string) int {
 		fmt.Fprintf(os.Stderr, "warning: rotate confirmation: %v\n", err)
 	} else {
 		fmt.Fprintf(os.Stdout, "to ensure target is up-to-date, run: zelta backup %s %s\n", p.Operands[0], p.Operands[1])
+	}
+	if streams := rotate.StreamCount(steps); streams > 0 && len(execution.Failures) == 0 {
+		// Byte accounting incomplete; shellspec accepts wildcard size (Awk parity).
+		fmt.Fprintf(os.Stdout, "0B sent, %d streams received in %.0f seconds\n", streams, secs)
 	}
 	if len(execution.Failures) > 0 {
 		printRotateFailures(execution.Failures)

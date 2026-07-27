@@ -24,15 +24,12 @@ setup_env() {
     # used to construct sandbox dir name
     SANDBOX_ZELTA_TMP_PREFIX=zelta_sandbox
 
-    # Prefer repo-local ./tmp (not /tmp) — see AGENTS.md / agents/zelta-go/08-testing.md
-    _repo_root="${REPO_ROOT:-${SHELLSPEC_PROJECT_ROOT:-}}"
-    if [ -z "$_repo_root" ]; then
-        _repo_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-    fi
+    # Awk parity: default sandbox under /tmp. Override parent with
+    # SANDBOX_ZELTA_TMP_BASE when needed.
     if [ -n "$SANDBOX_ZELTA_TMP_BASE" ]; then
         _tmp_base="$SANDBOX_ZELTA_TMP_BASE"
     else
-        _tmp_base="$_repo_root/tmp"
+        _tmp_base="/tmp"
     fi
     mkdir -p "$_tmp_base"
 
@@ -127,9 +124,12 @@ check_install() {
 
 # Make sure the installer worked and clean up carefully
 cleanup_temp_install() {
-    find "$SANDBOX_ZELTA_TMP_DIR" -type f | wc -w
+    find "$SANDBOX_ZELTA_TMP_DIR" -type f 2>/dev/null | wc -w
 	if [ -d "$SANDBOX_ZELTA_TMP_DIR" ]; then
-		rm "$ZELTA_ETC"/zelta.*
+		# Avoid literal "zelta.*" when the glob matches nothing (set -f / no nullglob).
+		if [ -d "$ZELTA_ETC" ]; then
+			find "$ZELTA_ETC" -maxdepth 1 -name 'zelta.*' -exec rm -f {} + 2>/dev/null || true
+		fi
 		rm -fr "$SANDBOX_ZELTA_TMP_DIR"
     	[ ! -e "$SANDBOX_ZELTA_TMP_DIR" ] && return 0
 	fi
@@ -168,8 +168,7 @@ backup_check_json_cr_sanitized() {
 	if [ -d "$SANDBOX_ZELTA_TMP_DIR" ]; then
 		_tmp="$SANDBOX_ZELTA_TMP_DIR/zelta_json_cr_$$"
 	else
-		_tmp="${_repo_root}/tmp/zelta_json_cr_$$"
-		mkdir -p "${_repo_root}/tmp"
+		_tmp="/tmp/zelta_json_cr_$$"
 	fi
 	# Prefer sandbox install binary; fall back to repo build (Go has no ZELTA_SHARE).
 	_zelta="$ZELTA_BIN/zelta"
@@ -232,8 +231,8 @@ skip_tgt_pool() {
 }
 
 _pool_img_path() {
-	# File-backed pool images live under the sandbox tmp dir (./tmp/…), not /tmp
-	printf '%s/%s.img' "${SANDBOX_ZELTA_TMP_DIR:-.}" "$1"
+	# File-backed pool images live under the sandbox tmp dir (/tmp/zelta_sandbox_…)
+	printf '%s/%s.img' "${SANDBOX_ZELTA_TMP_DIR:-/tmp}" "$1"
 }
 
 nuke_pool() {
@@ -361,7 +360,7 @@ make_initial_tree() {
 	# If we get this far, it will be safe to attempt to clean it up
 	tmpfile_touch "divergent_tree_created"
 
-	# Create encryption key (under sandbox ./tmp, not /tmp)
+	# Create encryption key under sandbox tmp
 	_key=$(_enc_key_path)
 	src_exec dd if=/dev/urandom bs=32 count=1 of="$_key" >/dev/null 2>&1 || return 1
 

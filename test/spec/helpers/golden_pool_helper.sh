@@ -9,8 +9,8 @@ _gp_validate_environment() {
     command -v zpool >/dev/null 2>&1 || _gp_die "zpool not found"
 }
 _gp_pool_img_file() {
-    # Prefer sandbox ./tmp (same as standard_test_helper), not /tmp
-    printf '%s/%s.img' "${SANDBOX_ZELTA_TMP_DIR:-.}" "$1"
+    # Same sandbox as standard_test_helper (default /tmp/zelta_sandbox_*)
+    printf '%s/%s.img' "${SANDBOX_ZELTA_TMP_DIR:-/tmp}" "$1"
 }
 
 _gp_golden_check_filename() {

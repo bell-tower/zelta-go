@@ -18,7 +18,8 @@ func TestDirectDivergencePlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_base\nzfs send -P -L -c -e tank/src@base\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\n" {
+	// Preserve suffix is TGT latest (@other), not match (@base) — Awk rename_dataset.
+	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_other\nzfs send -P -L -c -e tank/src@base\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\n" {
 		t.Fatalf("format=%q", got)
 	}
 }
@@ -32,7 +33,8 @@ func TestVerifiedSourceOriginPlanUsesOriginForSend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_base\nzfs send -P -L -c -e -i tank/original@base tank/clone@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s -o origin=tank/target_base@base tank/target\n" {
+	// Preserve = TGT latest (@other); recv -o origin still uses lineage snap @base on that preserve.
+	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_other\nzfs send -P -L -c -e -i tank/original@base tank/clone@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s -o origin=tank/target_other@base tank/target\n" {
 		t.Fatalf("format=%q", got)
 	}
 }
@@ -91,7 +93,7 @@ func TestPlanTreeAddsFullSourceOnlyChild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_base\nzfs send -P -L -c -e tank/src@base\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e tank/src/child@child\nzfs recv -v -u -x mountpoint -o canmount=noauto -s tank/target/child\n" {
+	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_other\nzfs send -P -L -c -e tank/src@base\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e tank/src/child@child\nzfs recv -v -u -x mountpoint -o canmount=noauto -s tank/target/child\n" {
 		t.Fatalf("format=%q", got)
 	}
 }
@@ -108,7 +110,7 @@ func TestPlanTreeUsesVerifiedChildOrigin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_base\nzfs send -P -L -c -e tank/src@base\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/original/child@child-base tank/src/child@child-new\nzfs recv -v -u -x mountpoint -o canmount=noauto -s -o origin=tank/target_base/child@child-base tank/target/child\n" {
+	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_other\nzfs send -P -L -c -e tank/src@base\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/original/child@child-base tank/src/child@child-new\nzfs recv -v -u -x mountpoint -o canmount=noauto -s -o origin=tank/target_other/child@child-base tank/target/child\n" {
 		t.Fatalf("format=%q", got)
 	}
 }
@@ -125,7 +127,7 @@ func TestExecuteRenamesThenPipesInPlanOrder(t *testing.T) {
 	if err := Execute(context.Background(), fake, TreeRequest{Source: "tank/src", Target: "tank/target", SyncDirection: "PULL"}, steps); err != nil {
 		t.Fatal(err)
 	}
-	if len(fake.Renames) != 1 || fake.Renames[0].OldDataset != "tank/target" || fake.Renames[0].NewDataset != "tank/target_base" {
+	if len(fake.Renames) != 1 || fake.Renames[0].OldDataset != "tank/target" || fake.Renames[0].NewDataset != "tank/target_other" {
 		t.Fatalf("renames=%v", fake.Renames)
 	}
 	if len(fake.Pipes) != 2 || fake.Pipes[0].Direction != "PULL" || fake.Pipes[1].Direction != "PULL" {
@@ -166,6 +168,24 @@ func TestNeedsPreservationDetectsRemainingSourceDelta(t *testing.T) {
 	}
 	if NeedsPreservation(&match.Result{Pairs: []*match.Pair{{SrcName: "tank/src", SrcLast: "@same", Match: "@same"}}}) {
 		t.Fatal("did not expect remaining delta")
+	}
+}
+
+func TestFullSendCountIgnoresVerifiedOriginPairs(t *testing.T) {
+	rows := []zfs.ListRow{{Name: "tank/target@base"}, {Name: "tank/target/child@base"}}
+	pairs := []*match.Pair{
+		{DSSuffix: "", SrcName: "tank/clone", SrcLast: "@new", SrcOrigin: "tank/original@base"},
+		{DSSuffix: "/child", SrcName: "tank/clone/child", SrcLast: "@new", SrcOrigin: "tank/original/child@base"},
+		{DSSuffix: "/full", SrcName: "tank/clone/full", SrcLast: "@new"},
+	}
+	if got := FullSendCount(pairs, "tank/target", rows); got != 1 {
+		t.Fatalf("FullSendCount=%d want 1", got)
+	}
+}
+
+func TestStreamCountCountsSendSteps(t *testing.T) {
+	if got := StreamCount([]Step{{Kind: "rename"}, {Kind: "send"}, {Kind: "recv"}, {Kind: "send"}, {Kind: "recv"}}); got != 2 {
+		t.Fatalf("StreamCount=%d", got)
 	}
 }
 

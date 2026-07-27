@@ -67,8 +67,8 @@ is_in_git_repo() {
 		return 1
 	fi
 
-	# Sandbox installs under SANDBOX_ZELTA_TMP_DIR (repo-local ./tmp/…) are
-	# always removable even though they sit inside the checkout.
+	# Sandbox installs under SANDBOX_ZELTA_TMP_DIR (/tmp/zelta_sandbox_… by
+	# default) are always removable.
 	if [ -n "$SANDBOX_ZELTA_TMP_DIR" ]; then
 		case "$check_path" in
 			"$SANDBOX_ZELTA_TMP_DIR"|"$SANDBOX_ZELTA_TMP_DIR"/*) return 1 ;;
