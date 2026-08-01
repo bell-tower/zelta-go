@@ -80,7 +80,7 @@ func sortedKeys(m map[string]string) []string {
 	return out
 }
 
-// shq wraps s in single quotes, escaping embedded single quotes via '\''.
+// shq wraps s in single quotes, escaping embedded single quotes via '\”.
 func shq(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }

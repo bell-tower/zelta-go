@@ -1,4 +1,4 @@
-package policy
+package zconf
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Job is one resolved backup pair from a policy config.
+// Job is one resolved backup pair from a zelta.conf document.
 type Job struct {
 	Site         string
 	Host         string // hostname without user@

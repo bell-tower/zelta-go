@@ -1,10 +1,10 @@
-package policy
+package zconf
 
 import (
 	"strings"
 	"sync"
 
-	"git.belltower.it/djbell/zelta-go/internal/opt"
+	"git.belltower.it/djbell/zelta-go/data"
 )
 
 type keyInfo struct {
@@ -21,7 +21,7 @@ var (
 
 func loadKeys() error {
 	keysOnce.Do(func() {
-		rows, err := opt.Table()
+		rows, err := data.Table()
 		if err != nil {
 			keysErr = err
 			return
