@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"git.belltower.it/djbell/zelta-go/internal/cmdbuild"
-	"git.belltower.it/djbell/zelta-go/internal/opt"
 	"git.belltower.it/djbell/zelta-go/match"
 )
 
@@ -52,7 +51,7 @@ type Plan struct {
 	Skip  int
 	Block int
 	// Flags drive SEND/RECV fragments (from Request.Flags or built-in defaults).
-	Flags    opt.SendRecv
+	Flags    SendRecv
 	Warnings []string
 	// Snap is set when a source snapshot is planned (@name without dataset).
 	SnapSavepoint string
@@ -122,8 +121,8 @@ func ViewsFromMatch(pairs []*match.Pair) []PairView {
 
 // PlanFromMatch builds send/recv steps from match pairs (no execution).
 // intermediate: true → -I (default); false → -i.
-// flags come from opt.Default() or an explicit Request.Flags value.
-func PlanFromMatch(pairs []PairView, intermediate bool, flags opt.SendRecv) (*Plan, error) {
+// flags come from DefaultSendRecv() or an explicit Request.Flags value.
+func PlanFromMatch(pairs []PairView, intermediate bool, flags SendRecv) (*Plan, error) {
 	p := &Plan{Flags: flags}
 	for _, v := range pairs {
 		if v.FilteredActive {
@@ -145,7 +144,7 @@ func PlanFromMatch(pairs []PairView, intermediate bool, flags opt.SendRecv) (*Pl
 	return p, nil
 }
 
-func planPair(v PairView, intermediate bool, flags opt.SendRecv) (*Step, error) {
+func planPair(v PairView, intermediate bool, flags SendRecv) (*Step, error) {
 	st := &Step{
 		DSSuffix:      v.DSSuffix,
 		Info:          v.Info,
@@ -211,7 +210,7 @@ func planPair(v PairView, intermediate bool, flags opt.SendRecv) (*Step, error) 
 	return st, nil
 }
 
-func planFilteredPair(v PairView, flags opt.SendRecv) ([]*Step, error) {
+func planFilteredPair(v PairView, flags SendRecv) ([]*Step, error) {
 	steps := make([]*Step, 0, len(v.FilteredEnds))
 	start := v.Match
 	for i, end := range v.FilteredEnds {
@@ -237,7 +236,7 @@ func planFilteredPair(v PairView, flags opt.SendRecv) ([]*Step, error) {
 	return steps, nil
 }
 
-func buildCmds(st *Step, intermediate bool, flags opt.SendRecv) error {
+func buildCmds(st *Step, intermediate bool, flags SendRecv) error {
 	if st.ResumeToken != "" {
 		send, err := cmdbuild.ResumeSendArgv(st.ResumeToken)
 		if err != nil {
@@ -277,7 +276,7 @@ func buildCmds(st *Step, intermediate bool, flags opt.SendRecv) error {
 	return buildRecvCmd(st, flags)
 }
 
-func buildRecvCmd(st *Step, flags opt.SendRecv) error {
+func buildRecvCmd(st *Step, flags SendRecv) error {
 	if st.TgtName == "" {
 		return fmt.Errorf("backup: empty target name for %q", st.DSSuffix)
 	}
@@ -294,7 +293,7 @@ func buildRecvCmd(st *Step, flags opt.SendRecv) error {
 
 // recvFlags: RECV_DEFAULT; full → TOP (root) + FS/VOL; + PARTIAL when Resume.
 // RECV_OVERRIDE replaces the whole fragment.
-func recvFlags(st *Step, f opt.SendRecv) string {
+func recvFlags(st *Step, f SendRecv) string {
 	if f.RecvOverride != "" {
 		return f.RecvOverride
 	}
@@ -385,7 +384,7 @@ func (p *Plan) refreshWarnings() {
 	}
 }
 
-func applySnapToStep(st *Step, savepoint string, intermediate bool, flags opt.SendRecv) error {
+func applySnapToStep(st *Step, savepoint string, intermediate bool, flags SendRecv) error {
 	switch st.Kind {
 	case KindSkip:
 		if st.Info != "up-to-date" {

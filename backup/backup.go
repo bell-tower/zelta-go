@@ -11,7 +11,6 @@ import (
 
 	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/internal/cmdbuild"
-	"git.belltower.it/djbell/zelta-go/internal/opt"
 	"git.belltower.it/djbell/zelta-go/match"
 	"git.belltower.it/djbell/zelta-go/report"
 	"git.belltower.it/djbell/zelta-go/zfs"
@@ -69,8 +68,8 @@ type Request struct {
 	Exclude  []string
 	// CreateParent defaults true when nil.
 	CreateParent *bool
-	// Flags overrides send/recv fragments. Nil → built-in defaults only (no env).
-	Flags *opt.SendRecv
+	// Flags overrides send/recv fragments. Nil → DefaultSendRecv() only (no env).
+	Flags *SendRecv
 	// SyncDirection: zero/DirectionPull (default), DirectionPush, DirectionProxy.
 	// Use ParseSyncDirection for CLI/env/JSON strings. Never reads process env.
 	SyncDirection SyncDirection
@@ -185,9 +184,6 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	}
 
 	flags := req.sendRecv()
-	if flags.BookmarkMode != "" && flags.BookmarkMode != "0" && flags.BookmarkMode != "1" {
-		return nil, fmt.Errorf("invalid bookmark mode: %s", flags.BookmarkMode)
-	}
 	snapReason := ShouldSnapshotWithThresholds(req.SnapMode, views, req.SnapTime, req.SnapSize)
 	var snapSavepoint string
 	var snapArgv []string
@@ -239,7 +235,7 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	}
 
 	direction := req.SyncDirection.pipeArg()
-	if flags.BookmarkMode == "1" {
+	if flags.Bookmarks {
 		plan.Bookmarks, err = buildBookmarkPlans(plan, srcStr, tgtStr, flags.BookmarkPrefix, tgtEp.Host)
 		if err != nil {
 			return nil, err
@@ -555,9 +551,9 @@ func sameRemote(a, b endpoint.Endpoint) bool {
 	return a.User == b.User && a.Host == b.Host
 }
 
-func (r Request) sendRecv() opt.SendRecv {
+func (r Request) sendRecv() SendRecv {
 	if r.Flags != nil {
 		return *r.Flags
 	}
-	return opt.Default()
+	return DefaultSendRecv()
 }

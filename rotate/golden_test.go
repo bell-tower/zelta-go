@@ -1,6 +1,7 @@
 package rotate
 
 import (
+	"git.belltower.it/djbell/zelta-go/backup"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -8,7 +9,6 @@ import (
 	"testing"
 
 	"git.belltower.it/djbell/zelta-go/match"
-	"git.belltower.it/djbell/zelta-go/internal/opt"
 	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
@@ -41,7 +41,7 @@ func runPlanGolden(t *testing.T, dir string) {
 	}
 	steps, err := PlanTree(TreeRequest{
 		Source: meta["source"], Target: meta["target"], Pairs: rows,
-		TargetRows: targetRows, Intermediate: meta["intermediate"] != "false", Flags: opt.Default(),
+		TargetRows: targetRows, Intermediate: meta["intermediate"] != "false", Flags: backup.DefaultSendRecv(),
 	})
 	got := ""
 	if err == nil {

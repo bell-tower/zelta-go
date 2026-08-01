@@ -4,12 +4,12 @@ package rotate
 import (
 	"context"
 	"fmt"
+	"git.belltower.it/djbell/zelta-go/backup"
 	"strings"
 
-	"git.belltower.it/djbell/zelta-go/internal/cmdbuild"
 	"git.belltower.it/djbell/zelta-go/endpoint"
+	"git.belltower.it/djbell/zelta-go/internal/cmdbuild"
 	"git.belltower.it/djbell/zelta-go/match"
-	"git.belltower.it/djbell/zelta-go/internal/opt"
 	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
@@ -23,7 +23,7 @@ type Request struct {
 	OriginVerified bool
 	SourceType     string
 	Intermediate   bool
-	Flags          opt.SendRecv
+	Flags          backup.SendRecv
 }
 
 type Step struct {
@@ -105,7 +105,7 @@ type TreeRequest struct {
 	PreservationExists bool
 	Intermediate       bool
 	SyncDirection      string
-	Flags              opt.SendRecv
+	Flags              backup.SendRecv
 }
 
 // PlanTree handles root direct-match and verified source-origin paths and
@@ -231,8 +231,8 @@ func planPair(sourceRoot, targetRoot, preserved string, pair *match.Pair, req Tr
 		return nil, err
 	}
 	recv, err := cmdbuild.Build("RECV", map[string]string{
-		"flags":  recvFlags(req.Flags, pair.SrcType, pair.DSSuffix == ""),
-		"ds":     targetDataset,
+		"flags": recvFlags(req.Flags, pair.SrcType, pair.DSSuffix == ""),
+		"ds":    targetDataset,
 	})
 	if err != nil {
 		return nil, err
@@ -308,7 +308,7 @@ func incrFlag(intermediate bool) string {
 	return "-i"
 }
 
-func recvFlags(f opt.SendRecv, sourceType string, root bool) string {
+func recvFlags(f backup.SendRecv, sourceType string, root bool) string {
 	if f.RecvOverride != "" {
 		return f.RecvOverride
 	}

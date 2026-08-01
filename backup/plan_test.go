@@ -9,12 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"git.belltower.it/djbell/zelta-go/internal/opt"
 	"git.belltower.it/djbell/zelta-go/match"
 	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
-func defFlags() opt.SendRecv { return opt.Default() }
+func defFlags() SendRecv { return DefaultSendRecv() }
 
 func TestPlanFullAndIncr(t *testing.T) {
 	views := []PairView{
@@ -786,7 +785,7 @@ func TestSyncDirectionWarningAndPipes(t *testing.T) {
 }
 
 func TestOptSendRecvFlags(t *testing.T) {
-	f := opt.Default()
+	f := DefaultSendRecv()
 	f.SendDefault = "--raw"
 	f.RecvTop = "-o readonly=off"
 	f.Resume = false
@@ -842,7 +841,7 @@ func TestOptSendRecvFlags(t *testing.T) {
 		t.Fatalf("want built-in send defaults:\n%s", res.Output)
 	}
 	// explicit Flags still apply
-	flags := opt.Default()
+	flags := DefaultSendRecv()
 	flags.SendDefault = "-p"
 	res, err = Run(context.Background(), fake, Request{
 		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/tgt"),
@@ -858,7 +857,7 @@ func TestOptSendRecvFlags(t *testing.T) {
 }
 
 func TestRecvProperties(t *testing.T) {
-	f := opt.Default()
+	f := DefaultSendRecv()
 	f.RecvPropsAdd = []string{"compression=lz4", "quota=10G"}
 	f.RecvPropsDel = []string{"mountpoint", "canmount"}
 	p, err := PlanFromMatch([]PairView{{
@@ -890,8 +889,8 @@ func TestRecvProperties(t *testing.T) {
 func TestCreateBookmarksAfterVerifiedReceive(t *testing.T) {
 	fake := &zfs.Fake{Lists: map[string]string{"tank/tgt@daily": "tank/tgt@daily\n"}}
 	plan := &Plan{Steps: []*Step{{Kind: KindIncremental, SourceEnd: "@daily", SrcName: "tank/src", TgtName: "tank/tgt"}}}
-	flags := opt.Default()
-	flags.BookmarkMode = "1"
+	flags := DefaultSendRecv()
+	flags.Bookmarks = true
 	bookmarks, err := buildBookmarkPlans(plan, "root@src:tank/src", "root@dst:tank/tgt", flags.BookmarkPrefix, "dst")
 	if err != nil {
 		t.Fatal(err)
@@ -909,7 +908,7 @@ func TestBookmarkDryRunUsesLatestIntermediateSnapshot(t *testing.T) {
 	plan, err := PlanFromMatch([]PairView{{
 		DSSuffix: "", Info: "syncable (full)", SrcLast: "@new", SrcNext: "@old",
 		SrcName: "tank/src", TgtName: "tank/tgt",
-	}}, true, opt.Default())
+	}}, true, DefaultSendRecv())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -946,7 +945,7 @@ func TestFilteredIntermediatePlansPerDataset(t *testing.T) {
 		{DSSuffix: "", Info: "syncable (full)", SrcName: "tank/src", TgtName: "tank/tgt", FilteredActive: true, FilteredEnds: []string{"@old", "@new"}},
 		{DSSuffix: "/child", Info: "syncable (incremental)", Match: "@child-m", SrcName: "tank/src/child", TgtName: "tank/tgt/child", FilteredActive: true, FilteredEnds: []string{"@child-new"}},
 	}
-	p, err := PlanFromMatch(views, true, opt.Default())
+	p, err := PlanFromMatch(views, true, DefaultSendRecv())
 	if err != nil {
 		t.Fatal(err)
 	}

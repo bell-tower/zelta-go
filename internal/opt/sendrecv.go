@@ -1,37 +1,18 @@
 package opt
 
-// SendRecv holds zfs send/recv flag fragments (oracle SEND_DEFAULT / RECV_*).
-type SendRecv struct {
-	SendDefault    string   // SEND_DEFAULT
-	RecvDefault    string   // RECV_DEFAULT (always prepended when set)
-	RecvTop        string   // RECV_TOP — full root only
-	RecvFS         string   // RECV_FS — full filesystem
-	RecvVol        string   // RECV_VOL — full volume
-	RecvPartial    string   // RECV_PARTIAL — when Resume
-	Resume         bool     // RESUME gates RecvPartial
-	RecvPropsAdd   []string // RECV_PROPS_ADD — repeated zfs recv -o properties
-	RecvPropsDel   []string // RECV_PROPS_DEL — repeated zfs recv -x properties
-	BookmarkMode   string
-	BookmarkPrefix string
-	SendOverride   string // SEND_OVERRIDE — if set, replaces SendDefault
-	RecvOverride   string // RECV_OVERRIDE — if set, replaces all recv flags
-}
+import "git.belltower.it/djbell/zelta-go/backup"
 
-// Default returns built-in oracle defaults (bin/zelta : ${ZELTA_*=…}).
+// SendRecv is the public send/recv flag type (re-exported for CLI callers).
+type SendRecv = backup.SendRecv
+
+// Default returns built-in oracle defaults.
 func Default() SendRecv {
-	return SendRecv{
-		SendDefault: "-L -c -e",
-		RecvDefault: "",
-		RecvTop:     "-o readonly=on",
-		RecvFS:      "-u -x mountpoint -o canmount=noauto",
-		RecvVol:     "",
-		RecvPartial: "-s",
-		Resume:      true,
-	}
+	return backup.DefaultSendRecv()
 }
 
 // Resolve merges built-in defaults with the seeded environment
 // (defaults + zelta.env-injected/process env + legacy aliases).
+// CLI-only; library action paths must not call this.
 func Resolve() SendRecv {
 	e, _ := seed()
 	return SendRecvFrom(e)
@@ -57,15 +38,8 @@ func SendRecvFrom(e Env) SendRecv {
 	d.Resume = e.Bool("RESUME", d.Resume)
 	d.RecvPropsAdd = e.List("RECV_PROPS_ADD")
 	d.RecvPropsDel = e.List("RECV_PROPS_DEL")
-	d.BookmarkMode = e.Get("BOOKMARK_MODE")
+	// BOOKMARK_MODE is "0"/"1" (or empty → false).
+	d.Bookmarks = e.Get("BOOKMARK_MODE") == "1"
 	d.BookmarkPrefix = e.Get("BOOKMARK_PREFIX")
 	return d
-}
-
-// SendFlags is the send -flags fragment (override wins).
-func (s SendRecv) SendFlags() string {
-	if s.SendOverride != "" {
-		return s.SendOverride
-	}
-	return s.SendDefault
 }
