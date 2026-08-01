@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/internal/cmdbuild"
+	"git.belltower.it/djbell/zelta-go/cmdbuild"
 )
 
 func osPipe() (io.ReadCloser, io.WriteCloser, error) {

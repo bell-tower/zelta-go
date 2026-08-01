@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"git.belltower.it/djbell/zelta-go/internal/cmdbuild"
+	"git.belltower.it/djbell/zelta-go/cmdbuild"
 	"git.belltower.it/djbell/zelta-go/match"
 )
 

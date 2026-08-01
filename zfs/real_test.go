@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/internal/cmdbuild"
+	"git.belltower.it/djbell/zelta-go/cmdbuild"
 )
 
 func TestShellSingleQuote(t *testing.T) {

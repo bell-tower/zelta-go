@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"git.belltower.it/djbell/zelta-go/internal/cmdbuild"
+	"git.belltower.it/djbell/zelta-go/cmdbuild"
 )
 
 // DefaultSnapName matches bin/zelta: date -u +zelta_%Y-%m-%d_%H.%M.%S
