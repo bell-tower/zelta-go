@@ -3,9 +3,10 @@ package backup_test
 import (
 	"context"
 	"fmt"
-	"git.belltower.it/djbell/zelta-go/endpoint"
+	"time"
 
 	"git.belltower.it/djbell/zelta-go/backup"
+	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
@@ -33,17 +34,44 @@ func ExampleRun_dryRun() {
 	// true
 }
 
-func ExampleRun_withSSH() {
-	// Production-shaped call (does not run here — needs real endpoints).
+func ExampleRun_fromMemory() {
+	// Integrator-shaped: build endpoints and dials without env or internal/.
+	src := endpoint.Endpoint{Dataset: "tank/data"}
+	tgt := endpoint.Endpoint{User: "root", Host: "backup", Dataset: "tank/data", Remote: true}
+	flags := backup.DefaultSendRecv()
+	flags.Bookmarks = true
 	_ = backup.Request{
-		Source: endpoint.MustParse("tank/data"),
-		Target: endpoint.MustParse("backup/data"),
-		OnLine: func(line string) { /* progress */ },
+		Source:        src,
+		Target:        tgt,
+		SnapMode:      backup.SnapIfNeeded,
+		SnapTime:      time.Hour,
+		SnapSize:      1 << 20,
+		SyncDirection: backup.DirectionPull,
+		Flags:         &flags,
+		OnLine:        func(line string) { /* progress */ },
 	}
 	_ = &zfs.Real{
 		SSH: zfs.SSHConfig{
 			IdentityFile: "/path/to/key",
 			Options:      []string{"BatchMode=yes"},
 		},
+	}
+}
+
+func ExampleRun_fromStrings() {
+	// Import edge: same types, filled via public Parse helpers (CLI/JSON path).
+	src, _ := endpoint.Parse("tank/data")
+	tgt, _ := endpoint.Parse("root@backup:tank/data")
+	mode := backup.ParseSnapMode("IF_NEEDED")
+	dir := backup.ParseSyncDirection("pull")
+	st, _ := backup.ParseSnapTime("1h")
+	ss, _ := backup.ParseSnapSize("1048576")
+	_ = backup.Request{
+		Source:        src,
+		Target:        tgt,
+		SnapMode:      mode,
+		SyncDirection: dir,
+		SnapTime:      st,
+		SnapSize:      ss,
 	}
 }
