@@ -25,7 +25,9 @@ make build
 ```
 
 ```sh
+make                      # build → bin/zelta, bin/zprune
 make test                 # go test ./...
+make clean                # remove bin/zelta, bin/zprune
 make shelltest            # binary smoke (no ZFS)
 make shellspec            # ShellSpec install + no-op + cleanup
 make shellspec-standard   # full Richard suite (needs sudo ZFS)

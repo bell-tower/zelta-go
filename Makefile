@@ -1,13 +1,16 @@
-.PHONY: test build vet fmt tidy doc shelltest shellspec shellspec-standard
+.PHONY: all test build clean vet fmt tidy doc shelltest shellspec shellspec-standard
 
 PREFIX ?= .
 BINDIR ?= $(PREFIX)/bin
+
+# Default: produce binaries. Run from repo root (same as go build ./cmd/…).
+all: build
 
 test:
 	go test ./...
 
 shelltest: build
-	ZELTA_BIN=./bin/zelta sh test/shell/basic_test.sh
+	ZELTA_BIN=$(BINDIR)/zelta sh test/shell/basic_test.sh
 
 # ShellSpec: install + no-op CLI checks + cleanup (no ZFS pools required)
 shellspec: build
@@ -28,6 +31,10 @@ build:
 	mkdir -p $(BINDIR)
 	go build -o $(BINDIR)/zelta ./cmd/zelta
 	cp $(BINDIR)/zelta $(BINDIR)/zprune
+
+clean:
+	rm -f $(BINDIR)/zelta $(BINDIR)/zprune
+	rmdir $(BINDIR) 2>/dev/null || true
 
 doc:
 	rsync -a ../zelta-awk/doc/man8/ cmd/zelta/doc/man8/

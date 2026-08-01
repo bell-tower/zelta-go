@@ -2,11 +2,11 @@
 #
 # Zelta Installer
 #
-#   PRE_RUN is executed before installation (default: build the Go binary).
-#   Override with PRE_RUN='' to skip, or PRE_RUN='make -C doc' to also build
-#   man pages.
+#   PRE_RUN is executed before installation (default: make build).
+#   Override with PRE_RUN='' to skip, or PRE_RUN='make build doc' to also
+#   refresh man pages from the awk tree.
 
-: ${PRE_RUN="make"}
+: ${PRE_RUN="make build"}
 if [ -n "$PRE_RUN" ]; then
 	echo "Running: $PRE_RUN"
 	# Capture build noise; only surface it when we cannot fall back to bin/.
