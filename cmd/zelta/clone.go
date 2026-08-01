@@ -19,7 +19,9 @@ func runClone(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-	printWarns(p.Warnings)
+	sink := newLogSink(p)
+	defer sink.Close()
+	printWarns(sink, p.Warnings)
 	if p.Usage {
 		cloneUsage()
 		return 0
@@ -35,6 +37,8 @@ func runClone(args []string) int {
 }
 
 func runCloneParsed(p *opt.Parsed) int {
+	sink := newLogSink(p)
+	defer sink.Close()
 	depth, code := depthFrom(p.Env, "clone")
 	if code != 0 {
 		return code
@@ -85,7 +89,8 @@ func runCloneParsed(p *opt.Parsed) int {
 			fmt.Fprintf(os.Stderr, "zelta clone: %v\n", err)
 			return 1
 		}
-		fmt.Print(out)
+		// Oracle: dry-run "+ …" lines are LOG_NOTICE.
+		emitBlob(sink, out)
 		return 0
 	}
 	for _, step := range steps {
@@ -101,6 +106,8 @@ func runCloneParsed(p *opt.Parsed) int {
 }
 
 func runCloneAndBackup(p *opt.Parsed) int {
+	sink := newLogSink(p)
+	defer sink.Close()
 	depth, code := depthFrom(p.Env, "clone")
 	if code != 0 {
 		return code
@@ -168,8 +175,8 @@ func runCloneAndBackup(p *opt.Parsed) int {
 		fmt.Fprintf(os.Stderr, "zelta clone: backup: %v\n", err)
 		return 1
 	}
-	printWarns(res.Warnings)
-	fmt.Print(res.Output)
+	printWarns(sink, res.Warnings)
+	emitBlob(sink, res.Output)
 	for _, msg := range res.Errors {
 		fmt.Fprintf(os.Stderr, "zelta clone: backup: %s\n", msg)
 	}

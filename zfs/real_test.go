@@ -3,8 +3,8 @@ package zfs
 import (
 	"testing"
 
-	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/cmdbuild"
+	"git.belltower.it/djbell/zelta-go/endpoint"
 )
 
 func TestShellSingleQuote(t *testing.T) {

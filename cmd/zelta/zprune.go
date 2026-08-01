@@ -21,7 +21,9 @@ func runZprune(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-	printWarns(p.Warnings)
+	sink := newLogSink(p)
+	defer sink.Close()
+	printWarns(sink, p.Warnings)
 	if p.Usage {
 		zpruneUsage()
 		return 0
@@ -86,8 +88,8 @@ func runZprune(args []string) int {
 		fmt.Fprintf(os.Stderr, "zprune: %v\n", err)
 		return 1
 	}
-	printWarns(res.Warnings)
-	fmt.Print(res.Output)
+	printWarns(sink, res.Warnings)
+	emitBlob(sink, res.Output)
 
 	candidates := res.Candidates()
 	if len(candidates) == 0 {

@@ -10,8 +10,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/cmdbuild"
+	"git.belltower.it/djbell/zelta-go/endpoint"
 )
 
 func osPipe() (io.ReadCloser, io.WriteCloser, error) {
@@ -33,6 +33,10 @@ type Real struct {
 	// StderrLog, when non-nil, receives a copy of stderr from zfs pipe
 	// commands. Useful for progress logging (see backup.Request.OnLine).
 	StderrLog io.Writer
+
+	// LogCmd, when non-nil, receives the endpoint and argv of each command
+	// about to run (after remote wrapping). Debug command echoes (-vv).
+	LogCmd func(ep endpoint.Endpoint, argv []string)
 }
 
 // SetStderrLog implements the optional progress-tee hook used by backup.OnLine.
@@ -439,6 +443,9 @@ func (r *Real) command(ctx context.Context, ep endpoint.Endpoint, argv []string)
 func (r *Real) commandOpts(ctx context.Context, ep endpoint.Endpoint, argv []string, role Role) (*exec.Cmd, error) {
 	if len(argv) == 0 {
 		return nil, fmt.Errorf("empty argv")
+	}
+	if r.LogCmd != nil {
+		r.LogCmd(ep, argv)
 	}
 	if target, ok := sshTarget(ep); ok {
 		return r.remoteCmd(ctx, target, shellJoin(argv), role)

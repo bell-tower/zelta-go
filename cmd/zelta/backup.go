@@ -18,7 +18,9 @@ func runBackup(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err) // oracle stop() prefix
 		return 1
 	}
-	printWarns(p.Warnings)
+	sink := newLogSink(p)
+	defer sink.Close()
+	printWarns(sink, p.Warnings)
 	if p.Usage {
 		backupUsage()
 		return 0
@@ -95,6 +97,7 @@ func runBackup(args []string) int {
 		CreateParent:  &createParent,
 		TargetOrigin:  origin,
 		JSON:          jsonMode,
+		Log:           sink,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta backup: %v\n", err)
@@ -107,10 +110,11 @@ func runBackup(args []string) int {
 		}
 		filteredWarnings = append(filteredWarnings, w)
 	}
-	printWarns(filteredWarnings)
-	if p.Env.Bool("DRYRUN", false) {
-		fmt.Fprint(os.Stderr, res.Output)
-	}
+	printWarns(sink, filteredWarnings)
+	// Oracle: syncing/up-to-date/+ command lines are LOG_NOTICE — `-q`
+	// silences them; json mode prefixes them to stderr; terminal mode
+	// prints them to stdout (dry-run and execute alike).
+	emitBlob(sink, res.Output)
 	if jsonMode && res.JSONReport != nil {
 		data, err := json.Marshal(res.JSONReport)
 		if err != nil {
@@ -118,8 +122,6 @@ func runBackup(args []string) int {
 			return 1
 		}
 		fmt.Println(string(data))
-	} else if !p.Env.Bool("DRYRUN", false) {
-		fmt.Print(res.Output)
 	}
 	for _, msg := range res.Errors {
 		fmt.Fprintf(os.Stderr, "zelta backup: %s\n", msg)

@@ -78,6 +78,16 @@ func CommandShell(epStr string, argv []string) (string, error) {
 	return cmd, nil
 }
 
+// CommandDebug renders argv as an oracle-style debug echo: backticks around
+// the command with the ` 2>&1` capture suffix (zelta-common CAPTURE_OUTPUT).
+func CommandDebug(ep endpoint.Endpoint, argv []string) string {
+	sh, err := CommandShell(ep.String(), argv)
+	if err != nil {
+		return "`" + SoftJoin(argv) + "`"
+	}
+	return "`" + sh + "  2>&1`"
+}
+
 // ShellJoin quotes argv for display/ssh (exported for backup dry-run of plain cmds).
 func ShellJoin(args []string) string { return shellJoin(args) }
 

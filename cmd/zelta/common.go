@@ -7,6 +7,7 @@ import (
 
 	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
+	"git.belltower.it/djbell/zelta-go/internal/zlog"
 )
 
 // parseEndpoint maps a CLI operand/env string to endpoint.Endpoint.
@@ -18,9 +19,14 @@ func parseEndpoint(s string) (endpoint.Endpoint, error) {
 	return endpoint.Parse(s)
 }
 
-func printWarns(warns []string) {
+// printWarns emits warnings through the sink (oracle LOG_WARNING; suppressed
+// at LOG_LEVEL 0, e.g. `zelta VERB -qq`).
+func printWarns(s *zlog.Sink, warns []string) {
+	if s == nil {
+		return
+	}
 	for _, w := range warns {
-		fmt.Fprintf(os.Stderr, "warning: %s\n", w)
+		s.Warning(w)
 	}
 }
 

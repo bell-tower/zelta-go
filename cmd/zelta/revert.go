@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"git.belltower.it/djbell/zelta-go/backup"
@@ -20,7 +19,9 @@ func runRevert(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-	printWarns(p.Warnings)
+	sink := newLogSink(p)
+	defer sink.Close()
+	printWarns(sink, p.Warnings)
 	if p.Usage {
 		revertUsage()
 		return 0
@@ -82,7 +83,8 @@ func runRevert(args []string) int {
 			fmt.Fprintf(os.Stderr, "zelta revert: %v\n", err)
 			return 1
 		}
-		fmt.Print(out)
+		// Oracle: dry-run "+ …" lines are LOG_NOTICE.
+		emitBlob(sink, out)
 		return 0
 	}
 	result, err := lineage.Apply(context.Background(), exec, current.String(), steps)
@@ -103,10 +105,9 @@ func runRevert(args []string) int {
 		}
 		return 1
 	}
-	logLevel, _ := strconv.Atoi(p.Env.Get("LOG_LEVEL"))
-	if logLevel >= 1 {
-		fmt.Fprintf(os.Stdout, "to retain replica history, run: zelta rotate '%s' 'TARGET'\n", current.String())
-	}
+	// Oracle LOG_NOTICE (zelta-backup run_revert): shown at default level,
+	// silenced by -q.
+	sink.Notice(fmt.Sprintf("to retain replica history, run: zelta rotate '%s' 'TARGET'", current.String()))
 	return 0
 }
 

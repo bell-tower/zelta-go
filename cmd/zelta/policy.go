@@ -18,7 +18,9 @@ func runPolicy(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-	printWarns(p.Warnings)
+	sink := newLogSink(p)
+	defer sink.Close()
+	printWarns(sink, p.Warnings)
 	if p.Usage {
 		policyUsage()
 		return 0
@@ -60,7 +62,7 @@ func runPolicy(args []string) int {
 	}
 
 	jobs, warns, err := policy.Load(cfg, override)
-	printWarns(warns)
+	printWarns(sink, warns)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"git.belltower.it/djbell/zelta-go/internal/opt"
+	"git.belltower.it/djbell/zelta-go/internal/zlog"
 	"git.belltower.it/djbell/zelta-go/match"
 	"git.belltower.it/djbell/zelta-go/report"
 )
@@ -17,7 +18,9 @@ func runMatch(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err) // oracle stop() prefix
 		return 1
 	}
-	printWarns(p.Warnings)
+	sink := newLogSink(p)
+	defer sink.Close()
+	printWarns(sink, p.Warnings)
 	if p.Usage {
 		matchUsage()
 		return 0
@@ -39,8 +42,10 @@ func runMatch(args []string) int {
 		if noWritten {
 			props = match.MinimalListProps
 		}
-		for _, op := range p.Operands {
-			fmt.Fprintln(os.Stdout, formatListCmd(op, props, depth))
+		if sink.Enabled(zlog.Notice) {
+			for _, op := range p.Operands {
+				fmt.Fprintln(os.Stdout, formatListCmd(op, props, depth))
+			}
 		}
 		return 0
 	}
@@ -87,13 +92,15 @@ func runMatch(args []string) int {
 		Parsable:  p.Env.Bool("PARSABLE", false),
 		NoWritten: noWritten,
 		CheckTime: p.Env.Bool("CHECK_TIME", false),
+		Log:       sink,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta match: %v\n", err)
 		return 1
 	}
-	printWarns(res.Warnings)
-	fmt.Print(res.Output)
+	printWarns(sink, res.Warnings)
+	// Oracle: the whole table is LOG_NOTICE — `-q` silences it.
+	emitBlob(sink, res.Output)
 	return 0
 }
 

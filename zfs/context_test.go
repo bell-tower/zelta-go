@@ -95,7 +95,7 @@ func TestLoadDatasetContextListOnly(t *testing.T) {
 
 func TestAncestorProp(t *testing.T) {
 	dc := &DatasetContext{BySuffix: map[string]map[string]string{
-		"":     {"encryption": "aes-256-gcm"},
+		"":       {"encryption": "aes-256-gcm"},
 		"/child": {"written": "1"},
 	}}
 	if got := dc.AncestorProp("/child/missing", "encryption"); got != "aes-256-gcm" {

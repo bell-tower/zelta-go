@@ -16,7 +16,9 @@ func runPrune(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err) // oracle stop() prefix
 		return 1
 	}
-	printWarns(p.Warnings)
+	sink := newLogSink(p)
+	defer sink.Close()
+	printWarns(sink, p.Warnings)
 	if p.Usage {
 		pruneUsage()
 		return 0
@@ -84,11 +86,12 @@ func runPrune(args []string) int {
 		fmt.Fprintf(os.Stderr, "zelta prune: %v\n", err)
 		return 1
 	}
-	printWarns(res.Warnings)
-	if n, _ := strconv.Atoi(p.Env.Get("LOG_LEVEL")); n >= 3 && res.Keeping != "" {
-		fmt.Fprintf(os.Stderr, "keeping: %s\n", res.Keeping)
+	printWarns(sink, res.Warnings)
+	// Oracle LOG_INFO "keeping: …" at -v; table itself is LOG_NOTICE.
+	if res.Keeping != "" {
+		sink.Info("keeping: " + res.Keeping)
 	}
-	fmt.Print(res.Output)
+	emitBlob(sink, res.Output)
 	return 0
 }
 

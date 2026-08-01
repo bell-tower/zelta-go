@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"git.belltower.it/djbell/zelta-go/backup"
-	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/cmdbuild"
+	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
 	"git.belltower.it/djbell/zelta-go/match"
 	"git.belltower.it/djbell/zelta-go/rotate"
@@ -21,7 +21,9 @@ func runRotate(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-	printWarns(p.Warnings)
+	sink := newLogSink(p)
+	defer sink.Close()
+	printWarns(sink, p.Warnings)
 	if p.Usage {
 		rotateUsage()
 		return 0
@@ -136,7 +138,7 @@ func runRotate(args []string) int {
 		tgtRoot = ep.Dataset
 	}
 	if fullCount := rotate.FullSendCount(m.Pairs, tgtRoot, m.TgtRows); fullCount > 0 {
-		fmt.Fprintf(os.Stderr, "warning: insufficient snapshots; performing full backup for %d datasets\n", fullCount)
+		sink.Warning(fmt.Sprintf("insufficient snapshots; performing full backup for %d datasets", fullCount))
 	}
 	if p.Env.Bool("DRYRUN", false) {
 		out, err := rotate.FormatRemote(steps, src.String(), tgt.String(), request.SyncDirection.PipeArg())
@@ -144,7 +146,8 @@ func runRotate(args []string) int {
 			fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
 			return 1
 		}
-		fmt.Print(out)
+		// Oracle: dry-run "+ …" lines are LOG_NOTICE.
+		emitBlob(sink, out)
 		return 0
 	}
 	execStart := time.Now()
@@ -166,9 +169,10 @@ func runRotate(args []string) int {
 		Scripting: true, Parsable: true,
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: rotate confirmation: %v\n", err)
+		sink.Warning(fmt.Sprintf("rotate confirmation: %v", err))
 	} else {
-		fmt.Fprintf(os.Stdout, "to ensure target is up-to-date, run: zelta backup %s %s\n", p.Operands[0], p.Operands[1])
+		// Oracle LOG_NOTICE.
+		sink.Notice(fmt.Sprintf("to ensure target is up-to-date, run: zelta backup %s %s", p.Operands[0], p.Operands[1]))
 	}
 	if streams := rotate.StreamCount(steps); streams > 0 && len(execution.Failures) == 0 {
 		// Byte accounting incomplete; shellspec accepts wildcard size (Awk parity).

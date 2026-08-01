@@ -21,8 +21,8 @@ type Features struct {
 // DatasetContext is filesystem/volume property state for one endpoint tree.
 // Populated by LoadDatasetContext (zfs get) or future cache hints.
 type DatasetContext struct {
-	Root     string
-	Exists   bool
+	Root   string
+	Exists bool
 	// BySuffix maps ds_suffix ("" = root) → property name → value.
 	BySuffix map[string]map[string]string
 	Features Features

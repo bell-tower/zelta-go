@@ -9,8 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/cmdbuild"
+	"git.belltower.it/djbell/zelta-go/endpoint"
+	"git.belltower.it/djbell/zelta-go/internal/zlog"
 	"git.belltower.it/djbell/zelta-go/match"
 	"git.belltower.it/djbell/zelta-go/report"
 	"git.belltower.it/djbell/zelta-go/zfs"
@@ -78,6 +79,10 @@ type Request struct {
 	// OnLine, when non-nil, is called for each line of zfs send/recv stderr
 	// output during execution. Useful for progress logging.
 	OnLine func(line string)
+	// Log, when non-nil, receives info/debug messages (oracle report()
+	// LOG_INFO/LOG_DEBUG) filtered and formatted by the sink. The inner
+	// match runs at notice level like the oracle's ipc-run --log-level=2.
+	Log *zlog.Sink
 }
 
 // Result is match + plan (+ dry-run / execute text).
@@ -109,6 +114,17 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	startTime := time.Now()
 	var execEndTime time.Time
 
+	// Oracle: LOG_INFO "checking properties for ID" + LOG_DEBUG "`zfs get`"
+	// before each context load; command echoes fire from the executor hook.
+	if req.Log != nil {
+		if real, ok := exec.(*zfs.Real); ok {
+			real.LogCmd = func(ep endpoint.Endpoint, argv []string) {
+				req.Log.Debug(zfs.CommandDebug(ep, argv))
+			}
+		}
+		req.Log.Info("checking properties for " + srcStr)
+	}
+
 	// Phase 1: cheap dataset context (zfs get filesystem/volume) — features + flags.
 	srcCtx, err := zfs.LoadDatasetContext(ctx, exec, srcStr, srcEp.Dataset, req.Depth)
 	if err != nil {
@@ -116,6 +132,9 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	}
 	if !srcCtx.Exists {
 		return nil, fmt.Errorf("source dataset '%s' does not exist", srcStr)
+	}
+	if req.Log != nil {
+		req.Log.Info("checking properties for " + tgtStr)
 	}
 	tgtCtx, err := zfs.LoadDatasetContext(ctx, exec, tgtStr, tgtEp.Dataset, req.Depth)
 	if err != nil {
@@ -142,6 +161,11 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	if filteredIntermediate && !req.TargetOrigin.IsZero() {
 		return nil, fmt.Errorf("target origin cannot be combined with filtered intermediate sends")
 	}
+	// Oracle LOG_INFO "checking replica deltas" before the inner match; the
+	// inner match runs at notice level (oracle ipc-run pins --log-level=2).
+	if req.Log != nil {
+		req.Log.Info("checking replica deltas")
+	}
 	mres, err := match.Compare(ctx, exec, match.Request{
 		Source:                  srcEp,
 		Target:                  tgtEp,
@@ -154,6 +178,7 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		PreserveSourceSnapshots: filteredIntermediate,
 		SrcContext:              srcCtx,
 		TgtContext:              tgtCtx,
+		Log:                     req.Log.Limit(zlog.Notice),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("match: %w", err)
@@ -512,6 +537,12 @@ func executePlan(ctx context.Context, exec zfs.Executor, req Request, plan *Plan
 func runStep(ctx context.Context, exec zfs.Executor, req Request, st *Step, direction string) error {
 	if len(st.Send) == 0 || len(st.Recv) == 0 {
 		return fmt.Errorf("backup: empty send/recv for %q", st.DSSuffix)
+	}
+	// Oracle LOG_DEBUG "`<pipe command>`" before each transfer.
+	if req.Log != nil {
+		if sh, err := zfs.PipeShellDirection(req.Source.String(), req.Target.String(), st.Send, st.Recv, direction); err == nil {
+			req.Log.Debug("`" + sh + "`")
+		}
 	}
 	if err := exec.RunPipeDirection(ctx, req.Source.String(), st.Send, req.Target.String(), st.Recv, direction); err != nil {
 		return fmt.Errorf("sync %s: %w", st.DSSuffix, err)
