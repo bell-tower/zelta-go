@@ -8,5 +8,7 @@
 //
 // Dry-run (-n) prints snap + send|recv; execute runs Snapshot + RunPipe.
 // Missing target parent: CREATE (default) even on dry-run, matching oracle.
-// SEND/RECV flag fragments come from Request.Flags or opt.Resolve().
+// SEND/RECV flag fragments come from Request.Flags or built-in defaults
+// (no process env). CLI/env strings map through ParseSnapMode, ParseSnapTime,
+// ParseSnapSize, and ParseSyncDirection.
 package backup

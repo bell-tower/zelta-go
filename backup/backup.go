@@ -53,21 +53,25 @@ type Request struct {
 	Target       string
 	TargetOrigin string // already-backed-up origin endpoint for clone replication
 	DryRun       bool
-	Intermediate bool   // true → -I (default); false → -i
-	SnapMode     string // IF_NEEDED (default), ALWAYS, NEVER
-	SnapName     string // bare name without @; empty → DefaultSnapName()
-	SnapTime     string // IF_NEEDED threshold; recent snapshots may skip
-	SnapSize     string // IF_NEEDED threshold in bytes; small changes may skip
-	Depth        int
-	Include      []string
-	Exclude      []string
-	// CreateParent mirrors ZELTA_CREATE_PARENT (default true). Nil → true.
+	Intermediate bool // true → -I (default); false → -i
+	// SnapMode: zero or SnapIfNeeded (default), SnapAlways, SnapNever.
+	// Use ParseSnapMode for CLI/env/JSON strings.
+	SnapMode SnapMode
+	SnapName string // bare name without @; empty → DefaultSnapName()
+	// SnapTime is an IF_NEEDED age threshold (0 = unset). Parse via ParseSnapTime.
+	SnapTime time.Duration
+	// SnapSize is an IF_NEEDED written-bytes threshold (0 = unset). Parse via ParseSnapSize.
+	SnapSize int64
+	Depth    int
+	Include  []string
+	Exclude  []string
+	// CreateParent defaults true when nil.
 	CreateParent *bool
-	// Flags overrides send/recv fragments. Nil → opt.Resolve() (defaults + env).
+	// Flags overrides send/recv fragments. Nil → built-in defaults only (no env).
 	Flags *opt.SendRecv
-	// SyncDirection for dual-remote: "PULL" (default), "PUSH", or ""/"0" (proxy + warn).
-	// Empty → ZELTA_SYNC_DIRECTION env or PULL.
-	SyncDirection string
+	// SyncDirection: zero/DirectionPull (default), DirectionPush, DirectionProxy.
+	// Use ParseSyncDirection for CLI/env/JSON strings. Never reads process env.
+	SyncDirection SyncDirection
 	// JSON true → collect telemetry and populate JSONReport in Result.
 	JSON bool
 	// OnLine, when non-nil, is called for each line of zfs send/recv stderr
@@ -107,7 +111,7 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	if strings.TrimSpace(req.TargetOrigin) != "" {
 		props = append(props, "origin")
 	}
-	if strings.TrimSpace(req.SnapTime) != "" || strings.TrimSpace(req.SnapSize) != "" {
+	if req.SnapTime > 0 || req.SnapSize > 0 {
 		props = append(props, "snapshots_changed")
 	}
 	filteredIntermediate := req.Intermediate && (len(req.Include) > 0 || len(req.Exclude) > 0)
@@ -230,16 +234,16 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		}
 	}
 
-	direction := req.syncDirection()
+	direction := req.SyncDirection.pipeArg()
 	if flags.BookmarkMode == "1" {
 		plan.Bookmarks, err = buildBookmarkPlans(plan, req.Source, req.Target, flags.BookmarkPrefix, tgtEp.Host)
 		if err != nil {
 			return nil, err
 		}
 	}
-	// Oracle: dual-remote + no direction → one warning (localhost proxy).
+	// Oracle: dual-remote + proxy → one warning (localhost proxy).
 	// Same remote on both ends is hairpin/local — never warned.
-	if direction == "" && bothRemote(srcEp, tgtEp) && !sameRemote(srcEp, tgtEp) {
+	if req.SyncDirection.Normalize() == DirectionProxy && bothRemote(srcEp, tgtEp) && !sameRemote(srcEp, tgtEp) {
 		mres.Warnings = append(mres.Warnings, "syncing remote endpoints through localhost; consider --push or --pull")
 	}
 
@@ -551,25 +555,5 @@ func (r Request) sendRecv() opt.SendRecv {
 	if r.Flags != nil {
 		return *r.Flags
 	}
-	return opt.Resolve()
-}
-
-// syncDirection mirrors ZELTA_SYNC_DIRECTION (shell default PULL).
-// Oracle false values ("0", "no", "false", "off") mean proxy (controller-side).
-func (r Request) syncDirection() string {
-	d := strings.TrimSpace(r.SyncDirection)
-	if d == "" {
-		if v, ok := opt.Lookup("SYNC_DIRECTION"); ok {
-			d = strings.TrimSpace(v)
-		}
-	}
-	if d == "" {
-		d = "PULL"
-	}
-	switch strings.ToLower(d) {
-	case "0", "no", "false", "off":
-		return ""
-	default:
-		return strings.ToUpper(d)
-	}
+	return opt.Default()
 }

@@ -111,12 +111,15 @@ func runCloneAndBackup(p *opt.Parsed) int {
 		return code
 	}
 
-	snapMode := backup.SnapIfNeeded
-	switch p.Env.Get("SNAP_MODE") {
-	case "0":
-		snapMode = backup.SnapNever
-	case "ALWAYS":
-		snapMode = backup.SnapAlways
+	snapTime, err := backup.ParseSnapTime(p.Env.Get("SNAP_TIME"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	snapSize, err := backup.ParseSnapSize(p.Env.Get("SNAP_SIZE"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
 	}
 	flags := opt.SendRecvFrom(p.Env)
 	createParent := p.Env.Bool("CREATE_PARENT", true)
@@ -126,13 +129,13 @@ func runCloneAndBackup(p *opt.Parsed) int {
 		TargetOrigin:  p.Operands[2],
 		DryRun:        p.Env.Bool("DRYRUN", false),
 		Intermediate:  p.Env.Bool("SEND_INTR", true),
-		SnapMode:      snapMode,
-		SnapTime:      p.Env.Get("SNAP_TIME"),
-		SnapSize:      p.Env.Get("SNAP_SIZE"),
+		SnapMode:      backup.ParseSnapMode(p.Env.Get("SNAP_MODE")),
+		SnapTime:      snapTime,
+		SnapSize:      snapSize,
 		Depth:         depth,
 		Include:       p.Env.List("INCLUDE"),
 		Exclude:       p.Env.List("EXCLUDE"),
-		SyncDirection: p.Env.Get("SYNC_DIRECTION"),
+		SyncDirection: backup.ParseSyncDirection(p.Env.Get("SYNC_DIRECTION")),
 		Flags:         &flags,
 		CreateParent:  &createParent,
 	})

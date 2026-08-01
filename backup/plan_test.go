@@ -409,17 +409,14 @@ func TestShouldSnapshot(t *testing.T) {
 func TestShouldSnapshotThresholds(t *testing.T) {
 	recent := time.Now().Add(-time.Minute).Unix()
 	view := PairView{SrcName: "tank/src", SrcLast: "@a", SrcWritten: "100", SrcSnapshotsChanged: fmt.Sprint(recent)}
-	if got := ShouldSnapshotWithThresholds(SnapIfNeeded, []PairView{view}, "1h", "200"); got != "" {
+	if got := ShouldSnapshotWithThresholds(SnapIfNeeded, []PairView{view}, time.Hour, 200); got != "" {
 		t.Fatalf("recent small change should skip: %q", got)
 	}
-	if got := ShouldSnapshotWithThresholds(SnapIfNeeded, []PairView{view}, "1s", "200"); got == "" {
+	if got := ShouldSnapshotWithThresholds(SnapIfNeeded, []PairView{view}, time.Second, 200); got == "" {
 		t.Fatal("stale time threshold should snapshot")
 	}
-	if got := ShouldSnapshotWithThresholds(SnapIfNeeded, []PairView{view}, "1h", "100"); got == "" {
+	if got := ShouldSnapshotWithThresholds(SnapIfNeeded, []PairView{view}, time.Hour, 100); got == "" {
 		t.Fatal("reached size threshold should snapshot")
-	}
-	if got := ShouldSnapshotWithThresholds(SnapIfNeeded, []PairView{view}, "bad", "200"); got == "" {
-		t.Fatal("invalid threshold should snapshot")
 	}
 }
 
@@ -733,7 +730,7 @@ func TestSyncDirectionWarningAndPipes(t *testing.T) {
 	res, err := Run(context.Background(), mk(), Request{
 		Source: "root@debian:tank/src", Target: "root@vault:tank/tgt",
 		DryRun: false, Intermediate: true, SnapMode: SnapNever,
-		SyncDirection: "0",
+		SyncDirection: DirectionProxy,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -751,7 +748,7 @@ func TestSyncDirectionWarningAndPipes(t *testing.T) {
 	res, err = Run(context.Background(), mk(), Request{
 		Source: "root@debian:tank/src", Target: "root@debian:tank/tgt",
 		DryRun: false, Intermediate: true, SnapMode: SnapNever,
-		SyncDirection: "0",
+		SyncDirection: DirectionProxy,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -765,7 +762,7 @@ func TestSyncDirectionWarningAndPipes(t *testing.T) {
 	_, err = Run(context.Background(), fake, Request{
 		Source: "root@debian:tank/src", Target: "root@vault:tank/tgt",
 		DryRun: false, Intermediate: true, SnapMode: SnapNever,
-		SyncDirection: "PUSH",
+		SyncDirection: DirectionPush,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -826,10 +823,9 @@ func TestOptSendRecvFlags(t *testing.T) {
 		}
 	}
 
-	// env path via Run
+	// nil Flags uses built-in defaults only (no process env).
 	t.Setenv("ZELTA_SEND_DEFAULT", "-p")
 	src := "tank/src\t100\t0\t1\t1M\tfilesystem\ntank/src@a\t101\t0\t2\t1K\tsnapshot\n"
-	// empty tgt list = missing target; key must match dataset
 	fake := &zfs.Fake{Lists: map[string]string{"tank/src": src, "tank/tgt": ""}}
 	res, err := Run(context.Background(), fake, Request{
 		Source: "tank/src", Target: "tank/tgt",
@@ -838,8 +834,25 @@ func TestOptSendRecvFlags(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if strings.Contains(res.Output, "zfs send -P -p") {
+		t.Fatalf("env must not affect nil Flags path:\n%s", res.Output)
+	}
+	if !strings.Contains(res.Output, "zfs send -P -L -c -e") {
+		t.Fatalf("want built-in send defaults:\n%s", res.Output)
+	}
+	// explicit Flags still apply
+	flags := opt.Default()
+	flags.SendDefault = "-p"
+	res, err = Run(context.Background(), fake, Request{
+		Source: "tank/src", Target: "tank/tgt",
+		DryRun: true, Intermediate: true, SnapMode: SnapNever,
+		Flags: &flags,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !strings.Contains(res.Output, "zfs send -P -p") {
-		t.Fatalf("env SEND_DEFAULT not applied:\n%s", res.Output)
+		t.Fatalf("explicit Flags not applied:\n%s", res.Output)
 	}
 }
 

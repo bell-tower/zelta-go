@@ -51,7 +51,7 @@ type Plan struct {
 	Incr  int
 	Skip  int
 	Block int
-	// Flags drive SEND/RECV fragments (from opt.Resolve or Request).
+	// Flags drive SEND/RECV fragments (from Request.Flags or built-in defaults).
 	Flags    opt.SendRecv
 	Warnings []string
 	// Snap is set when a source snapshot is planned (@name without dataset).
@@ -122,7 +122,7 @@ func ViewsFromMatch(pairs []*match.Pair) []PairView {
 
 // PlanFromMatch builds send/recv steps from match pairs (no execution).
 // intermediate: true → -I (default); false → -i.
-// flags come from opt.Default() or opt.Resolve() (env).
+// flags come from opt.Default() or an explicit Request.Flags value.
 func PlanFromMatch(pairs []PairView, intermediate bool, flags opt.SendRecv) (*Plan, error) {
 	p := &Plan{Flags: flags}
 	for _, v := range pairs {

@@ -34,12 +34,15 @@ func runBackup(args []string) int {
 		depth = 1
 	}
 
-	snapMode := backup.SnapIfNeeded
-	switch p.Env.Get("SNAP_MODE") {
-	case "0":
-		snapMode = backup.SnapNever
-	case "ALWAYS":
-		snapMode = backup.SnapAlways
+	snapTime, err := backup.ParseSnapTime(p.Env.Get("SNAP_TIME"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	snapSize, err := backup.ParseSnapSize(p.Env.Get("SNAP_SIZE"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
 	}
 	jsonMode := p.Env.Get("LOG_MODE") == "json"
 	flags := opt.SendRecvFrom(p.Env)
@@ -50,14 +53,14 @@ func runBackup(args []string) int {
 		Target:        p.Operands[1],
 		DryRun:        p.Env.Bool("DRYRUN", false),
 		Intermediate:  p.Env.Bool("SEND_INTR", true),
-		SnapMode:      snapMode,
+		SnapMode:      backup.ParseSnapMode(p.Env.Get("SNAP_MODE")),
 		SnapName:      strings.TrimPrefix(p.Env.Get("SNAP_NAME"), "@"),
-		SnapTime:      p.Env.Get("SNAP_TIME"),
-		SnapSize:      p.Env.Get("SNAP_SIZE"),
+		SnapTime:      snapTime,
+		SnapSize:      snapSize,
 		Depth:         depth,
 		Include:       p.Env.List("INCLUDE"),
 		Exclude:       p.Env.List("EXCLUDE"),
-		SyncDirection: p.Env.Get("SYNC_DIRECTION"),
+		SyncDirection: backup.ParseSyncDirection(p.Env.Get("SYNC_DIRECTION")),
 		Flags:         &flags,
 		CreateParent:  &createParent,
 		TargetOrigin:  p.Env.Get("ORIGIN_ID"),

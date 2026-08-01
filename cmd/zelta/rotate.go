@@ -210,14 +210,22 @@ func printRotateFailures(failures []rotate.Failure) {
 }
 
 func prepareRotateSnapshot(mode, requested, snapTime, snapSize string, pairs []*match.Pair) (string, bool, error) {
-	mode = strings.ToUpper(strings.TrimSpace(mode))
-	if mode == "" {
-		mode = "IF_NEEDED"
+	snapMode := backup.ParseSnapMode(mode)
+	if strings.EqualFold(strings.TrimSpace(mode), "SKIP") {
+		snapMode = backup.SnapNever
 	}
-	force := mode == "ALWAYS" || mode == "1" || mode == "YES" || mode == "TRUE"
-	disabled := mode == "0" || mode == "OFF" || mode == "NO" || mode == "FALSE" || mode == "SKIP"
+	force := snapMode == backup.SnapAlways
+	disabled := snapMode == backup.SnapNever
 	need := force
-	if !force && !disabled && (strings.TrimSpace(snapTime) != "" || strings.TrimSpace(snapSize) != "") {
+	st, err := backup.ParseSnapTime(snapTime)
+	if err != nil {
+		return "", false, err
+	}
+	ss, err := backup.ParseSnapSize(snapSize)
+	if err != nil {
+		return "", false, err
+	}
+	if !force && !disabled && (st > 0 || ss > 0) {
 		views := make([]backup.PairView, 0, len(pairs))
 		for _, pair := range pairs {
 			views = append(views, backup.PairView{
@@ -225,13 +233,13 @@ func prepareRotateSnapshot(mode, requested, snapTime, snapSize string, pairs []*
 				SrcSnapshotsChanged: pair.SrcSnapshotsChanged,
 			})
 		}
-		need = backup.ShouldSnapshotWithThresholds(backup.SnapIfNeeded, views, snapTime, snapSize) != ""
+		need = backup.ShouldSnapshotWithThresholds(backup.SnapIfNeeded, views, st, ss) != ""
 	}
 	for _, pair := range pairs {
 		if pair == nil || pair.SrcName == "" {
 			continue
 		}
-		if strings.TrimSpace(snapTime) != "" || strings.TrimSpace(snapSize) != "" {
+		if st > 0 || ss > 0 {
 			continue
 		}
 		if pair.SrcLast == "" || (pair.Match != "" && pair.Match == pair.SrcLast) || written(pair.SrcWritten) {
