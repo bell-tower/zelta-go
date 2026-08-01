@@ -175,8 +175,16 @@ func runRotate(args []string) int {
 		sink.Notice(fmt.Sprintf("to ensure target is up-to-date, run: zelta backup %s %s", p.Operands[0], p.Operands[1]))
 	}
 	if streams := rotate.StreamCount(steps); streams > 0 && len(execution.Failures) == 0 {
-		// Byte accounting incomplete; shellspec accepts wildcard size (Awk parity).
-		fmt.Fprintf(os.Stdout, "0B sent, %d streams received in %.0f seconds\n", streams, secs)
+		s := execution.Stats
+		streams := s.Streams
+		if streams == 0 {
+			streams = rotate.StreamCount(steps)
+		}
+		if s.Secs > 0 {
+			secs = s.Secs
+		}
+		// Awk parity: size/stream counts come from zfs send -P and zfs recv -v.
+		fmt.Fprintf(os.Stdout, "%s sent, %d streams received in %g seconds\n", backup.HumanBytes(s.Bytes), streams, secs)
 	}
 	if len(execution.Failures) > 0 {
 		printRotateFailures(execution.Failures)

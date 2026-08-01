@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"git.belltower.it/djbell/zelta-go/cmdbuild"
 	"git.belltower.it/djbell/zelta-go/endpoint"
@@ -30,18 +31,31 @@ type Real struct {
 	// Remote overrides SSH when non-nil.
 	Remote Remote
 
-	// StderrLog, when non-nil, receives a copy of stderr from zfs pipe
-	// commands. Useful for progress logging (see backup.Request.OnLine).
+	// StderrLog, when non-nil, receives a copy of zfs pipe output lines
+	// (send/recv stderr plus zfs recv -v verbose stdout). Useful for
+	// progress logging (see backup.Request.OnLine).
 	StderrLog io.Writer
 
 	// LogCmd, when non-nil, receives the endpoint and argv of each command
 	// about to run (after remote wrapping). Debug command echoes (-vv).
 	LogCmd func(ep endpoint.Endpoint, argv []string)
+
+	statsMu sync.Mutex
+	stats   PipeStats
 }
 
 // SetStderrLog implements the optional progress-tee hook used by backup.OnLine.
 func (r *Real) SetStderrLog(w io.Writer) {
 	r.StderrLog = w
+}
+
+// TakeStats returns and resets the accumulated pipe telemetry (PipeStatsReporter).
+func (r *Real) TakeStats() PipeStats {
+	r.statsMu.Lock()
+	defer r.statsMu.Unlock()
+	s := r.stats
+	r.stats = PipeStats{}
+	return s
 }
 
 func (r *Real) bin() string {
@@ -274,15 +288,9 @@ func (r *Real) RunPipeDirection(ctx context.Context, leftEp string, leftArgv []s
 		if err != nil {
 			return err
 		}
-		if r.StderrLog != nil {
-			out, err := r.runWithStderrLog(ctx, cmd)
-			if err != nil {
-				return fmt.Errorf("zfs pipe on %s: %w\n%s", lt, err, out)
-			}
-		} else {
-			if out, err := cmd.CombinedOutput(); err != nil {
-				return fmt.Errorf("zfs pipe on %s: %w\n%s", lt, err, out)
-			}
+		out, err := r.runCaptured(ctx, cmd)
+		if err != nil {
+			return fmt.Errorf("zfs pipe on %s: %w\n%s", lt, err, out)
 		}
 		return nil
 	}
@@ -301,15 +309,9 @@ func (r *Real) RunPipeDirection(ctx context.Context, leftEp string, leftArgv []s
 			if err != nil {
 				return err
 			}
-			if r.StderrLog != nil {
-				out, err := r.runWithStderrLog(ctx, cmd)
-				if err != nil {
-					return fmt.Errorf("zfs pull pipe on %s: %w\n%s", rt, err, out)
-				}
-			} else {
-				if out, err := cmd.CombinedOutput(); err != nil {
-					return fmt.Errorf("zfs pull pipe on %s: %w\n%s", rt, err, out)
-				}
+			out, err := r.runCaptured(ctx, cmd)
+			if err != nil {
+				return fmt.Errorf("zfs pull pipe on %s: %w\n%s", rt, err, out)
 			}
 			return nil
 		case "PUSH":
@@ -323,15 +325,9 @@ func (r *Real) RunPipeDirection(ctx context.Context, leftEp string, leftArgv []s
 			if err != nil {
 				return err
 			}
-			if r.StderrLog != nil {
-				out, err := r.runWithStderrLog(ctx, cmd)
-				if err != nil {
-					return fmt.Errorf("zfs push pipe on %s: %w\n%s", lt, err, out)
-				}
-			} else {
-				if out, err := cmd.CombinedOutput(); err != nil {
-					return fmt.Errorf("zfs push pipe on %s: %w\n%s", lt, err, out)
-				}
+			out, err := r.runCaptured(ctx, cmd)
+			if err != nil {
+				return fmt.Errorf("zfs push pipe on %s: %w\n%s", lt, err, out)
 			}
 			return nil
 		}
@@ -358,16 +354,12 @@ func (r *Real) RunPipeDirection(ctx context.Context, leftEp string, leftArgv []s
 	rightCmd.Stdin = pr
 
 	var leftStderr, rightStderr bytes.Buffer
-	if r.StderrLog != nil {
-		leftCmd.Stderr = io.MultiWriter(&leftStderr, r.StderrLog)
-		rightCmd.Stderr = io.MultiWriter(&rightStderr, r.StderrLog)
-		// zfs recv -v messages go to stdout; tee them like the Awk oracle
-		// (pipeline stdout + 2>&1) instead of leaking to the parent stdout.
-		rightCmd.Stdout = r.StderrLog
-	} else {
-		leftCmd.Stderr = &leftStderr
-		rightCmd.Stderr = &rightStderr
-	}
+	sink := &pipeSink{exec: r}
+	leftCmd.Stderr = io.MultiWriter(&leftStderr, sink)
+	rightCmd.Stderr = io.MultiWriter(&rightStderr, sink)
+	// zfs recv -v messages go to stdout; capture them for telemetry and
+	// progress instead of leaking to the parent stdout.
+	rightCmd.Stdout = sink
 
 	if err := leftCmd.Start(); err != nil {
 		pr.Close()
@@ -471,9 +463,10 @@ func (r *Real) remoteShell(target, remoteCmd string, role Role) (string, error) 
 	return r.remote().Shell(target, remoteCmd, role)
 }
 
-// runWithStderrLog runs cmd with separate stdout/stderr pipes, writes stderr
-// to r.StderrLog, and returns stdout + any exit error.
-func (r *Real) runWithStderrLog(ctx context.Context, cmd *exec.Cmd) ([]byte, error) {
+// runCaptured runs cmd with separate stdout/stderr pipes, feeds every line
+// through the stats sink (and StderrLog when set), and returns combined
+// output + any exit error.
+func (r *Real) runCaptured(ctx context.Context, cmd *exec.Cmd) ([]byte, error) {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -487,22 +480,13 @@ func (r *Real) runWithStderrLog(ctx context.Context, cmd *exec.Cmd) ([]byte, err
 	}
 	var outBuf bytes.Buffer
 	var errBuf bytes.Buffer
+	sink := &pipeSink{exec: r}
 	done := make(chan error, 1)
 	go func() {
-		// zfs recv -v messages go to stdout; tee them into StderrLog so
-		// pipe progress (size/received lines) is captured like the Awk oracle.
-		if r.StderrLog != nil {
-			_, _ = io.Copy(io.MultiWriter(&outBuf, r.StderrLog), stdout)
-		} else {
-			_, _ = io.Copy(&outBuf, stdout)
-		}
+		_, _ = io.Copy(io.MultiWriter(&outBuf, sink), stdout)
 	}()
 	go func() {
-		if r.StderrLog != nil {
-			_, _ = io.Copy(io.MultiWriter(&errBuf, r.StderrLog), stderr)
-		} else {
-			_, _ = io.Copy(&errBuf, stderr)
-		}
+		_, _ = io.Copy(io.MultiWriter(&errBuf, sink), stderr)
 	}()
 	go func() {
 		done <- cmd.Wait()
@@ -510,7 +494,7 @@ func (r *Real) runWithStderrLog(ctx context.Context, cmd *exec.Cmd) ([]byte, err
 	select {
 	case err := <-done:
 		if err != nil {
-			return outBuf.Bytes(), fmt.Errorf("%w: %s", err, strings.TrimSpace(errBuf.String()))
+			return []byte(strings.TrimSpace(outBuf.String() + "\n" + errBuf.String())), err
 		}
 		return outBuf.Bytes(), nil
 	case <-ctx.Done():

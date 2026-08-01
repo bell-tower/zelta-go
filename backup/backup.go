@@ -286,11 +286,16 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 
 	var b strings.Builder
 	var errors []string
-	// Always capture pipe stderr for replication telemetry; forward each line
-	// to req.OnLine when a progress hook is set.
-	parser := &streamParser{onLine: req.OnLine}
-	if tee, ok := exec.(stderrTee); ok {
-		tee.SetStderrLog(&lineWriter{fn: parser.Line})
+	// Pipe telemetry lives in the executor (zfs.Real parses send/recv output
+	// internally); reset stale counters and forward raw lines to req.OnLine.
+	var stats zfs.PipeStats
+	if reporter, ok := exec.(zfs.PipeStatsReporter); ok {
+		reporter.TakeStats()
+	}
+	if req.OnLine != nil {
+		if tee, ok := exec.(stderrTee); ok {
+			tee.SetStderrLog(&lineWriter{fn: req.OnLine})
+		}
 	}
 
 	if req.DryRun {
@@ -312,6 +317,9 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		}
 		errors = append(errors, createBookmarks(ctx, exec, req, plan)...)
 		execEndTime = time.Now()
+		if reporter, ok := exec.(zfs.PipeStatsReporter); ok {
+			stats = reporter.TakeStats()
+		}
 		if work == 0 && plan.Skip > 0 {
 			if plan.Skip == 1 {
 				b.WriteString("dataset up-to-date\n")
@@ -321,17 +329,17 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		}
 		if work > 0 {
 			secs := execEndTime.Sub(execStart).Seconds()
-			streams := parser.streams
-			if streams == 0 {
-				streams = work
+			streams := work
+			if stats.Streams > 0 {
+				streams = stats.Streams
 			}
-			if parser.secs > 0 {
-				secs = parser.secs
+			if stats.Secs > 0 {
+				secs = stats.Secs
 			}
 			// Awk parity: size/stream counts come from zfs send -P and
-			// zfs recv -v stderr; fall back to plan counts when the host
-			// omits them.
-			b.WriteString(fmt.Sprintf("%s sent, %d streams received in %g seconds\n", HumanBytes(parser.bytes), streams, secs))
+			// zfs recv -v output; fall back to plan counts when the executor
+			// does not report them.
+			b.WriteString(fmt.Sprintf("%s sent, %d streams received in %g seconds\n", HumanBytes(stats.Bytes), streams, secs))
 		}
 	}
 	if sum := plan.Summary(); sum != "" {
@@ -369,7 +377,7 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 			streamCount, sentStreams,
 			errors, messages,
 			startTime, execEndTime,
-			parser.bytes, parser.streams, parser.secs,
+			stats.Bytes, stats.Streams, stats.Secs,
 		)
 	}
 	return res, nil

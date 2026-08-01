@@ -7,8 +7,8 @@ import (
 	"git.belltower.it/djbell/zelta-go/backup"
 	"strings"
 
-	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/cmdbuild"
+	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/match"
 	"git.belltower.it/djbell/zelta-go/zfs"
 )
@@ -44,6 +44,9 @@ type ExecutionResult struct {
 	Preserved bool
 	Completed []string
 	Failures  []Failure
+	// Stats carries send/recv replication telemetry from the executor when it
+	// reports it (zero when the executor does not).
+	Stats zfs.PipeStats
 }
 
 // NeedsPreservation reports whether any source dataset still has source
@@ -406,6 +409,9 @@ func ExecuteResult(ctx context.Context, exec zfs.Executor, req TreeRequest, step
 	target := req.Target
 	target.Snapshot = ""
 	result := &ExecutionResult{}
+	if reporter, ok := exec.(zfs.PipeStatsReporter); ok {
+		reporter.TakeStats() // discard telemetry from earlier runs on this exec
+	}
 	for i := 0; i < len(steps); i++ {
 		step := steps[i]
 		switch step.Kind {
@@ -449,6 +455,9 @@ func ExecuteResult(ctx context.Context, exec zfs.Executor, req TreeRequest, step
 		default:
 			return nil, fmt.Errorf("rotate: unknown step %q", step.Kind)
 		}
+	}
+	if reporter, ok := exec.(zfs.PipeStatsReporter); ok {
+		result.Stats = reporter.TakeStats()
 	}
 	return result, nil
 }
