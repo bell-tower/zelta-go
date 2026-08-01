@@ -62,8 +62,8 @@ func ExampleRun_fromStrings() {
 	// Import edge: same types, filled via public Parse helpers (CLI/JSON path).
 	src, _ := endpoint.Parse("tank/data")
 	tgt, _ := endpoint.Parse("root@backup:tank/data")
-	mode := backup.ParseSnapMode("IF_NEEDED")
-	dir := backup.ParseSyncDirection("pull")
+	mode, _ := backup.ParseSnapMode("IF_NEEDED")
+	dir, _ := backup.ParseSyncDirection("pull")
 	st, _ := backup.ParseSnapTime("1h")
 	ss, _ := backup.ParseSnapSize("1048576")
 	_ = backup.Request{

@@ -6,13 +6,14 @@ import (
 	"git.belltower.it/djbell/zelta-go/backup"
 	"testing"
 
+	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/match"
 	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
 func TestDirectDivergencePlan(t *testing.T) {
 	steps, err := Plan(Request{
-		Source: "tank/src", Target: "tank/target", Match: "@base",
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/target"), Match: "@base",
 		SourceLast: "@new", TargetLast: "@other", Intermediate: true, Flags: backup.DefaultSendRecv(),
 	})
 	if err != nil {
@@ -26,7 +27,7 @@ func TestDirectDivergencePlan(t *testing.T) {
 
 func TestVerifiedSourceOriginPlanUsesOriginForSend(t *testing.T) {
 	steps, err := Plan(Request{
-		Source: "tank/clone", Target: "tank/target", SourceOrigin: "tank/original@base",
+		Source: endpoint.MustParse("tank/clone"), Target: endpoint.MustParse("tank/target"), SourceOrigin: "tank/original@base",
 		OriginVerified: true, SourceLast: "@new", TargetLast: "@other",
 		Intermediate: false, Flags: backup.DefaultSendRecv(),
 	})
@@ -41,7 +42,7 @@ func TestVerifiedSourceOriginPlanUsesOriginForSend(t *testing.T) {
 
 func TestPlanUsesNextSourceSnapshotForOneRotateStep(t *testing.T) {
 	steps, err := Plan(Request{
-		Source: "tank/src", Target: "tank/target", Match: "@base", SourceNext: "@next",
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/target"), Match: "@base", SourceNext: "@next",
 		SourceLast: "@latest", TargetLast: "@other", Intermediate: true, Flags: backup.DefaultSendRecv(),
 	})
 	if err != nil {
@@ -54,7 +55,7 @@ func TestPlanUsesNextSourceSnapshotForOneRotateStep(t *testing.T) {
 
 func TestPlanAllowsTargetAtTheCommonMatch(t *testing.T) {
 	steps, err := Plan(Request{
-		Source: "tank/src", Target: "tank/target", Match: "@base",
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/target"), Match: "@base",
 		SourceLast: "@new", TargetLast: "@base", Intermediate: true, Flags: backup.DefaultSendRecv(),
 	})
 	if err != nil {
@@ -84,7 +85,7 @@ func TestFormatRemoteUsesDirectionAwarePipe(t *testing.T) {
 
 func TestPlanTreeAddsFullSourceOnlyChild(t *testing.T) {
 	steps, err := PlanTree(TreeRequest{
-		Source: "tank/src", Target: "tank/target", Intermediate: true, Flags: backup.DefaultSendRecv(),
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/target"), Intermediate: true, Flags: backup.DefaultSendRecv(),
 		Pairs: []*match.Pair{
 			{DSSuffix: "", SrcName: "tank/src", TgtName: "tank/target", Match: "@base", SrcLast: "@new", TgtLast: "@other", SrcType: "filesystem"},
 			{DSSuffix: "/child", SrcName: "tank/src/child", SrcLast: "@child", SrcType: "filesystem"},
@@ -100,7 +101,7 @@ func TestPlanTreeAddsFullSourceOnlyChild(t *testing.T) {
 
 func TestPlanTreeUsesVerifiedChildOrigin(t *testing.T) {
 	steps, err := PlanTree(TreeRequest{
-		Source: "tank/src", Target: "tank/target", Intermediate: true, Flags: backup.DefaultSendRecv(),
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/target"), Intermediate: true, Flags: backup.DefaultSendRecv(),
 		TargetRows: []zfs.ListRow{{Name: "tank/target@base"}, {Name: "tank/target/child@child-base"}},
 		Pairs: []*match.Pair{
 			{DSSuffix: "", SrcName: "tank/src", TgtName: "tank/target", Match: "@base", SrcLast: "@new", TgtLast: "@other"},
@@ -117,14 +118,14 @@ func TestPlanTreeUsesVerifiedChildOrigin(t *testing.T) {
 
 func TestExecuteRenamesThenPipesInPlanOrder(t *testing.T) {
 	steps, err := Plan(Request{
-		Source: "tank/src", Target: "tank/target", Match: "@base",
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/target"), Match: "@base",
 		SourceLast: "@new", TargetLast: "@other", Intermediate: true, Flags: backup.DefaultSendRecv(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	fake := &zfs.Fake{}
-	if err := Execute(context.Background(), fake, TreeRequest{Source: "tank/src", Target: "tank/target", SyncDirection: "PULL"}, steps); err != nil {
+	if err := Execute(context.Background(), fake, TreeRequest{Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/target"), SyncDirection: backup.DirectionPull}, steps); err != nil {
 		t.Fatal(err)
 	}
 	if len(fake.Renames) != 1 || fake.Renames[0].OldDataset != "tank/target" || fake.Renames[0].NewDataset != "tank/target_other" {
@@ -136,7 +137,7 @@ func TestExecuteRenamesThenPipesInPlanOrder(t *testing.T) {
 }
 
 func TestRotateRejectsNoNewSourceSnapshot(t *testing.T) {
-	_, err := Plan(Request{Source: "s", Target: "t", Match: "@base", SourceLast: "@base", TargetLast: "@other"})
+	_, err := Plan(Request{Source: endpoint.MustParse("s"), Target: endpoint.MustParse("t"), Match: "@base", SourceLast: "@base", TargetLast: "@other"})
 	if err == nil {
 		t.Fatal("expected up-to-date source error")
 	}
@@ -144,7 +145,7 @@ func TestRotateRejectsNoNewSourceSnapshot(t *testing.T) {
 
 func TestRotateRejectsUnverifiedRollbackLineage(t *testing.T) {
 	_, err := PlanTree(TreeRequest{
-		Source: "tank/src", Target: "tank/target", TargetRows: []zfs.ListRow{{Name: "tank/target@other"}},
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/target"), TargetRows: []zfs.ListRow{{Name: "tank/target@other"}},
 		Pairs: []*match.Pair{{DSSuffix: "", SrcName: "tank/src", TgtName: "tank/target", SrcLast: "@new", TgtLast: "@other"}},
 	})
 	if err == nil {
@@ -154,7 +155,7 @@ func TestRotateRejectsUnverifiedRollbackLineage(t *testing.T) {
 
 func TestRotateRejectsPreservationCollision(t *testing.T) {
 	_, err := PlanTree(TreeRequest{
-		Source: "tank/src", Target: "tank/target", PreservationExists: true,
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/target"), PreservationExists: true,
 		Pairs: []*match.Pair{{DSSuffix: "", SrcName: "tank/src", TgtName: "tank/target", Match: "@base", SrcLast: "@new", TgtLast: "@other"}},
 	})
 	if err == nil {
@@ -191,7 +192,7 @@ func TestStreamCountCountsSendSteps(t *testing.T) {
 
 func TestExecuteResultContinuesAfterChildFailure(t *testing.T) {
 	steps, err := PlanTree(TreeRequest{
-		Source: "tank/src", Target: "tank/target", Intermediate: true, Flags: backup.DefaultSendRecv(),
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/target"), Intermediate: true, Flags: backup.DefaultSendRecv(),
 		Pairs: []*match.Pair{
 			{DSSuffix: "", SrcName: "tank/src", TgtName: "tank/target", Match: "@base", SrcLast: "@new", TgtLast: "@other"},
 			{DSSuffix: "/child", SrcName: "tank/src/child", TgtName: "tank/target/child", Match: "@base", SrcLast: "@child-new", TgtLast: "@child-other"},
@@ -202,7 +203,7 @@ func TestExecuteResultContinuesAfterChildFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	fake := &failPipeFake{Fake: &zfs.Fake{}, failSuffix: "tank/src/child"}
-	result, err := ExecuteResult(context.Background(), fake, TreeRequest{Source: "tank/src", Target: "tank/target", SyncDirection: "PULL"}, steps)
+	result, err := ExecuteResult(context.Background(), fake, TreeRequest{Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/target"), SyncDirection: backup.DirectionPull}, steps)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,14 +220,14 @@ func TestExecuteResultContinuesAfterChildFailure(t *testing.T) {
 
 func TestExecuteResultStopsAfterPreservationFailure(t *testing.T) {
 	steps, err := PlanTree(TreeRequest{
-		Source: "tank/src", Target: "tank/target", Intermediate: true, Flags: backup.DefaultSendRecv(),
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/target"), Intermediate: true, Flags: backup.DefaultSendRecv(),
 		Pairs: []*match.Pair{{DSSuffix: "", SrcName: "tank/src", TgtName: "tank/target", Match: "@base", SrcLast: "@new", TgtLast: "@other"}},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	fake := &failRenameFake{Fake: &zfs.Fake{}}
-	result, err := ExecuteResult(context.Background(), fake, TreeRequest{Source: "tank/src", Target: "tank/target"}, steps)
+	result, err := ExecuteResult(context.Background(), fake, TreeRequest{Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/target")}, steps)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +245,7 @@ func TestExecuteResultReportsSnapshotFailureAfterPreservation(t *testing.T) {
 		{Kind: "rename", Argv: []string{"zfs", "rename", "-fp", "tank/target", "tank/target_base"}},
 		{Kind: "snapshot", Argv: []string{"zfs", "snapshot", "-r", "tank/src@new"}},
 	}
-	result, err := ExecuteResult(context.Background(), fake, TreeRequest{Source: "tank/src", Target: "tank/target"}, steps)
+	result, err := ExecuteResult(context.Background(), fake, TreeRequest{Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/target")}, steps)
 	if err != nil {
 		t.Fatal(err)
 	}

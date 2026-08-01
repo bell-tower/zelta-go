@@ -18,29 +18,30 @@ const (
 )
 
 // ParseSnapMode maps CLI/env/JSON strings to SnapMode.
-// Empty and unknown aliases become SnapIfNeeded.
-func ParseSnapMode(s string) SnapMode {
-	switch normalizeSnapMode(s) {
-	case SnapAlways:
-		return SnapAlways
-	case SnapNever:
-		return SnapNever
+// Empty → (SnapIfNeeded, nil). Unknown non-empty values error (strict import edge).
+// SKIP is the rotate dialect alias for SnapNever.
+func ParseSnapMode(s string) (SnapMode, error) {
+	m := strings.ToUpper(strings.TrimSpace(s))
+	switch m {
+	case "", string(SnapIfNeeded):
+		return SnapIfNeeded, nil
+	case string(SnapNever), "0", "OFF", "NO", "FALSE", "SKIP":
+		return SnapNever, nil
+	case string(SnapAlways), "1", "YES", "TRUE":
+		return SnapAlways, nil
 	default:
-		return SnapIfNeeded
+		return "", fmt.Errorf("invalid snap mode: %q (want IF_NEEDED, ALWAYS, NEVER)", s)
 	}
 }
 
-func normalizeSnapMode(mode string) SnapMode {
-	m := strings.ToUpper(strings.TrimSpace(mode))
-	switch m {
-	case "", string(SnapIfNeeded):
-		return SnapIfNeeded
-	case "0", "OFF", "NO", "FALSE", string(SnapNever):
-		return SnapNever
-	case "1", "YES", "TRUE", string(SnapAlways):
-		return SnapAlways
+// normalizeSnapMode coerces a typed SnapMode to a known constant. Lenient —
+// used inside actions where values are already typed; unknown → SnapIfNeeded.
+func normalizeSnapMode(mode SnapMode) SnapMode {
+	switch mode {
+	case SnapNever, SnapAlways:
+		return mode
 	default:
-		return SnapMode(m)
+		return SnapIfNeeded
 	}
 }
 
@@ -57,17 +58,22 @@ const (
 )
 
 // ParseSyncDirection maps CLI/env/JSON strings to SyncDirection.
-// Empty → DirectionPull. Falsey ("0", "no", …) → DirectionProxy.
-func ParseSyncDirection(s string) SyncDirection {
+// Empty → (DirectionPull, nil). Unknown values error (strict import edge).
+// Falsey ("0", "no", …) → DirectionProxy (oracle dual-remote default).
+func ParseSyncDirection(s string) (SyncDirection, error) {
 	d := strings.TrimSpace(s)
 	if d == "" {
-		return DirectionPull
+		return DirectionPull, nil
 	}
 	switch strings.ToLower(d) {
-	case "0", "no", "false", "off", "proxy":
-		return DirectionProxy
+	case "pull":
+		return DirectionPull, nil
+	case "push":
+		return DirectionPush, nil
+	case "proxy", "0", "no", "false", "off":
+		return DirectionProxy, nil
 	default:
-		return SyncDirection(strings.ToUpper(d))
+		return "", fmt.Errorf("invalid sync direction: %q (want PULL, PUSH, PROXY)", s)
 	}
 }
 
@@ -79,8 +85,9 @@ func (d SyncDirection) Normalize() SyncDirection {
 	return d
 }
 
-// pipeArg is the string passed to zfs pipe helpers (proxy → "").
-func (d SyncDirection) pipeArg() string {
+// PipeArg returns the token passed to zfs pipe helpers at the Executor edge
+// (DirectionProxy → "", the controller/dual-remote form).
+func (d SyncDirection) PipeArg() string {
 	switch d.Normalize() {
 	case DirectionPush:
 		return "PUSH"

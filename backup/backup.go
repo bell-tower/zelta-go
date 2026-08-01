@@ -234,7 +234,7 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		}
 	}
 
-	direction := req.SyncDirection.pipeArg()
+	direction := req.SyncDirection.PipeArg()
 	if flags.Bookmarks {
 		plan.Bookmarks, err = buildBookmarkPlans(plan, srcStr, tgtStr, flags.BookmarkPrefix, tgtEp.Host)
 		if err != nil {

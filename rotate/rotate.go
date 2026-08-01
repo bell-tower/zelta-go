@@ -14,7 +14,7 @@ import (
 )
 
 type Request struct {
-	Source, Target string
+	Source, Target endpoint.Endpoint
 	Match          string
 	SourceLast     string
 	SourceNext     string
@@ -99,26 +99,19 @@ func StreamCount(steps []Step) int {
 // TreeRequest plans a complete dataset tree. TargetRows are used to verify
 // source clone origins before they are used as incremental bases.
 type TreeRequest struct {
-	Source, Target     string
+	Source, Target     endpoint.Endpoint
 	Pairs              []*match.Pair
 	TargetRows         []zfs.ListRow
 	PreservationExists bool
 	Intermediate       bool
-	SyncDirection      string
+	SyncDirection      backup.SyncDirection
 	Flags              backup.SendRecv
 }
 
 // PlanTree handles root direct-match and verified source-origin paths and
 // plans full sends for source-only children. It remains planner-only.
 func PlanTree(req TreeRequest) ([]Step, error) {
-	src, err := endpoint.Parse(req.Source)
-	if err != nil {
-		return nil, fmt.Errorf("source: %w", err)
-	}
-	tgt, err := endpoint.Parse(req.Target)
-	if err != nil {
-		return nil, fmt.Errorf("target: %w", err)
-	}
+	src, tgt := req.Source, req.Target
 	root := findRoot(req.Pairs)
 	if root == nil || root.SrcName == "" {
 		return nil, fmt.Errorf("rotate source root is missing")
@@ -268,8 +261,8 @@ func hasSnapshot(rows []zfs.ListRow, name string) bool {
 func Plan(req Request) ([]Step, error) {
 	root := &match.Pair{
 		DSSuffix:  "",
-		SrcName:   req.Source,
-		TgtName:   req.Target,
+		SrcName:   req.Source.Dataset,
+		TgtName:   req.Target.Dataset,
 		Match:     req.Match,
 		SrcLast:   req.SourceLast,
 		SrcNext:   req.SourceNext,
@@ -280,11 +273,7 @@ func Plan(req Request) ([]Step, error) {
 	var targetRows []zfs.ListRow
 	if req.OriginVerified {
 		if _, originSnap, ok := splitOrigin(req.SourceOrigin); ok {
-			tgt, err := endpoint.Parse(req.Target)
-			if err != nil {
-				return nil, err
-			}
-			targetRows = []zfs.ListRow{{Name: tgt.Dataset + originSnap}}
+			targetRows = []zfs.ListRow{{Name: req.Target.Dataset + originSnap}}
 		}
 	}
 	return PlanTree(TreeRequest{
@@ -414,10 +403,7 @@ func Execute(ctx context.Context, exec zfs.Executor, req TreeRequest, steps []St
 // failures stop the operation; independent child streams continue so callers
 // receive a complete partial-progress report.
 func ExecuteResult(ctx context.Context, exec zfs.Executor, req TreeRequest, steps []Step) (*ExecutionResult, error) {
-	target, err := endpoint.Parse(req.Target)
-	if err != nil {
-		return nil, fmt.Errorf("target: %w", err)
-	}
+	target := req.Target
 	target.Snapshot = ""
 	result := &ExecutionResult{}
 	for i := 0; i < len(steps); i++ {
@@ -436,7 +422,7 @@ func ExecuteResult(ctx context.Context, exec zfs.Executor, req TreeRequest, step
 			if len(step.Argv) == 0 {
 				return nil, fmt.Errorf("rotate: malformed snapshot step")
 			}
-			if err := exec.Snapshot(ctx, req.Source, step.Argv[len(step.Argv)-1], true); err != nil {
+			if err := exec.Snapshot(ctx, req.Source.String(), step.Argv[len(step.Argv)-1], true); err != nil {
 				result.Failures = append(result.Failures, Failure{Kind: step.Kind, Err: fmt.Errorf("snapshot source: %w", err)})
 				return result, nil
 			}
@@ -445,7 +431,7 @@ func ExecuteResult(ctx context.Context, exec zfs.Executor, req TreeRequest, step
 				return nil, fmt.Errorf("rotate: send without receive for %q", step.DSSuffix)
 			}
 			recv := steps[i+1]
-			if err := exec.RunPipeDirection(ctx, req.Source, step.Argv, req.Target, recv.Argv, req.SyncDirection); err != nil {
+			if err := exec.RunPipeDirection(ctx, req.Source.String(), step.Argv, req.Target.String(), recv.Argv, req.SyncDirection.PipeArg()); err != nil {
 				result.Failures = append(result.Failures, Failure{Kind: step.Kind, DSSuffix: step.DSSuffix, Err: fmt.Errorf("sync %s: %w", step.DSSuffix, err)})
 				if i+2 < len(steps) && steps[i+2].Kind == "send" && steps[i+2].DSSuffix == step.DSSuffix {
 					i += 3

@@ -58,11 +58,19 @@ func TestBackupFromParseHelpers(t *testing.T) {
 	if err != nil || st != time.Hour {
 		t.Fatalf("ParseSnapTime: %v %v", st, err)
 	}
+	mode, err := backup.ParseSnapMode("0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, err := backup.ParseSyncDirection("pull")
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := backup.Request{
 		Source:        src,
 		Target:        tgt,
-		SnapMode:      backup.ParseSnapMode("0"),
-		SyncDirection: backup.ParseSyncDirection("pull"),
+		SnapMode:      mode,
+		SyncDirection: dir,
 		DryRun:        true,
 	}
 	f := &zfs.Fake{Lists: map[string]string{

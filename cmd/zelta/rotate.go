@@ -65,10 +65,15 @@ func runRotate(args []string) int {
 		fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
 		return 1
 	}
+	syncDir, err := rotateDirection(p.Env.Get("SYNC_DIRECTION"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
+		return 1
+	}
 	request := rotate.TreeRequest{
-		Source: p.Operands[0], Target: p.Operands[1], Pairs: m.Pairs,
+		Source: src, Target: tgt, Pairs: m.Pairs,
 		TargetRows: m.TgtRows, Intermediate: p.Env.Bool("SEND_INTR", true),
-		SyncDirection: rotateDirection(p.Env.Get("SYNC_DIRECTION")),
+		SyncDirection: syncDir,
 		Flags:         opt.SendRecvFrom(p.Env),
 	}
 	steps, err := rotate.PlanTree(request)
@@ -98,7 +103,7 @@ func runRotate(args []string) int {
 		fmt.Fprintln(os.Stderr, "zelta rotate: preservation rename is missing")
 		return 1
 	}
-	exists, err := exec.Exists(context.Background(), p.Operands[1], preserved)
+	exists, err := exec.Exists(context.Background(), tgt.String(), preserved)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta rotate: preservation check: %v\n", err)
 		return 1
@@ -134,7 +139,7 @@ func runRotate(args []string) int {
 		fmt.Fprintf(os.Stderr, "warning: insufficient snapshots; performing full backup for %d datasets\n", fullCount)
 	}
 	if p.Env.Bool("DRYRUN", false) {
-		out, err := rotate.FormatRemote(steps, p.Operands[0], p.Operands[1], request.SyncDirection)
+		out, err := rotate.FormatRemote(steps, src.String(), tgt.String(), request.SyncDirection.PipeArg())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
 			return 1
@@ -179,15 +184,8 @@ func runRotate(args []string) int {
 
 func rotateUsage() { fmt.Fprintln(os.Stderr, "usage: zelta rotate SOURCE TARGET") }
 
-func rotateDirection(value string) string {
-	switch value {
-	case "0", "no", "false", "off", "NO", "FALSE", "OFF":
-		return ""
-	case "", "pull", "PULL":
-		return "PULL"
-	default:
-		return value
-	}
+func rotateDirection(value string) (backup.SyncDirection, error) {
+	return backup.ParseSyncDirection(value)
 }
 
 func preservationEndpoint(target, dataset string) string {
@@ -220,9 +218,9 @@ func printRotateFailures(failures []rotate.Failure) {
 }
 
 func prepareRotateSnapshot(mode, requested, snapTime, snapSize string, pairs []*match.Pair) (string, bool, error) {
-	snapMode := backup.ParseSnapMode(mode)
-	if strings.EqualFold(strings.TrimSpace(mode), "SKIP") {
-		snapMode = backup.SnapNever
+	snapMode, err := backup.ParseSnapMode(mode)
+	if err != nil {
+		return "", false, err
 	}
 	force := snapMode == backup.SnapAlways
 	disabled := snapMode == backup.SnapNever

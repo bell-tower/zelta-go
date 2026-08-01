@@ -24,7 +24,7 @@ func ShouldSnapshot(mode SnapMode, views []PairView) string {
 // threshold data conservatively requires a snapshot.
 // snapTime/snapSize zero means unset.
 func ShouldSnapshotWithThresholds(mode SnapMode, views []PairView, snapTime time.Duration, snapSize int64) string {
-	mode = ParseSnapMode(string(mode))
+	mode = normalizeSnapMode(mode)
 	if mode == SnapNever {
 		return ""
 	}

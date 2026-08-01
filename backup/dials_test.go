@@ -9,17 +9,29 @@ func TestParseSnapMode(t *testing.T) {
 	cases := []struct {
 		in   string
 		want SnapMode
+		err  bool
 	}{
-		{"", SnapIfNeeded},
-		{"IF_NEEDED", SnapIfNeeded},
-		{"0", SnapNever},
-		{"never", SnapNever},
-		{"ALWAYS", SnapAlways},
-		{"1", SnapAlways},
-		{"bogus", SnapIfNeeded},
+		{"", SnapIfNeeded, false},
+		{"IF_NEEDED", SnapIfNeeded, false},
+		{"0", SnapNever, false},
+		{"never", SnapNever, false},
+		{"ALWAYS", SnapAlways, false},
+		{"1", SnapAlways, false},
+		{"SKIP", SnapNever, false},
+		{"bogus", "", true},
 	}
 	for _, tc := range cases {
-		if got := ParseSnapMode(tc.in); got != tc.want {
+		got, err := ParseSnapMode(tc.in)
+		if tc.err {
+			if err == nil {
+				t.Fatalf("ParseSnapMode(%q): want error, got %q", tc.in, got)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatalf("ParseSnapMode(%q): unexpected error %v", tc.in, err)
+		}
+		if got != tc.want {
 			t.Fatalf("ParseSnapMode(%q)=%q want %q", tc.in, got, tc.want)
 		}
 	}
@@ -30,21 +42,32 @@ func TestParseSyncDirection(t *testing.T) {
 		in   string
 		want SyncDirection
 		pipe string
+		err  bool
 	}{
-		{"", DirectionPull, "PULL"},
-		{"pull", DirectionPull, "PULL"},
-		{"PUSH", DirectionPush, "PUSH"},
-		{"0", DirectionProxy, ""},
-		{"no", DirectionProxy, ""},
-		{"proxy", DirectionProxy, ""},
+		{"", DirectionPull, "PULL", false},
+		{"pull", DirectionPull, "PULL", false},
+		{"PUSH", DirectionPush, "PUSH", false},
+		{"0", DirectionProxy, "", false},
+		{"no", DirectionProxy, "", false},
+		{"proxy", DirectionProxy, "", false},
+		{"bogus", "", "", true},
 	}
 	for _, tc := range cases {
-		got := ParseSyncDirection(tc.in)
+		got, err := ParseSyncDirection(tc.in)
+		if tc.err {
+			if err == nil {
+				t.Fatalf("ParseSyncDirection(%q): want error, got %q", tc.in, got)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatalf("ParseSyncDirection(%q): unexpected error %v", tc.in, err)
+		}
 		if got != tc.want {
 			t.Fatalf("ParseSyncDirection(%q)=%q want %q", tc.in, got, tc.want)
 		}
-		if p := got.pipeArg(); p != tc.pipe {
-			t.Fatalf("pipeArg(%q)=%q want %q", tc.in, p, tc.pipe)
+		if p := got.PipeArg(); p != tc.pipe {
+			t.Fatalf("PipeArg(%q)=%q want %q", tc.in, p, tc.pipe)
 		}
 	}
 	if SyncDirection("").Normalize() != DirectionPull {

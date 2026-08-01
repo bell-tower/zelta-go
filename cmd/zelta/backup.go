@@ -46,6 +46,16 @@ func runBackup(args []string) int {
 		return 1
 	}
 	jsonMode := p.Env.Get("LOG_MODE") == "json"
+	snapMode, err := backup.ParseSnapMode(p.Env.Get("SNAP_MODE"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	syncDir, err := backup.ParseSyncDirection(p.Env.Get("SYNC_DIRECTION"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
 	flags := opt.SendRecvFrom(p.Env)
 	createParent := p.Env.Bool("CREATE_PARENT", true)
 
@@ -73,14 +83,14 @@ func runBackup(args []string) int {
 		Target:        tgt,
 		DryRun:        p.Env.Bool("DRYRUN", false),
 		Intermediate:  p.Env.Bool("SEND_INTR", true),
-		SnapMode:      backup.ParseSnapMode(p.Env.Get("SNAP_MODE")),
+		SnapMode:      snapMode,
 		SnapName:      strings.TrimPrefix(p.Env.Get("SNAP_NAME"), "@"),
 		SnapTime:      snapTime,
 		SnapSize:      snapSize,
 		Depth:         depth,
 		Include:       p.Env.List("INCLUDE"),
 		Exclude:       p.Env.List("EXCLUDE"),
-		SyncDirection: backup.ParseSyncDirection(p.Env.Get("SYNC_DIRECTION")),
+		SyncDirection: syncDir,
 		Flags:         &flags,
 		CreateParent:  &createParent,
 		TargetOrigin:  origin,
