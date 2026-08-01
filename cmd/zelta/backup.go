@@ -30,6 +30,9 @@ func runBackup(args []string) int {
 	if code != 0 {
 		return code
 	}
+	if p.Env.Get("VERB") == "replicate" {
+		depth = 1
+	}
 
 	snapMode := backup.SnapIfNeeded
 	switch p.Env.Get("SNAP_MODE") {

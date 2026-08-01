@@ -72,7 +72,7 @@ func TestPruneTime(t *testing.T) {
 }
 
 func TestPruneGuardUnsynced(t *testing.T) {
-	// Oracle 1.2.0 quirk: unsynced prunes nothing, even with a full guard target.
+	// Snapshots present on the guard by both GUID and name are eligible.
 	tgt := "bpool/tgt@new\t90\t0\t1000000\t0\t1000\n" +
 		"bpool/tgt@mid\t80\t0\t900000\t0\t1000\n" +
 		"bpool/tgt@old\t70\t1000\t800000\t0\t2000\n" +
@@ -88,8 +88,8 @@ func TestPruneGuardUnsynced(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Output != "" {
-		t.Fatalf("unsynced keeps everything (oracle quirk):\n%s", res.Output)
+	if !strings.Contains(res.Output, "apool/treetop@old%mid") {
+		t.Fatalf("unsynced should prune guarded history:\n%s", res.Output)
 	}
 }
 

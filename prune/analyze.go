@@ -202,13 +202,13 @@ func analyze(dss []*dsSnaps, tgt map[string]*guardDS, sel *selector, guard strin
 				d.keptSnaps = append(d.keptSnaps, sp)
 				continue
 			}
-			// Oracle 1.2.0 quirk: --prune-guard=unsynced prunes nothing
-			// (synced_allows_prune never returns true against the target
-			// endpoint in prune mode — observed against full/partial/empty
-			// guard targets). Match the oracle: keep every snap.
+			// Unsynced protection requires both the snapshot GUID and its
+			// savepoint name to exist on the guard endpoint.
 			if guard == GuardUnsynced {
-				d.keptSnaps = append(d.keptSnaps, sp)
-				continue
+				if gd == nil || !gd.GUIDs[sp.GUID] || !gd.Names[sp.Savepoint] {
+					d.keptSnaps = append(d.keptSnaps, sp)
+					continue
+				}
 			}
 			gridKeep := len(sel.grid) > 0 &&
 				(i == 0 || i == len(d.Snaps)-1 || g.keeps(sp.Creation, anchor))
