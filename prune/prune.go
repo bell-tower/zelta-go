@@ -5,7 +5,6 @@ package prune
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"git.belltower.it/djbell/zelta-go/endpoint"
@@ -13,28 +12,25 @@ import (
 	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
-// Guard modes (oracle GUARD_*).
-const (
-	GuardNone     = "none"
-	GuardLatest   = "latest"
-	GuardUnsynced = "unsynced"
-)
-
 // Request is a read-only prune analysis.
 type Request struct {
 	Source      string
 	GuardTarget string // --match-endpoint; empty → no guard
-	PruneGuard  string // latest (default when target), unsynced, none
-	PruneNum    int    // --prune-num: keep N snaps after match (-1 = unset)
-	PruneTime   string // --prune-time duration
-	PruneGrid   string // --prune-grid spec
-	PruneSize   string // --prune-size
-	Depth       int
-	Include     []string
-	Exclude     []string
-	NoRanges    bool
-	Visual      bool
-	Now         int64 // unix seconds; 0 → time.Now()
+	// PruneGuard: zero/GuardLatest (default when target), GuardUnsynced, GuardNone.
+	// Use ParsePruneGuard for CLI/env/JSON strings.
+	PruneGuard PruneGuard
+	PruneNum   int // --prune-num: keep N snaps after match (-1 = unset)
+	// PruneTime is age threshold. nil = unset; non-nil (including 0) = set.
+	// Use ParsePruneTime for CLI/env/JSON strings.
+	PruneTime *time.Duration
+	PruneGrid string // --prune-grid spec (still a string this session)
+	PruneSize string // --prune-size (still a string this session)
+	Depth     int
+	Include   []string
+	Exclude   []string
+	NoRanges  bool
+	Visual    bool
+	Now       int64 // unix seconds; 0 → time.Now()
 }
 
 // ListProps: source has clones; guard target does not (oracle).
@@ -75,7 +71,7 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	if req.Depth < 0 {
 		return nil, fmt.Errorf("depth of '%d' invalid; must be positive", req.Depth)
 	}
-	guard := strings.ToLower(req.PruneGuard)
+	guard := req.PruneGuard
 	if guard == "" {
 		guard = GuardLatest
 	}

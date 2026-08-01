@@ -48,12 +48,22 @@ func runZprune(args []string) int {
 		pruneNum = n
 	}
 
+	pruneGuard, err := prune.ParsePruneGuard(p.Env.Get("PRUNE_GUARD"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zprune: %v\n", err)
+		return 1
+	}
+	pruneTime, err := prune.ParsePruneTime(p.Env.Get("PRUNE_TIME"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zprune: %v\n", err)
+		return 1
+	}
 	res, err := prune.Run(context.Background(), newReal(), prune.Request{
 		Source:      p.Operands[0],
 		GuardTarget: p.Env.Get("MATCH_ENDPOINT"),
-		PruneGuard:  p.Env.Get("PRUNE_GUARD"),
+		PruneGuard:  pruneGuard,
 		PruneNum:    pruneNum,
-		PruneTime:   p.Env.Get("PRUNE_TIME"),
+		PruneTime:   pruneTime,
 		PruneGrid:   p.Env.Get("PRUNE_GRID"),
 		PruneSize:   p.Env.Get("PRUNE_SIZE"),
 		Depth:       depth,

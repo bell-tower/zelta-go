@@ -4,9 +4,12 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"git.belltower.it/djbell/zelta-go/zfs"
 )
+
+func pt(d time.Duration) *time.Duration { return &d }
 
 // source list: newest-first snaps (zfs -S createtxg), 7 cols incl. clones.
 const srcList = `apool/treetop@new	90	0	1000000	0	1000	-
@@ -31,7 +34,7 @@ func TestPruneNoGuard(t *testing.T) {
 	res, err := Run(context.Background(), fakeExec(t, ""), Request{
 		Source:    "apool/treetop",
 		PruneNum:  1,
-		PruneTime: "0",
+		PruneTime: pt(0),
 		Now:       now,
 	})
 	if err != nil {
@@ -56,7 +59,7 @@ func TestPruneTime(t *testing.T) {
 	res, err := Run(context.Background(), fakeExec(t, ""), Request{
 		Source:    "apool/treetop",
 		PruneNum:  0,
-		PruneTime: "100000s", // keep creation >= 850000 → @new (1e6) @mid (9e5); @old (8e5) pruned
+		PruneTime: pt(100000 * time.Second), // keep creation >= 850000 → @new (1e6) @mid (9e5); @old (8e5) pruned
 		Now:       now,
 	})
 	if err != nil {
@@ -82,7 +85,7 @@ func TestPruneGuardUnsynced(t *testing.T) {
 		GuardTarget: "bpool/tgt",
 		PruneGuard:  GuardUnsynced,
 		PruneNum:    0,
-		PruneTime:   "0",
+		PruneTime: pt(0),
 		Now:         1000100,
 	})
 	if err != nil {
@@ -102,7 +105,7 @@ func TestPruneGuardLatest(t *testing.T) {
 		GuardTarget: "bpool/tgt",
 		PruneGuard:  GuardLatest,
 		PruneNum:    1,
-		PruneTime:   "0",
+		PruneTime: pt(0),
 		Now:         1000100,
 	})
 	if err != nil {
@@ -118,7 +121,7 @@ func TestPruneGuardLatest(t *testing.T) {
 		GuardTarget: "bpool/tgt",
 		PruneGuard:  GuardLatest,
 		PruneNum:    0,
-		PruneTime:   "0",
+		PruneTime: pt(0),
 		Now:         1000100,
 	})
 	if err != nil {
@@ -135,7 +138,7 @@ func TestPruneGuardLatest(t *testing.T) {
 func TestPruneNoRangesVisual(t *testing.T) {
 	res, err := Run(context.Background(), fakeExec(t, ""), Request{
 		Source:   "apool/treetop",
-		PruneNum: 1, PruneTime: "0",
+		PruneNum: 1, PruneTime: pt(0),
 		Now:      1000100,
 		NoRanges: true,
 	})
@@ -153,7 +156,7 @@ func TestPruneNoRangesVisual(t *testing.T) {
 	}
 
 	res2, err := Run(context.Background(), fakeExec(t, ""), Request{
-		Source: "apool/treetop", PruneNum: 1, PruneTime: "0",
+		Source: "apool/treetop", PruneNum: 1, PruneTime: pt(0),
 		Now: 1000100, Visual: true,
 	})
 	if err != nil {
@@ -181,7 +184,7 @@ func TestPruneDefaults(t *testing.T) {
 
 func TestPruneFilteredSnapsKept(t *testing.T) {
 	res, err := Run(context.Background(), fakeExec(t, ""), Request{
-		Source: "apool/treetop", PruneNum: 0, PruneTime: "0",
+		Source: "apool/treetop", PruneNum: 0, PruneTime: pt(0),
 		Now:     1000100,
 		Exclude: []string{"@old"},
 	})

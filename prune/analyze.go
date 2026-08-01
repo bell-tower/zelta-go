@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"git.belltower.it/djbell/zelta-go/match"
 	"git.belltower.it/djbell/zelta-go/zfs"
@@ -129,18 +130,15 @@ type selector struct {
 func selectorFromRequest(req Request) (*selector, error) {
 	s := &selector{num: req.PruneNum}
 	// Oracle default when all retention opts unset: num=30 time=30days.
-	if req.PruneNum < 0 && req.PruneTime == "" && req.PruneGrid == "" && req.PruneSize == "" {
+	if req.PruneNum < 0 && req.PruneTime == nil && req.PruneGrid == "" && req.PruneSize == "" {
 		s.num = 30
 		d, _ := ParseDuration("30days")
 		s.timeSecs, s.hasTime = d, true
 		return s, nil
 	}
-	if req.PruneTime != "" {
-		d, err := ParseDuration(req.PruneTime)
-		if err != nil {
-			return nil, fmt.Errorf("invalid --prune-time: %s", req.PruneTime)
-		}
-		s.timeSecs, s.hasTime = d, true
+	if req.PruneTime != nil {
+		s.timeSecs = int64(*req.PruneTime / time.Second)
+		s.hasTime = true
 	}
 	if req.PruneGrid != "" {
 		g, err := parseGrid(req.PruneGrid)
@@ -163,7 +161,7 @@ func selectorFromRequest(req Request) (*selector, error) {
 }
 
 // analyze selects prune candidates per dataset (oracle analyze_prune_candidates).
-func analyze(dss []*dsSnaps, tgt map[string]*guardDS, sel *selector, guard string, now int64) {
+func analyze(dss []*dsSnaps, tgt map[string]*guardDS, sel *selector, guard PruneGuard, now int64) {
 	for _, d := range dss {
 		if d.Filtered {
 			continue

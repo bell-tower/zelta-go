@@ -49,12 +49,24 @@ func runPruneGolden(t *testing.T, dir string) {
 			t.Fatal(err)
 		}
 	}
+	var pruneGuard PruneGuard
+	if meta["prune-guard"] != "" {
+		var gerr error
+		pruneGuard, gerr = ParsePruneGuard(meta["prune-guard"])
+		if gerr != nil {
+			t.Fatal(gerr)
+		}
+	}
+	pruneTime, terr := ParsePruneTime(meta["prune-time"])
+	if terr != nil {
+		t.Fatal(terr)
+	}
 	res, runErr := Run(context.Background(), &zfs.Fake{Lists: map[string]string{
 		source:               string(src),
 		meta["guard-target"]: string(tgt),
 	}}, Request{
-		Source: source, GuardTarget: meta["guard-target"], PruneGuard: meta["prune-guard"],
-		PruneNum: pruneNum, PruneTime: meta["prune-time"], PruneGrid: meta["prune-grid"],
+		Source: source, GuardTarget: meta["guard-target"], PruneGuard: pruneGuard,
+		PruneNum: pruneNum, PruneTime: pruneTime, PruneGrid: meta["prune-grid"],
 		NoRanges: meta["no-ranges"] == "true", Visual: meta["visual"] == "true", Now: now,
 	})
 	gotOut, gotErr, gotExit := "", "", 0
