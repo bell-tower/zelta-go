@@ -123,10 +123,25 @@ func runCloneAndBackup(p *opt.Parsed) int {
 	}
 	flags := opt.SendRecvFrom(p.Env)
 	createParent := p.Env.Bool("CREATE_PARENT", true)
+	src, err := parseEndpoint(p.Operands[1])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: source: %v\n", err)
+		return 1
+	}
+	origin, err := parseEndpoint(p.Operands[2])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: target-origin: %v\n", err)
+		return 1
+	}
+	tgt, err := parseEndpoint(p.Operands[3])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: target: %v\n", err)
+		return 1
+	}
 	res, err := backup.Run(context.Background(), newReal(), backup.Request{
-		Source:        p.Operands[1],
-		Target:        p.Operands[3],
-		TargetOrigin:  p.Operands[2],
+		Source:        src,
+		Target:        tgt,
+		TargetOrigin:  origin,
 		DryRun:        p.Env.Bool("DRYRUN", false),
 		Intermediate:  p.Env.Bool("SEND_INTR", true),
 		SnapMode:      backup.ParseSnapMode(p.Env.Get("SNAP_MODE")),

@@ -90,6 +90,20 @@ func splitHostDataset(s string) (host, dataset string, ok bool) {
 	return hostPart, s[colon+1:], true
 }
 
+// IsZero reports an unset endpoint (no dataset).
+func (e Endpoint) IsZero() bool {
+	return e.Dataset == "" && e.Host == "" && e.User == "" && e.Snapshot == "" && e.Raw == ""
+}
+
+// MustParse is for tests and static fixtures; panics on error.
+func MustParse(s string) Endpoint {
+	e, err := Parse(s)
+	if err != nil {
+		panic(err)
+	}
+	return e
+}
+
 // String rebuilds a canonical endpoint string.
 func (e Endpoint) String() string {
 	ds := e.Dataset

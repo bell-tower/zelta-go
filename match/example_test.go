@@ -3,6 +3,7 @@ package match_test
 import (
 	"context"
 	"fmt"
+	"git.belltower.it/djbell/zelta-go/endpoint"
 
 	"git.belltower.it/djbell/zelta-go/match"
 	"git.belltower.it/djbell/zelta-go/zfs"
@@ -17,8 +18,8 @@ func ExampleCompare() {
 		},
 	}
 	res, err := match.Compare(ctx, f, match.Request{
-		Source: "pool/src",
-		Target: "pool/tgt",
+		Source: endpoint.MustParse("pool/src"),
+		Target: endpoint.MustParse("pool/tgt"),
 	})
 	if err != nil {
 		panic(err)

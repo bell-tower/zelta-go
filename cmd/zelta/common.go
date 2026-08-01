@@ -5,8 +5,18 @@ import (
 	"os"
 	"strconv"
 
+	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
 )
+
+// parseEndpoint maps a CLI operand/env string to endpoint.Endpoint.
+// Empty s returns a zero endpoint and nil error.
+func parseEndpoint(s string) (endpoint.Endpoint, error) {
+	if s == "" {
+		return endpoint.Endpoint{}, nil
+	}
+	return endpoint.Parse(s)
+}
 
 func printWarns(warns []string) {
 	for _, w := range warns {

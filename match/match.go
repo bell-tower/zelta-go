@@ -13,8 +13,8 @@ import (
 
 // Request is a match comparison.
 type Request struct {
-	Source                  string
-	Target                  string
+	Source                  endpoint.Endpoint
+	Target                  endpoint.Endpoint
 	Props                   []string // empty → resolveListProps
 	Cols                    []string // empty → expand default proplist
 	Depth                   int      // 0 = unlimited; zfs -d + pair filter
@@ -55,18 +55,19 @@ var RotateListProps = []string{"name", "guid", "origin", "written", "snapshots_c
 
 // Compare loads lists, pairs by ds_suffix/GUID, and renders columns.
 func Compare(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
-	srcEp, err := endpoint.Parse(req.Source)
-	if err != nil {
-		return nil, fmt.Errorf("source: %w", err)
+	srcEp := req.Source
+	tgtEp := req.Target
+	if srcEp.Dataset == "" {
+		return nil, fmt.Errorf("source: empty endpoint")
 	}
-	tgtEp, err := endpoint.Parse(req.Target)
-	if err != nil {
-		return nil, fmt.Errorf("target: %w", err)
+	if tgtEp.Dataset == "" {
+		return nil, fmt.Errorf("target: empty endpoint")
 	}
 	if req.Depth < 0 {
 		return nil, fmt.Errorf("depth of '%d' invalid; must be positive", req.Depth)
 	}
 	cols := req.Cols
+	var err error
 	if len(cols) == 0 {
 		cols, err = report.ExpandProplist("")
 		if err != nil {
@@ -76,14 +77,14 @@ func Compare(ctx context.Context, exec zfs.Executor, req Request) (*Result, erro
 	props := resolveListProps(req, cols)
 
 	t0 := time.Now()
-	srcLines, err := exec.List(ctx, req.Source, srcEp.Dataset, props, req.Depth)
+	srcLines, err := exec.List(ctx, srcEp.String(), srcEp.Dataset, props, req.Depth)
 	if err != nil {
 		return nil, fmt.Errorf("list source: %w", err)
 	}
 	srcDur := time.Since(t0).Seconds()
 
 	t1 := time.Now()
-	tgtLines, err := exec.List(ctx, req.Target, tgtEp.Dataset, props, req.Depth)
+	tgtLines, err := exec.List(ctx, tgtEp.String(), tgtEp.Dataset, props, req.Depth)
 	if err != nil {
 		return nil, fmt.Errorf("list target: %w", err)
 	}

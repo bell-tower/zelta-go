@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
@@ -61,11 +62,16 @@ func runPruneGolden(t *testing.T, dir string) {
 	if terr != nil {
 		t.Fatal(terr)
 	}
+	srcEp := endpoint.MustParse(source)
+	var guardEp endpoint.Endpoint
+	if meta["guard-target"] != "" {
+		guardEp = endpoint.MustParse(meta["guard-target"])
+	}
 	res, runErr := Run(context.Background(), &zfs.Fake{Lists: map[string]string{
 		source:               string(src),
 		meta["guard-target"]: string(tgt),
 	}}, Request{
-		Source: source, GuardTarget: meta["guard-target"], PruneGuard: pruneGuard,
+		Source: srcEp, GuardTarget: guardEp, PruneGuard: pruneGuard,
 		PruneNum: pruneNum, PruneTime: pruneTime, PruneGrid: meta["prune-grid"],
 		NoRanges: meta["no-ranges"] == "true", Visual: meta["visual"] == "true", Now: now,
 	})

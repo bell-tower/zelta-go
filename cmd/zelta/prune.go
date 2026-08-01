@@ -41,9 +41,9 @@ func runPrune(args []string) int {
 	}
 
 	// Optional second operand is the guard/match endpoint (oracle CLI form).
-	guard := p.Env.Get("MATCH_ENDPOINT")
-	if len(p.Operands) == 2 && guard == "" {
-		guard = p.Operands[1]
+	guardStr := p.Env.Get("MATCH_ENDPOINT")
+	if len(p.Operands) == 2 && guardStr == "" {
+		guardStr = p.Operands[1]
 	}
 
 	pruneGuard, err := prune.ParsePruneGuard(p.Env.Get("PRUNE_GUARD"))
@@ -56,8 +56,18 @@ func runPrune(args []string) int {
 		fmt.Fprintf(os.Stderr, "zelta prune: %v\n", err)
 		return 1
 	}
+	src, err := parseEndpoint(p.Operands[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: source: %v\n", err)
+		return 1
+	}
+	guard, err := parseEndpoint(guardStr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: match-endpoint: %v\n", err)
+		return 1
+	}
 	res, err := prune.Run(context.Background(), newReal(), prune.Request{
-		Source:      p.Operands[0],
+		Source:      src,
 		GuardTarget: guard,
 		PruneGuard:  pruneGuard,
 		PruneNum:    pruneNum,

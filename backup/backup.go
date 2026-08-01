@@ -49,9 +49,11 @@ func (w *lineWriter) Write(p []byte) (int, error) {
 
 // Request is a backup run.
 type Request struct {
-	Source       string
-	Target       string
-	TargetOrigin string // already-backed-up origin endpoint for clone replication
+	Source endpoint.Endpoint
+	Target endpoint.Endpoint
+	// TargetOrigin is the already-backed-up origin endpoint for clone replication.
+	// Zero means unset. Build via endpoint.Parse or field assignment.
+	TargetOrigin endpoint.Endpoint
 	DryRun       bool
 	Intermediate bool // true → -I (default); false → -i
 	// SnapMode: zero or SnapIfNeeded (default), SnapAlways, SnapNever.
@@ -94,33 +96,35 @@ type Result struct {
 
 // Run matches source/target, plans snap+send/recv, dry-runs or executes.
 func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
-	srcEp, err := endpoint.Parse(req.Source)
-	if err != nil {
-		return nil, fmt.Errorf("source: %w", err)
+	srcEp := req.Source
+	tgtEp := req.Target
+	if srcEp.Dataset == "" {
+		return nil, fmt.Errorf("source: empty endpoint")
 	}
-	tgtEp, err := endpoint.Parse(req.Target)
-	if err != nil {
-		return nil, fmt.Errorf("target: %w", err)
+	if tgtEp.Dataset == "" {
+		return nil, fmt.Errorf("target: empty endpoint")
 	}
+	srcStr := srcEp.String()
+	tgtStr := tgtEp.String()
 
 	startTime := time.Now()
 	var execEndTime time.Time
 
 	// Written + type (parsable default cols would skip written via add_written).
 	props := append([]string(nil), match.BackupListProps...)
-	if strings.TrimSpace(req.TargetOrigin) != "" {
+	if !req.TargetOrigin.IsZero() {
 		props = append(props, "origin")
 	}
 	if req.SnapTime > 0 || req.SnapSize > 0 {
 		props = append(props, "snapshots_changed")
 	}
 	filteredIntermediate := req.Intermediate && (len(req.Include) > 0 || len(req.Exclude) > 0)
-	if filteredIntermediate && strings.TrimSpace(req.TargetOrigin) != "" {
+	if filteredIntermediate && !req.TargetOrigin.IsZero() {
 		return nil, fmt.Errorf("target origin cannot be combined with filtered intermediate sends")
 	}
 	mres, err := match.Compare(ctx, exec, match.Request{
-		Source:                  req.Source,
-		Target:                  req.Target,
+		Source:                  srcEp,
+		Target:                  tgtEp,
 		Depth:                   req.Depth,
 		Include:                 req.Include,
 		Exclude:                 req.Exclude,
@@ -133,14 +137,14 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		return nil, fmt.Errorf("match: %w", err)
 	}
 
-	if strings.Contains(req.Source, "\r") && srcEp.Dataset != "" {
-		mres.Warnings = append(mres.Warnings, "carriage return stripped: "+srcEp.String())
+	if strings.Contains(srcEp.Raw, "\r") && srcEp.Dataset != "" {
+		mres.Warnings = append(mres.Warnings, "carriage return stripped: "+srcStr)
 	}
-	if strings.Contains(req.Target, "\r") && tgtEp.Dataset != "" {
-		mres.Warnings = append(mres.Warnings, "carriage return stripped: "+tgtEp.String())
+	if strings.Contains(tgtEp.Raw, "\r") && tgtEp.Dataset != "" {
+		mres.Warnings = append(mres.Warnings, "carriage return stripped: "+tgtStr)
 	}
 	views := ViewsFromMatch(mres.Pairs)
-	if strings.TrimSpace(req.TargetOrigin) != "" {
+	if !req.TargetOrigin.IsZero() {
 		if err := configureTargetOrigin(ctx, exec, req.TargetOrigin, mres, views, props, req.Depth); err != nil {
 			return nil, err
 		}
@@ -150,7 +154,7 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 			continue
 		}
 		targetDataset := joinTgt(tgtEp.Dataset, views[i].DSSuffix)
-		if encryption, err := targetParentEncryption(ctx, exec, req.Target, targetDataset, props, req.Depth); err != nil {
+		if encryption, err := targetParentEncryption(ctx, exec, tgtStr, targetDataset, props, req.Depth); err != nil {
 			return nil, err
 		} else if encryption != "" {
 			views[i].TgtEncryption = encryption
@@ -176,7 +180,7 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		createParent = *req.CreateParent
 	}
 	// Oracle validate_target_parent_dataset: even dry-run may CREATE parent.
-	if err := ensureTargetParent(ctx, exec, req.Target, tgtEp.Dataset, len(mres.TgtRows) > 0, createParent); err != nil {
+	if err := ensureTargetParent(ctx, exec, tgtStr, tgtEp.Dataset, len(mres.TgtRows) > 0, createParent); err != nil {
 		return nil, err
 	}
 
@@ -223,7 +227,7 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 				}
 			}
 		} else {
-			if err := exec.Snapshot(ctx, req.Source, srcEp.Dataset+snapSavepoint, true); err != nil {
+			if err := exec.Snapshot(ctx, srcStr, srcEp.Dataset+snapSavepoint, true); err != nil {
 				return nil, fmt.Errorf("snapshot: %w", err)
 			}
 			if !filteredIntermediate {
@@ -236,7 +240,7 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 
 	direction := req.SyncDirection.pipeArg()
 	if flags.BookmarkMode == "1" {
-		plan.Bookmarks, err = buildBookmarkPlans(plan, req.Source, req.Target, flags.BookmarkPrefix, tgtEp.Host)
+		plan.Bookmarks, err = buildBookmarkPlans(plan, srcStr, tgtStr, flags.BookmarkPrefix, tgtEp.Host)
 		if err != nil {
 			return nil, err
 		}
@@ -256,7 +260,7 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	}
 
 	if req.DryRun {
-		out, err := FormatDryRunDirection(plan, req.Source, req.Target, direction)
+		out, err := FormatDryRunDirection(plan, srcStr, tgtStr, direction)
 		if err != nil {
 			return nil, err
 		}
@@ -354,13 +358,12 @@ func targetParentEncryption(ctx context.Context, exec zfs.Executor, target, data
 	return "", nil
 }
 
-func configureTargetOrigin(ctx context.Context, exec zfs.Executor, targetOrigin string, mres *match.Result, views []PairView, props []string, depth int) error {
-	originTarget, err := endpoint.Parse(targetOrigin)
-	if err != nil {
-		return fmt.Errorf("target origin: %w", err)
-	}
+func configureTargetOrigin(ctx context.Context, exec zfs.Executor, originTarget endpoint.Endpoint, mres *match.Result, views []PairView, props []string, depth int) error {
 	if originTarget.Snapshot != "" {
 		return fmt.Errorf("target origin must not include a snapshot")
+	}
+	if originTarget.Dataset == "" {
+		return fmt.Errorf("target origin: empty endpoint")
 	}
 	var sourceOrigin string
 	for _, pair := range mres.Pairs {
@@ -373,7 +376,8 @@ func configureTargetOrigin(ctx context.Context, exec zfs.Executor, targetOrigin 
 	if !ok {
 		return fmt.Errorf("target origin: source has no usable clone origin")
 	}
-	originLines, err := exec.List(ctx, targetOrigin, originTarget.Dataset, props, depth)
+	originStr := originTarget.String()
+	originLines, err := exec.List(ctx, originStr, originTarget.Dataset, props, depth)
 	if err != nil {
 		return fmt.Errorf("target origin list: %w", err)
 	}
@@ -499,7 +503,7 @@ func runStep(ctx context.Context, exec zfs.Executor, req Request, st *Step, dire
 	if len(st.Send) == 0 || len(st.Recv) == 0 {
 		return fmt.Errorf("backup: empty send/recv for %q", st.DSSuffix)
 	}
-	if err := exec.RunPipeDirection(ctx, req.Source, st.Send, req.Target, st.Recv, direction); err != nil {
+	if err := exec.RunPipeDirection(ctx, req.Source.String(), st.Send, req.Target.String(), st.Recv, direction); err != nil {
 		return fmt.Errorf("sync %s: %w", st.DSSuffix, err)
 	}
 	return nil

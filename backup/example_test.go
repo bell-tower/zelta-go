@@ -3,6 +3,7 @@ package backup_test
 import (
 	"context"
 	"fmt"
+	"git.belltower.it/djbell/zelta-go/endpoint"
 
 	"git.belltower.it/djbell/zelta-go/backup"
 	"git.belltower.it/djbell/zelta-go/zfs"
@@ -17,8 +18,8 @@ func ExampleRun_dryRun() {
 		},
 	}
 	res, err := backup.Run(ctx, f, backup.Request{
-		Source: "pool/src",
-		Target: "pool/tgt",
+		Source: endpoint.MustParse("pool/src"),
+		Target: endpoint.MustParse("pool/tgt"),
 		DryRun: true,
 		JSON:   true,
 	})
@@ -35,8 +36,8 @@ func ExampleRun_dryRun() {
 func ExampleRun_withSSH() {
 	// Production-shaped call (does not run here — needs real endpoints).
 	_ = backup.Request{
-		Source: "tank/data",
-		Target: "backup/data",
+		Source: endpoint.MustParse("tank/data"),
+		Target: endpoint.MustParse("backup/data"),
 		OnLine: func(line string) { /* progress */ },
 	}
 	_ = &zfs.Real{

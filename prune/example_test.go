@@ -3,6 +3,7 @@ package prune_test
 import (
 	"context"
 	"fmt"
+	"git.belltower.it/djbell/zelta-go/endpoint"
 
 	"git.belltower.it/djbell/zelta-go/prune"
 	"git.belltower.it/djbell/zelta-go/zfs"
@@ -16,7 +17,7 @@ func ExampleRun() {
 		},
 	}
 	res, err := prune.Run(ctx, f, prune.Request{
-		Source:     "pool/src",
+		Source:     endpoint.MustParse("pool/src"),
 		PruneGuard: prune.GuardLatest,
 	})
 	if err != nil {

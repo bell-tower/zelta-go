@@ -2,6 +2,7 @@ package prune
 
 import (
 	"context"
+	"git.belltower.it/djbell/zelta-go/endpoint"
 	"strings"
 	"testing"
 	"time"
@@ -32,7 +33,7 @@ func fakeExec(t *testing.T, tgt string) *zfs.Fake {
 func TestPruneNoGuard(t *testing.T) {
 	now := int64(1000000 + 100) // after newest snap
 	res, err := Run(context.Background(), fakeExec(t, ""), Request{
-		Source:    "apool/treetop",
+		Source:    endpoint.MustParse("apool/treetop"),
 		PruneNum:  1,
 		PruneTime: pt(0),
 		Now:       now,
@@ -57,7 +58,7 @@ func TestPruneNoGuard(t *testing.T) {
 func TestPruneTime(t *testing.T) {
 	now := int64(950000)
 	res, err := Run(context.Background(), fakeExec(t, ""), Request{
-		Source:    "apool/treetop",
+		Source:    endpoint.MustParse("apool/treetop"),
 		PruneNum:  0,
 		PruneTime: pt(100000 * time.Second), // keep creation >= 850000 → @new (1e6) @mid (9e5); @old (8e5) pruned
 		Now:       now,
@@ -81,11 +82,11 @@ func TestPruneGuardUnsynced(t *testing.T) {
 		"bpool/tgt@old\t70\t1000\t800000\t0\t2000\n" +
 		"bpool/tgt\t1\t0\t1000000\t1M\t1000\n"
 	res, err := Run(context.Background(), fakeExec(t, tgt), Request{
-		Source:      "apool/treetop",
-		GuardTarget: "bpool/tgt",
+		Source:      endpoint.MustParse("apool/treetop"),
+		GuardTarget: endpoint.MustParse("bpool/tgt"),
 		PruneGuard:  GuardUnsynced,
 		PruneNum:    0,
-		PruneTime: pt(0),
+		PruneTime:   pt(0),
 		Now:         1000100,
 	})
 	if err != nil {
@@ -101,11 +102,11 @@ func TestPruneGuardLatest(t *testing.T) {
 	// num=1 keeps first snap after match going older (@old) → nothing pruned.
 	tgt := "bpool/tgt@mid\t80\t0\t900000\t0\t1000\nbpool/tgt\t1\t0\t900000\t1M\t1000\n"
 	res, err := Run(context.Background(), fakeExec(t, tgt), Request{
-		Source:      "apool/treetop",
-		GuardTarget: "bpool/tgt",
+		Source:      endpoint.MustParse("apool/treetop"),
+		GuardTarget: endpoint.MustParse("bpool/tgt"),
 		PruneGuard:  GuardLatest,
 		PruneNum:    1,
-		PruneTime: pt(0),
+		PruneTime:   pt(0),
 		Now:         1000100,
 	})
 	if err != nil {
@@ -117,11 +118,11 @@ func TestPruneGuardLatest(t *testing.T) {
 	}
 	// num=0 → @old prunes
 	res, err = Run(context.Background(), fakeExec(t, tgt), Request{
-		Source:      "apool/treetop",
-		GuardTarget: "bpool/tgt",
+		Source:      endpoint.MustParse("apool/treetop"),
+		GuardTarget: endpoint.MustParse("bpool/tgt"),
 		PruneGuard:  GuardLatest,
 		PruneNum:    0,
-		PruneTime: pt(0),
+		PruneTime:   pt(0),
 		Now:         1000100,
 	})
 	if err != nil {
@@ -137,7 +138,7 @@ func TestPruneGuardLatest(t *testing.T) {
 
 func TestPruneNoRangesVisual(t *testing.T) {
 	res, err := Run(context.Background(), fakeExec(t, ""), Request{
-		Source:   "apool/treetop",
+		Source:   endpoint.MustParse("apool/treetop"),
 		PruneNum: 1, PruneTime: pt(0),
 		Now:      1000100,
 		NoRanges: true,
@@ -156,7 +157,7 @@ func TestPruneNoRangesVisual(t *testing.T) {
 	}
 
 	res2, err := Run(context.Background(), fakeExec(t, ""), Request{
-		Source: "apool/treetop", PruneNum: 1, PruneTime: pt(0),
+		Source: endpoint.MustParse("apool/treetop"), PruneNum: 1, PruneTime: pt(0),
 		Now: 1000100, Visual: true,
 	})
 	if err != nil {
@@ -170,7 +171,7 @@ func TestPruneNoRangesVisual(t *testing.T) {
 func TestPruneDefaults(t *testing.T) {
 	// all unset → num=30 time=30days: nothing pruned here (3 snaps < 30)
 	res, err := Run(context.Background(), fakeExec(t, ""), Request{
-		Source:   "apool/treetop",
+		Source:   endpoint.MustParse("apool/treetop"),
 		PruneNum: -1,
 		Now:      1000100,
 	})
@@ -184,7 +185,7 @@ func TestPruneDefaults(t *testing.T) {
 
 func TestPruneFilteredSnapsKept(t *testing.T) {
 	res, err := Run(context.Background(), fakeExec(t, ""), Request{
-		Source: "apool/treetop", PruneNum: 0, PruneTime: pt(0),
+		Source: endpoint.MustParse("apool/treetop"), PruneNum: 0, PruneTime: pt(0),
 		Now:     1000100,
 		Exclude: []string{"@old"},
 	})

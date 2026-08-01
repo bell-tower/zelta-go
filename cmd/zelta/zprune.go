@@ -58,9 +58,19 @@ func runZprune(args []string) int {
 		fmt.Fprintf(os.Stderr, "zprune: %v\n", err)
 		return 1
 	}
+	src, err := parseEndpoint(p.Operands[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: source: %v\n", err)
+		return 1
+	}
+	guard, err := parseEndpoint(p.Env.Get("MATCH_ENDPOINT"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: match-endpoint: %v\n", err)
+		return 1
+	}
 	res, err := prune.Run(context.Background(), newReal(), prune.Request{
-		Source:      p.Operands[0],
-		GuardTarget: p.Env.Get("MATCH_ENDPOINT"),
+		Source:      src,
+		GuardTarget: guard,
 		PruneGuard:  pruneGuard,
 		PruneNum:    pruneNum,
 		PruneTime:   pruneTime,

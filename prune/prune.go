@@ -14,8 +14,9 @@ import (
 
 // Request is a read-only prune analysis.
 type Request struct {
-	Source      string
-	GuardTarget string // --match-endpoint; empty → no guard
+	Source endpoint.Endpoint
+	// GuardTarget is the match-endpoint; zero → no guard.
+	GuardTarget endpoint.Endpoint
 	// PruneGuard: zero/GuardLatest (default when target), GuardUnsynced, GuardNone.
 	// Use ParsePruneGuard for CLI/env/JSON strings.
 	PruneGuard PruneGuard
@@ -64,9 +65,9 @@ func (r *Result) Candidates() []string {
 
 // Run lists source (+ guard target), selects prune candidates, renders output.
 func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
-	srcEp, err := endpoint.Parse(req.Source)
-	if err != nil {
-		return nil, fmt.Errorf("source: %w", err)
+	srcEp := req.Source
+	if srcEp.Dataset == "" {
+		return nil, fmt.Errorf("source: empty endpoint")
 	}
 	if req.Depth < 0 {
 		return nil, fmt.Errorf("depth of '%d' invalid; must be positive", req.Depth)
@@ -81,14 +82,11 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		return nil, fmt.Errorf("invalid prune-guard mode: %s", req.PruneGuard)
 	}
 
-	var tgtEp endpoint.Endpoint
-	if req.GuardTarget != "" {
-		tgtEp, err = endpoint.Parse(req.GuardTarget)
-		if err != nil {
-			return nil, fmt.Errorf("match-endpoint: %w", err)
-		}
-	} else {
+	tgtEp := req.GuardTarget
+	if tgtEp.IsZero() {
 		guard = GuardNone // oracle: no second operand → GUARD_NONE
+	} else if tgtEp.Dataset == "" {
+		return nil, fmt.Errorf("match-endpoint: empty endpoint")
 	}
 
 	sel, err := selectorFromRequest(req)
@@ -96,7 +94,7 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		return nil, err
 	}
 
-	srcLines, err := exec.List(ctx, req.Source, srcEp.Dataset, SourceListProps, req.Depth)
+	srcLines, err := exec.List(ctx, srcEp.String(), srcEp.Dataset, SourceListProps, req.Depth)
 	if err != nil {
 		return nil, fmt.Errorf("list source: %w", err)
 	}
@@ -106,8 +104,8 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	}
 
 	var tgtRows []zfs.ListRow
-	if req.GuardTarget != "" {
-		tgtLines, err := exec.List(ctx, req.GuardTarget, tgtEp.Dataset, TargetListProps, req.Depth)
+	if !tgtEp.IsZero() {
+		tgtLines, err := exec.List(ctx, tgtEp.String(), tgtEp.Dataset, TargetListProps, req.Depth)
 		if err != nil {
 			return nil, fmt.Errorf("list match-endpoint: %w", err)
 		}

@@ -2,6 +2,7 @@ package match
 
 import (
 	"context"
+	"git.belltower.it/djbell/zelta-go/endpoint"
 	"strings"
 	"testing"
 
@@ -68,8 +69,8 @@ func TestCompareFake(t *testing.T) {
 		"tank/tgt": "tank/tgt\tg1\t0\t1\t1M\ntank/tgt@a\tg2\t0\t2\t1K\n",
 	}}
 	res, err := Compare(context.Background(), fake, Request{
-		Source:    "tank/src",
-		Target:    "tank/tgt",
+		Source:    endpoint.MustParse("tank/src"),
+		Target:    endpoint.MustParse("tank/tgt"),
 		Scripting: true,
 	})
 	if err != nil {
@@ -96,7 +97,7 @@ func TestCompareCapturesEncryptionAndIVSet(t *testing.T) {
 		"tank/tgt": "tank/tgt\tg1\taes-256-gcm\t-\ntank/tgt@base\tg2\taes-256-gcm\tiv-1\n",
 	}}
 	res, err := Compare(context.Background(), fake, Request{
-		Source: "tank/src", Target: "tank/tgt",
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/tgt"),
 		Props: []string{"name", "guid", "encryption", "ivsetguid"},
 	})
 	if err != nil {
@@ -132,8 +133,8 @@ func TestCompareBasicOracle(t *testing.T) {
 	}}
 
 	res, err := Compare(context.Background(), fake, Request{
-		Source:    "tank/src",
-		Target:    "tank/tgt",
+		Source:    endpoint.MustParse("tank/src"),
+		Target:    endpoint.MustParse("tank/tgt"),
 		Scripting: true,
 	})
 	if err != nil {
@@ -145,8 +146,8 @@ func TestCompareBasicOracle(t *testing.T) {
 	}
 
 	hum, err := Compare(context.Background(), fake, Request{
-		Source: "tank/src",
-		Target: "tank/tgt",
+		Source: endpoint.MustParse("tank/src"),
+		Target: endpoint.MustParse("tank/tgt"),
 	})
 	if err != nil {
 		t.Fatal(err)

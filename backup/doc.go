@@ -3,7 +3,8 @@
 // Typical use:
 //
 //	res, err := backup.Run(ctx, &zfs.Real{SSH: zfs.SSHConfig{…}}, backup.Request{
-//	    Source: "tank/src", Target: "backup/tgt",
+//	    Source: endpoint.MustParse("tank/src"),
+//	    Target: endpoint.MustParse("backup/tgt"),
 //	})
 //
 // Dry-run (-n) prints snap + send|recv; execute runs Snapshot + RunPipe.

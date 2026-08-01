@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"git.belltower.it/djbell/zelta-go/internal/cmdbuild"
-	"git.belltower.it/djbell/zelta-go/match"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
+	"git.belltower.it/djbell/zelta-go/match"
 )
 
 // Kind is the planned action for one dataset pair.

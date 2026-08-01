@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/report"
 	"git.belltower.it/djbell/zelta-go/zfs"
 )
@@ -78,8 +79,8 @@ func runGoldenCase(t *testing.T, dir string) {
 		tgt: string(tgtList),
 	}}
 	res, err := Compare(context.Background(), fake, Request{
-		Source:    src,
-		Target:    tgt,
+		Source:    endpoint.MustParse(src),
+		Target:    endpoint.MustParse(tgt),
 		Cols:      cols,
 		Depth:     depth,
 		Include:   include,

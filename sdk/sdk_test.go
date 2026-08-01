@@ -2,6 +2,7 @@ package sdk_test
 
 import (
 	"context"
+	"git.belltower.it/djbell/zelta-go/endpoint"
 	"strings"
 	"testing"
 
@@ -21,8 +22,8 @@ func TestBackupDryRun(t *testing.T) {
 	}
 	req := backup.Request{
 		DryRun: true,
-		Source: "pool/src",
-		Target: "pool/tgt",
+		Source: endpoint.MustParse("pool/src"),
+		Target: endpoint.MustParse("pool/tgt"),
 		JSON:   true,
 	}
 	res, err := backup.Run(ctx, f, req)
@@ -46,8 +47,8 @@ func TestMatchCompare(t *testing.T) {
 		},
 	}
 	req := match.Request{
-		Source: "pool/src",
-		Target: "pool/tgt",
+		Source: endpoint.MustParse("pool/src"),
+		Target: endpoint.MustParse("pool/tgt"),
 	}
 	res, err := match.Compare(ctx, f, req)
 	if err != nil {
@@ -66,7 +67,7 @@ func TestPruneRun(t *testing.T) {
 		},
 	}
 	req := prune.Request{
-		Source:     "pool/src",
+		Source:     endpoint.MustParse("pool/src"),
 		PruneGuard: prune.GuardLatest,
 	}
 	res, err := prune.Run(ctx, f, req)

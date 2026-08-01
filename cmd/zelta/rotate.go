@@ -31,8 +31,18 @@ func runRotate(args []string) int {
 		return 2
 	}
 	exec := newReal()
+	src, err := parseEndpoint(p.Operands[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: source: %v\n", err)
+		return 1
+	}
+	tgt, err := parseEndpoint(p.Operands[1])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: target: %v\n", err)
+		return 1
+	}
 	m, err := match.Compare(context.Background(), exec, match.Request{
-		Source: p.Operands[0], Target: p.Operands[1], Props: match.RotateListProps,
+		Source: src, Target: tgt, Props: match.RotateListProps,
 		Scripting: true, Parsable: true,
 	})
 	if err != nil {
@@ -147,7 +157,7 @@ func runRotate(args []string) int {
 		fmt.Fprintf(os.Stdout, "renaming '%s' to '%s'\n", p.Operands[1], preserved)
 	}
 	_, err = match.Compare(context.Background(), exec, match.Request{
-		Source: p.Operands[0], Target: p.Operands[1], Props: match.RotateListProps,
+		Source: src, Target: tgt, Props: match.RotateListProps,
 		Scripting: true, Parsable: true,
 	})
 	if err != nil {

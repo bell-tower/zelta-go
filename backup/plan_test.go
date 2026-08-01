@@ -3,13 +3,14 @@ package backup
 import (
 	"context"
 	"fmt"
+	"git.belltower.it/djbell/zelta-go/endpoint"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
-	"git.belltower.it/djbell/zelta-go/match"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
+	"git.belltower.it/djbell/zelta-go/match"
 	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
@@ -142,7 +143,7 @@ func TestRunEncryptionFallbackDropsEmbeddedDataFlag(t *testing.T) {
 			"tank/tgt@base\tg2\t0\t2\t1K\tsnapshot\taes-256-gcm\tiv-target\t-\n",
 	}}
 	res, err := Run(context.Background(), fake, Request{
-		Source: "tank/src", Target: "tank/tgt", SnapMode: SnapNever,
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/tgt"), SnapMode: SnapNever,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -186,7 +187,7 @@ func TestRunResumesTargetToken(t *testing.T) {
 		"tank/src": "tank/src\tg1\t0\t1\t1M\tfilesystem\t-\ntank/src@a\tg2\t0\t2\t1K\tsnapshot\t-\n",
 		"tank/tgt": "tank/tgt\tg1\t0\t1\t1M\tfilesystem\ttoken-123\n",
 	}}
-	_, err := Run(context.Background(), fake, Request{Source: "tank/src", Target: "tank/tgt", SnapMode: SnapNever})
+	_, err := Run(context.Background(), fake, Request{Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/tgt"), SnapMode: SnapNever})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +204,7 @@ func TestRunResumeFailureDoesNotRetryNormalSend(t *testing.T) {
 		},
 		PipeErrors: map[string]error{"token-123": fmt.Errorf("interrupted receive")},
 	}
-	_, err := Run(context.Background(), fake, Request{Source: "tank/src", Target: "tank/tgt", SnapMode: SnapNever})
+	_, err := Run(context.Background(), fake, Request{Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/tgt"), SnapMode: SnapNever})
 	if err == nil {
 		t.Fatal("expected resume failure")
 	}
@@ -270,8 +271,8 @@ func TestIntermediateFullExecuteTwoPass(t *testing.T) {
 		"tank/src@snap1\t101\t0\t2\t1K\tsnapshot\n"
 	fake := &zfs.Fake{Lists: map[string]string{"tank/src": src, "tank/tgt": ""}}
 	res, err := Run(context.Background(), fake, Request{
-		Source:       "tank/src",
-		Target:       "tank/tgt",
+		Source:       endpoint.MustParse("tank/src"),
+		Target:       endpoint.MustParse("tank/tgt"),
 		DryRun:       false,
 		Intermediate: true,
 		SnapMode:     SnapNever,
@@ -344,7 +345,7 @@ func TestRunTargetOriginRequiresBackedUpOrigin(t *testing.T) {
 		"backup/original": "backup/original\t1\t0\t100\t1K\tfilesystem\t-\nbackup/original@base\t2\t0\t200\t1K\tsnapshot\t-",
 	}}
 	res, err := Run(context.Background(), fake, Request{
-		Source: "tank/clone", Target: "backup/clone", TargetOrigin: "backup/original",
+		Source: endpoint.MustParse("tank/clone"), Target: endpoint.MustParse("backup/clone"), TargetOrigin: endpoint.MustParse("backup/original"),
 		SnapMode: SnapNever, DryRun: true,
 	})
 	if err != nil {
@@ -427,8 +428,8 @@ func TestRunDryExecute(t *testing.T) {
 
 	// up-to-date, no written → no snap, nothing to send
 	res, err := Run(context.Background(), fake, Request{
-		Source:       "tank/src",
-		Target:       "tank/tgt",
+		Source:       endpoint.MustParse("tank/src"),
+		Target:       endpoint.MustParse("tank/tgt"),
 		DryRun:       true,
 		Intermediate: true,
 	})
@@ -443,8 +444,8 @@ func TestRunDryExecute(t *testing.T) {
 	srcW := "tank/src\t100\t4096\t1\t1M\tfilesystem\ntank/src@a\t101\t0\t2\t1K\tsnapshot\n"
 	fake2 := &zfs.Fake{Lists: map[string]string{"tank/src": srcW, "tank/tgt": tgt}}
 	res, err = Run(context.Background(), fake2, Request{
-		Source:       "tank/src",
-		Target:       "tank/tgt",
+		Source:       endpoint.MustParse("tank/src"),
+		Target:       endpoint.MustParse("tank/tgt"),
 		DryRun:       true,
 		Intermediate: true,
 		SnapName:     "testsnap",
@@ -465,8 +466,8 @@ func TestRunDryExecute(t *testing.T) {
 	// execute path records snapshot + pipe
 	fake3 := &zfs.Fake{Lists: map[string]string{"tank/src": srcW, "tank/tgt": tgt}}
 	res, err = Run(context.Background(), fake3, Request{
-		Source:       "tank/src",
-		Target:       "tank/tgt",
+		Source:       endpoint.MustParse("tank/src"),
+		Target:       endpoint.MustParse("tank/tgt"),
 		DryRun:       false,
 		Intermediate: true,
 		SnapName:     "execsnap",
@@ -535,7 +536,7 @@ func TestCreateParentReadonlyRetry(t *testing.T) {
 		failLeft: 1,
 	}
 	_, err := Run(context.Background(), fake, Request{
-		Source: "tank/src", Target: "tank/a/b/leaf",
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/a/b/leaf"),
 		DryRun: true, Intermediate: true, SnapMode: SnapNever,
 	})
 	if err != nil {
@@ -554,7 +555,7 @@ func TestCreateParentReadonlyRetry(t *testing.T) {
 		failLeft: 99,
 	}
 	_, err = Run(context.Background(), fake2, Request{
-		Source: "tank/src", Target: "tank/a/b/leaf",
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/a/b/leaf"),
 		DryRun: true, Intermediate: true, SnapMode: SnapNever,
 	})
 	if err == nil || !strings.Contains(err.Error(), "incomplete zfs create") {
@@ -567,8 +568,8 @@ func TestRunCreateParent(t *testing.T) {
 	// missing target → empty list
 	fake := &zfs.Fake{Lists: map[string]string{"tank/src": src, "tank/new/leaf": ""}}
 	res, err := Run(context.Background(), fake, Request{
-		Source:       "tank/src",
-		Target:       "tank/new/leaf",
+		Source:       endpoint.MustParse("tank/src"),
+		Target:       endpoint.MustParse("tank/new/leaf"),
 		DryRun:       true,
 		Intermediate: true,
 		SnapMode:     SnapNever,
@@ -587,8 +588,8 @@ func TestRunCreateParent(t *testing.T) {
 	off := false
 	fake2 := &zfs.Fake{Lists: map[string]string{"tank/src": src, "tank/missing/x": ""}}
 	_, err = Run(context.Background(), fake2, Request{
-		Source:       "tank/src",
-		Target:       "tank/missing/x",
+		Source:       endpoint.MustParse("tank/src"),
+		Target:       endpoint.MustParse("tank/missing/x"),
 		DryRun:       true,
 		Intermediate: true,
 		SnapMode:     SnapNever,
@@ -605,8 +606,8 @@ func TestRunCreateParent(t *testing.T) {
 	tgt := "tank/tgt\t100\t0\t1\t1M\tfilesystem\ntank/tgt@a\t101\t0\t2\t1K\tsnapshot\n"
 	fake3 := &zfs.Fake{Lists: map[string]string{"tank/src": src, "tank/tgt": tgt}}
 	_, err = Run(context.Background(), fake3, Request{
-		Source:       "tank/src",
-		Target:       "tank/tgt",
+		Source:       endpoint.MustParse("tank/src"),
+		Target:       endpoint.MustParse("tank/tgt"),
 		DryRun:       true,
 		Intermediate: true,
 		SnapMode:     SnapNever,
@@ -628,8 +629,8 @@ func TestRunInheritsTargetParentEncryption(t *testing.T) {
 		"tank/new": parent,
 	}}
 	res, err := Run(context.Background(), fake, Request{
-		Source:       "tank/src",
-		Target:       "root@debian:tank/new/leaf/child",
+		Source:       endpoint.MustParse("tank/src"),
+		Target:       endpoint.MustParse("root@debian:tank/new/leaf/child"),
 		DryRun:       true,
 		Intermediate: true,
 		SnapMode:     SnapNever,
@@ -672,7 +673,7 @@ func TestFilterWarnings(t *testing.T) {
 	tgt := "tank/tgt\t100\t0\t1\t1M\tfilesystem\ntank/tgt@a\t101\t0\t2\t1K\tsnapshot\n"
 	fake := &zfs.Fake{Lists: map[string]string{"tank/src": src, "tank/tgt": tgt}}
 	res, err := Run(context.Background(), fake, Request{
-		Source: "tank/src", Target: "tank/tgt",
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/tgt"),
 		DryRun: true, Intermediate: true, SnapMode: SnapNever,
 		Exclude: []string{"foo*bar"},
 	})
@@ -694,7 +695,7 @@ func TestVolumeTypeFromList(t *testing.T) {
 		"tank/src/vol1@a\t201\t0\t2\t1K\tsnapshot\n"
 	fake := &zfs.Fake{Lists: map[string]string{"tank/src": src, "tank/tgt": ""}}
 	res, err := Run(context.Background(), fake, Request{
-		Source: "tank/src", Target: "tank/tgt",
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/tgt"),
 		DryRun: true, Intermediate: true, SnapMode: SnapNever,
 	})
 	if err != nil {
@@ -728,7 +729,7 @@ func TestSyncDirectionWarningAndPipes(t *testing.T) {
 	}
 	// both endpoints remote, no direction → proxy warning + direction "" to pipe
 	res, err := Run(context.Background(), mk(), Request{
-		Source: "root@debian:tank/src", Target: "root@vault:tank/tgt",
+		Source: endpoint.MustParse("root@debian:tank/src"), Target: endpoint.MustParse("root@vault:tank/tgt"),
 		DryRun: false, Intermediate: true, SnapMode: SnapNever,
 		SyncDirection: DirectionProxy,
 	})
@@ -746,7 +747,7 @@ func TestSyncDirectionWarningAndPipes(t *testing.T) {
 	}
 	// Same remote both ends (hairpin) → NO proxy warning (oracle).
 	res, err = Run(context.Background(), mk(), Request{
-		Source: "root@debian:tank/src", Target: "root@debian:tank/tgt",
+		Source: endpoint.MustParse("root@debian:tank/src"), Target: endpoint.MustParse("root@debian:tank/tgt"),
 		DryRun: false, Intermediate: true, SnapMode: SnapNever,
 		SyncDirection: DirectionProxy,
 	})
@@ -760,7 +761,7 @@ func TestSyncDirectionWarningAndPipes(t *testing.T) {
 	}
 	fake := mk() // re-run execute to capture pipe direction
 	_, err = Run(context.Background(), fake, Request{
-		Source: "root@debian:tank/src", Target: "root@vault:tank/tgt",
+		Source: endpoint.MustParse("root@debian:tank/src"), Target: endpoint.MustParse("root@vault:tank/tgt"),
 		DryRun: false, Intermediate: true, SnapMode: SnapNever,
 		SyncDirection: DirectionPush,
 	})
@@ -773,7 +774,7 @@ func TestSyncDirectionWarningAndPipes(t *testing.T) {
 
 	// dry-run PULL shape
 	res, err = Run(context.Background(), mk(), Request{
-		Source: "root@debian:tank/src", Target: "root@vault:tank/tgt",
+		Source: endpoint.MustParse("root@debian:tank/src"), Target: endpoint.MustParse("root@vault:tank/tgt"),
 		DryRun: true, Intermediate: true, SnapMode: SnapNever,
 	})
 	if err != nil {
@@ -828,7 +829,7 @@ func TestOptSendRecvFlags(t *testing.T) {
 	src := "tank/src\t100\t0\t1\t1M\tfilesystem\ntank/src@a\t101\t0\t2\t1K\tsnapshot\n"
 	fake := &zfs.Fake{Lists: map[string]string{"tank/src": src, "tank/tgt": ""}}
 	res, err := Run(context.Background(), fake, Request{
-		Source: "tank/src", Target: "tank/tgt",
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/tgt"),
 		DryRun: true, Intermediate: true, SnapMode: SnapNever,
 	})
 	if err != nil {
@@ -844,7 +845,7 @@ func TestOptSendRecvFlags(t *testing.T) {
 	flags := opt.Default()
 	flags.SendDefault = "-p"
 	res, err = Run(context.Background(), fake, Request{
-		Source: "tank/src", Target: "tank/tgt",
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/tgt"),
 		DryRun: true, Intermediate: true, SnapMode: SnapNever,
 		Flags: &flags,
 	})
@@ -992,7 +993,7 @@ func TestRunFilteredIntermediateKeepsExcludedHistoryOutOfStream(t *testing.T) {
 		"tank/tgt@m\t2\t0\t2\t1K\tsnapshot\n"
 	fake := &zfs.Fake{Lists: map[string]string{"tank/src": src, "tank/tgt": tgt}}
 	res, err := Run(context.Background(), fake, Request{
-		Source: "tank/src", Target: "tank/tgt", Intermediate: true,
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/tgt"), Intermediate: true,
 		SnapMode: SnapNever, Exclude: []string{"@skip"},
 	})
 	if err != nil {
@@ -1014,7 +1015,7 @@ func TestFilteredIntermediateIncludesCreatedSnapshot(t *testing.T) {
 		"tank/tgt@m\t2\t0\t2\t1K\tsnapshot\n"
 	fake := &zfs.Fake{Lists: map[string]string{"tank/src": src, "tank/tgt": tgt}}
 	res, err := Run(context.Background(), fake, Request{
-		Source: "tank/src", Target: "tank/tgt", Intermediate: true,
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/tgt"), Intermediate: true,
 		SnapMode: SnapAlways, SnapName: "created", Exclude: []string{"@skip"},
 	})
 	if err != nil {
@@ -1040,7 +1041,7 @@ func TestRunFilteredDatasetExclusionWinsOverParentInclude(t *testing.T) {
 		"tank/tgt/child@old\t2\t0\t1\t1K\tsnapshot\n"
 	fake := &zfs.Fake{Lists: map[string]string{"tank/src": src, "tank/tgt": tgt}}
 	res, err := Run(context.Background(), fake, Request{
-		Source: "tank/src", Target: "tank/tgt", Intermediate: true, SnapMode: SnapNever,
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/tgt"), Intermediate: true, SnapMode: SnapNever,
 		Include: []string{"tank/src"}, Exclude: []string{"tank/src/child"},
 	})
 	if err != nil {
@@ -1061,7 +1062,7 @@ func TestRunFilteredWithNoEligibleSnapshotsIsNoOp(t *testing.T) {
 		"tank/tgt@new\t4\t0\t4\t1K\tsnapshot\n"
 	fake := &zfs.Fake{Lists: map[string]string{"tank/src": src, "tank/tgt": tgt}}
 	res, err := Run(context.Background(), fake, Request{
-		Source: "tank/src", Target: "tank/tgt", Intermediate: true, SnapMode: SnapNever,
+		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/tgt"), Intermediate: true, SnapMode: SnapNever,
 		Exclude: []string{"@new"},
 	})
 	if err != nil {
