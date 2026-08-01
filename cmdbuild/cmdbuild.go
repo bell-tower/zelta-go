@@ -156,6 +156,30 @@ func ListArgv(props []string, depth int, dataset string) ([]string, error) {
 	})
 }
 
+// PropsArgv builds PROPS from cmds.tsv (zfs get filesystem/volume properties).
+// depth 0 = unlimited; depth > 0 maps to zfs get -d (depth-1) like Awk load_properties.
+func PropsArgv(props string, depth int, dataset string) ([]string, error) {
+	if dataset == "" {
+		return nil, fmt.Errorf("cmdbuild: PROPS empty dataset")
+	}
+	if props == "" {
+		props = "all"
+	}
+	flags := ""
+	if depth > 0 {
+		d := depth - 1
+		if d < 0 {
+			d = 0
+		}
+		flags = "-d" + strconv.Itoa(d)
+	}
+	return Build("PROPS", map[string]string{
+		"props": props,
+		"flags": flags,
+		"ds":    dataset,
+	})
+}
+
 // SnapArgv builds SNAP (always -r per cmds.tsv) for dataset@snap.
 func SnapArgv(datasetSnap string) ([]string, error) {
 	if datasetSnap == "" {

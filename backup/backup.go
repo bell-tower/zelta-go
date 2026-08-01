@@ -109,14 +109,43 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	startTime := time.Now()
 	var execEndTime time.Time
 
-	// Written + type (parsable default cols would skip written via add_written).
-	props := append([]string(nil), match.BackupListProps...)
-	if !req.TargetOrigin.IsZero() {
-		props = append(props, "origin")
+	// Phase 1: cheap dataset context (zfs get filesystem/volume) — features + flags.
+	srcCtx, err := zfs.LoadDatasetContext(ctx, exec, srcStr, srcEp.Dataset, req.Depth)
+	if err != nil {
+		return nil, fmt.Errorf("source properties: %w", err)
 	}
-	if req.SnapTime > 0 || req.SnapSize > 0 {
-		props = append(props, "snapshots_changed")
+	if !srcCtx.Exists {
+		return nil, fmt.Errorf("source dataset '%s' does not exist", srcStr)
 	}
+	tgtCtx, err := zfs.LoadDatasetContext(ctx, exec, tgtStr, tgtEp.Dataset, req.Depth)
+	if err != nil {
+		return nil, fmt.Errorf("target properties: %w", err)
+	}
+	if !tgtCtx.Exists {
+		// Missing target: inherit encryption/features from nearest existing ancestor.
+		if err := fillMissingTargetParentContext(ctx, exec, tgtStr, tgtEp.Dataset, tgtCtx); err != nil {
+			return nil, err
+		}
+	}
+
+	// Phase 2: expensive snap list — only columns features allow.
+	// Awk: MATCH_IVSET only when target exists and source is encrypted.
+	wantIVSet := tgtCtx.Exists && srcCtx.SourceEncrypted()
+	snapOpts := match.SnapListOpts{
+		Written:          true,
+		IVSet:            wantIVSet,
+		Origin:           !req.TargetOrigin.IsZero(),
+		SnapshotsChanged: req.SnapTime > 0 || req.SnapSize > 0,
+	}
+	// Prefer source feature flags; union target when present for resume tokens etc.
+	feat := srcCtx.Features
+	if tgtCtx.Exists {
+		feat.ReceiveResumeToken = feat.ReceiveResumeToken || tgtCtx.Features.ReceiveResumeToken
+		feat.Origin = feat.Origin || tgtCtx.Features.Origin
+		feat.SnapshotsChanged = feat.SnapshotsChanged || tgtCtx.Features.SnapshotsChanged
+	}
+	props := match.SnapListProps(feat, snapOpts)
+
 	filteredIntermediate := req.Intermediate && (len(req.Include) > 0 || len(req.Exclude) > 0)
 	if filteredIntermediate && !req.TargetOrigin.IsZero() {
 		return nil, fmt.Errorf("target origin cannot be combined with filtered intermediate sends")
@@ -131,6 +160,8 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		Scripting:               true,
 		Parsable:                true,
 		PreserveSourceSnapshots: filteredIntermediate,
+		SrcContext:              srcCtx,
+		TgtContext:              tgtCtx,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("match: %w", err)
@@ -146,17 +177,6 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	if !req.TargetOrigin.IsZero() {
 		if err := configureTargetOrigin(ctx, exec, req.TargetOrigin, mres, views, props, req.Depth); err != nil {
 			return nil, err
-		}
-	}
-	for i := range views {
-		if views[i].TgtName != "" {
-			continue
-		}
-		targetDataset := joinTgt(tgtEp.Dataset, views[i].DSSuffix)
-		if encryption, err := targetParentEncryption(ctx, exec, tgtStr, targetDataset, props, req.Depth); err != nil {
-			return nil, err
-		} else if encryption != "" {
-			views[i].TgtEncryption = encryption
 		}
 	}
 	var filteredFilter *match.Filter
@@ -327,31 +347,33 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	return res, nil
 }
 
-func targetParentEncryption(ctx context.Context, exec zfs.Executor, target, dataset string, props []string, depth int) (string, error) {
+// fillMissingTargetParentContext walks parents of a missing target and copies
+// encryption (and feature flags) onto tgtCtx root so child sends inherit correctly.
+func fillMissingTargetParentContext(ctx context.Context, exec zfs.Executor, tgtStr, dataset string, tgtCtx *zfs.DatasetContext) error {
 	parent := parentDataset(dataset)
 	for parent != "" {
-		exists, err := exec.Exists(ctx, target, parent)
+		pctx, err := zfs.LoadDatasetContext(ctx, exec, tgtStr, parent, 1)
 		if err != nil {
-			return "", err
+			return fmt.Errorf("target parent properties: %w", err)
 		}
-		if exists {
-			lines, err := exec.List(ctx, target, parent, props, depth)
-			if err != nil {
-				return "", fmt.Errorf("target parent list: %w", err)
+		if pctx.Exists {
+			tgtCtx.Features = pctx.Features
+			if tgtCtx.BySuffix == nil {
+				tgtCtx.BySuffix = make(map[string]map[string]string)
 			}
-			rows, err := zfs.ParseListLines(lines, props)
-			if err != nil {
-				return "", fmt.Errorf("target parent parse: %w", err)
-			}
-			for _, row := range rows {
-				if row.Name == parent {
-					return row.Props["encryption"], nil
+			if enc := pctx.Prop("", "encryption"); enc != "" {
+				m := tgtCtx.BySuffix[""]
+				if m == nil {
+					m = make(map[string]string)
+					tgtCtx.BySuffix[""] = m
 				}
+				m["encryption"] = enc
 			}
+			return nil
 		}
 		parent = parentDataset(parent)
 	}
-	return "", nil
+	return nil
 }
 
 func configureTargetOrigin(ctx context.Context, exec zfs.Executor, originTarget endpoint.Endpoint, mres *match.Result, views []PairView, props []string, depth int) error {

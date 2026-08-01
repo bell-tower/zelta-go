@@ -2,10 +2,10 @@ package match
 
 import (
 	"context"
-	"git.belltower.it/djbell/zelta-go/endpoint"
 	"strings"
 	"testing"
 
+	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
@@ -29,23 +29,37 @@ func TestParseBytes(t *testing.T) {
 }
 
 func TestResolveListProps(t *testing.T) {
+	ctx := context.Background()
+	fake := &zfs.Fake{Lists: map[string]string{"tank/src": "tank/src\tg1\n"}}
 	full := strings.Join(DefaultListProps, ",")
 	min := strings.Join(MinimalListProps, ",")
-	got := strings.Join(resolveListProps(Request{}, DefaultCols), ",")
-	if got != full {
+	got, err := resolveListProps(ctx, fake, Request{Source: endpoint.MustParse("tank/src")}, DefaultCols)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(got, ",") != full {
 		t.Fatalf("default props=%s", got)
 	}
-	got = strings.Join(resolveListProps(Request{NoWritten: true}, DefaultCols), ",")
-	if got != min {
+	got, err = resolveListProps(ctx, fake, Request{Source: endpoint.MustParse("tank/src"), NoWritten: true}, DefaultCols)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(got, ",") != min {
 		t.Fatalf("nowritten props=%s", got)
 	}
 	// -p without written cols skips slow props
-	got = strings.Join(resolveListProps(Request{Parsable: true}, DefaultCols), ",")
-	if got != min {
+	got, err = resolveListProps(ctx, fake, Request{Source: endpoint.MustParse("tank/src"), Parsable: true}, DefaultCols)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(got, ",") != min {
 		t.Fatalf("parsable default cols props=%s want min", got)
 	}
-	got = strings.Join(resolveListProps(Request{Parsable: true}, []string{"ds_suffix", "xfer_size"}), ",")
-	if got != full {
+	got, err = resolveListProps(ctx, fake, Request{Source: endpoint.MustParse("tank/src"), Parsable: true}, []string{"ds_suffix", "xfer_size"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(got, ",") != full {
 		t.Fatalf("parsable xfer_size props=%s want full", got)
 	}
 }
@@ -92,13 +106,30 @@ func TestCompareFake(t *testing.T) {
 }
 
 func TestCompareCapturesEncryptionAndIVSet(t *testing.T) {
-	fake := &zfs.Fake{Lists: map[string]string{
-		"tank/src": "tank/src\tg1\taes-256-gcm\t-\ntank/src@base\tg2\taes-256-gcm\tiv-1\n",
-		"tank/tgt": "tank/tgt\tg1\taes-256-gcm\t-\ntank/tgt@base\tg2\taes-256-gcm\tiv-1\n",
-	}}
+	// Snap list: name,guid,ivsetguid — encryption from DatasetContext.
+	fake := &zfs.Fake{
+		Lists: map[string]string{
+			"tank/src": "tank/src\tg1\t-\ntank/src@base\tg2\tiv-1\n",
+			"tank/tgt": "tank/tgt\tg1\t-\ntank/tgt@base\tg2\tiv-1\n",
+		},
+		Props: map[string]string{
+			"tank/src": "tank/src\tencryption\taes-256-gcm\n",
+			"tank/tgt": "tank/tgt\tencryption\taes-256-gcm\n",
+		},
+	}
+	srcCtx, err := zfs.LoadDatasetContext(context.Background(), fake, "tank/src", "tank/src", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tgtCtx, err := zfs.LoadDatasetContext(context.Background(), fake, "tank/tgt", "tank/tgt", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 	res, err := Compare(context.Background(), fake, Request{
 		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/tgt"),
-		Props: []string{"name", "guid", "encryption", "ivsetguid"},
+		Props:      []string{"name", "guid", "ivsetguid"},
+		SrcContext: srcCtx,
+		TgtContext: tgtCtx,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -111,6 +142,36 @@ func TestCompareCapturesEncryptionAndIVSet(t *testing.T) {
 	}
 	if got := res.Pairs[0].TgtEncryption; got != "aes-256-gcm" {
 		t.Fatalf("target encryption=%q", got)
+	}
+}
+
+func TestCompareDefaultNoIVSetProbe(t *testing.T) {
+	// Default match must not require encryption columns or fail on old hosts.
+	fake := &zfs.Fake{Lists: map[string]string{
+		"zroot":        "zroot\t100\t0\t1000\t1M\nzroot@a\t101\t0\t1500\t500K\n",
+		"backup/zroot": "backup/zroot\t100\t0\t1000\t1M\nbackup/zroot@a\t101\t0\t1500\t500K\n",
+	}}
+	res, err := Compare(context.Background(), fake, Request{
+		Source:    endpoint.MustParse("app2:zroot"),
+		Target:    endpoint.MustParse("vault:backup/zroot"),
+		Scripting: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Pairs) == 0 || res.Pairs[0].Info != "up-to-date" {
+		t.Fatalf("pairs=%+v", res.Pairs)
+	}
+}
+
+func TestSnapListPropsIVSetOnlyWhenFeatured(t *testing.T) {
+	got := strings.Join(SnapListProps(zfs.Features{}, SnapListOpts{Written: true, IVSet: true}), ",")
+	if got != "name,guid,written,creation,used" {
+		t.Fatalf("no feature: %s", got)
+	}
+	got = strings.Join(SnapListProps(zfs.Features{IVSetGUID: true}, SnapListOpts{Written: true, IVSet: true}), ",")
+	if got != "name,guid,written,creation,used,ivsetguid" {
+		t.Fatalf("with feature: %s", got)
 	}
 }
 

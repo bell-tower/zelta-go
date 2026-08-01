@@ -134,13 +134,20 @@ func TestRemoveSendFeatureFromShortFlags(t *testing.T) {
 }
 
 func TestRunEncryptionFallbackDropsEmbeddedDataFlag(t *testing.T) {
-	fake := &zfs.Fake{Lists: map[string]string{
-		"tank/src": "tank/src\tg1\t0\t1\t1M\tfilesystem\taes-256-gcm\t-\t-\n" +
-			"tank/src@new\tg3\t0\t3\t1K\tsnapshot\taes-256-gcm\tiv-new\t-\n" +
-			"tank/src@base\tg2\t0\t2\t1K\tsnapshot\taes-256-gcm\tiv-source\t-\n",
-		"tank/tgt": "tank/tgt\tg1\t0\t1\t1M\tfilesystem\taes-256-gcm\t-\t-\n" +
-			"tank/tgt@base\tg2\t0\t2\t1K\tsnapshot\taes-256-gcm\tiv-target\t-\n",
-	}}
+	// Snap list: name,guid,written,creation,used,ivsetguid
+	fake := &zfs.Fake{
+		Lists: map[string]string{
+			"tank/src": "tank/src\tg1\t0\t1\t1M\t-\n" +
+				"tank/src@new\tg3\t0\t3\t1K\tiv-new\n" +
+				"tank/src@base\tg2\t0\t2\t1K\tiv-source\n",
+			"tank/tgt": "tank/tgt\tg1\t0\t1\t1M\t-\n" +
+				"tank/tgt@base\tg2\t0\t2\t1K\tiv-target\n",
+		},
+		Props: map[string]string{
+			"tank/src": "tank/src\tencryption\taes-256-gcm\ntank/src\ttype\tfilesystem\n",
+			"tank/tgt": "tank/tgt\tencryption\taes-256-gcm\ntank/tgt\ttype\tfilesystem\n",
+		},
+	}
 	res, err := Run(context.Background(), fake, Request{
 		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/tgt"), SnapMode: SnapNever,
 	})
@@ -182,10 +189,16 @@ func TestPlanResumeTokenUsesTokenSendOnly(t *testing.T) {
 }
 
 func TestRunResumesTargetToken(t *testing.T) {
-	fake := &zfs.Fake{Lists: map[string]string{
-		"tank/src": "tank/src\tg1\t0\t1\t1M\tfilesystem\t-\ntank/src@a\tg2\t0\t2\t1K\tsnapshot\t-\n",
-		"tank/tgt": "tank/tgt\tg1\t0\t1\t1M\tfilesystem\ttoken-123\n",
-	}}
+	fake := &zfs.Fake{
+		Lists: map[string]string{
+			"tank/src": "tank/src\tg1\t0\t1\t1M\ntank/src@a\tg2\t0\t2\t1K\n",
+			"tank/tgt": "tank/tgt\tg1\t0\t1\t1M\n",
+		},
+		Props: map[string]string{
+			"tank/src": "tank/src\ttype\tfilesystem\n",
+			"tank/tgt": "tank/tgt\ttype\tfilesystem\ntank/tgt\treceive_resume_token\ttoken-123\n",
+		},
+	}
 	_, err := Run(context.Background(), fake, Request{Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/tgt"), SnapMode: SnapNever})
 	if err != nil {
 		t.Fatal(err)
@@ -198,8 +211,12 @@ func TestRunResumesTargetToken(t *testing.T) {
 func TestRunResumeFailureDoesNotRetryNormalSend(t *testing.T) {
 	fake := &zfs.Fake{
 		Lists: map[string]string{
-			"tank/src": "tank/src\tg1\t0\t1\t1M\tfilesystem\t-\ntank/src@a\tg2\t0\t2\t1K\tsnapshot\t-\n",
-			"tank/tgt": "tank/tgt\tg1\t0\t1\t1M\tfilesystem\ttoken-123\n",
+			"tank/src": "tank/src\tg1\t0\t1\t1M\ntank/src@a\tg2\t0\t2\t1K\n",
+			"tank/tgt": "tank/tgt\tg1\t0\t1\t1M\n",
+		},
+		Props: map[string]string{
+			"tank/src": "tank/src\ttype\tfilesystem\n",
+			"tank/tgt": "tank/tgt\ttype\tfilesystem\ntank/tgt\treceive_resume_token\ttoken-123\n",
 		},
 		PipeErrors: map[string]error{"token-123": fmt.Errorf("interrupted receive")},
 	}
@@ -338,11 +355,18 @@ func TestPlanTargetOriginUsesOriginSendBase(t *testing.T) {
 }
 
 func TestRunTargetOriginRequiresBackedUpOrigin(t *testing.T) {
-	fake := &zfs.Fake{Lists: map[string]string{
-		"tank/clone":      "tank/clone\t1\t0\t100\t1K\tfilesystem\ttank/original@base\ntank/clone@clone-snap\t2\t0\t200\t1K\tsnapshot\t-",
-		"backup/clone":    "",
-		"backup/original": "backup/original\t1\t0\t100\t1K\tfilesystem\t-\nbackup/original@base\t2\t0\t200\t1K\tsnapshot\t-",
-	}}
+	// Snap list with origin: name,guid,written,creation,used,origin
+	fake := &zfs.Fake{
+		Lists: map[string]string{
+			"tank/clone":      "tank/clone\t1\t0\t100\t1K\ttank/original@base\ntank/clone@clone-snap\t2\t0\t200\t1K\t-",
+			"backup/clone":    "",
+			"backup/original": "backup/original\t1\t0\t100\t1K\t-\nbackup/original@base\t2\t0\t200\t1K\t-",
+		},
+		Props: map[string]string{
+			"tank/clone":      "tank/clone\ttype\tfilesystem\ntank/clone\torigin\ttank/original@base\n",
+			"backup/original": "backup/original\ttype\tfilesystem\n",
+		},
+	}
 	res, err := Run(context.Background(), fake, Request{
 		Source: endpoint.MustParse("tank/clone"), Target: endpoint.MustParse("backup/clone"), TargetOrigin: endpoint.MustParse("backup/original"),
 		SnapMode: SnapNever, DryRun: true,
@@ -620,13 +644,18 @@ func TestRunCreateParent(t *testing.T) {
 }
 
 func TestRunInheritsTargetParentEncryption(t *testing.T) {
-	src := "tank/src\t100\t0\t1\t1M\tfilesystem\toff\t-\t-\ntank/src@a\t101\t0\t2\t1K\tsnapshot\toff\t-\t-\n"
-	parent := "tank/new\t200\t0\t1\t1M\tfilesystem\taes-256-gcm\t-\t-\n"
-	fake := &zfs.Fake{Lists: map[string]string{
-		"tank/src": src,
-		"root@debian:tank/new/leaf/child:tank/new/leaf/child": "",
-		"tank/new": parent,
-	}}
+	// Target missing (empty list); parent tank/new is encrypted via get props.
+	fake := &zfs.Fake{
+		Lists: map[string]string{
+			"tank/src":            "tank/src\t100\t0\t1\t1M\ntank/src@a\t101\t0\t2\t1K\n",
+			"tank/new/leaf/child": "",
+		},
+		Props: map[string]string{
+			"tank/src": "tank/src\tencryption\toff\ntank/src\ttype\tfilesystem\n",
+			"tank/new": "tank/new\tencryption\taes-256-gcm\ntank/new\ttype\tfilesystem\n",
+		},
+		Existing: map[string]bool{"tank/new": true},
+	}
 	res, err := Run(context.Background(), fake, Request{
 		Source:       endpoint.MustParse("tank/src"),
 		Target:       endpoint.MustParse("root@debian:tank/new/leaf/child"),
@@ -688,11 +717,17 @@ func TestFilterWarnings(t *testing.T) {
 }
 
 func TestVolumeTypeFromList(t *testing.T) {
-	src := "tank/src\t100\t0\t1\t1M\tfilesystem\n" +
-		"tank/src@a\t101\t0\t2\t1K\tsnapshot\n" +
-		"tank/src/vol1\t200\t0\t1\t1M\tvolume\n" +
-		"tank/src/vol1@a\t201\t0\t2\t1K\tsnapshot\n"
-	fake := &zfs.Fake{Lists: map[string]string{"tank/src": src, "tank/tgt": ""}}
+	// Type comes from dataset get context, not snap list.
+	src := "tank/src\t100\t0\t1\t1M\n" +
+		"tank/src@a\t101\t0\t2\t1K\n" +
+		"tank/src/vol1\t200\t0\t1\t1M\n" +
+		"tank/src/vol1@a\t201\t0\t2\t1K\n"
+	fake := &zfs.Fake{
+		Lists: map[string]string{"tank/src": src, "tank/tgt": ""},
+		Props: map[string]string{
+			"tank/src": "tank/src\ttype\tfilesystem\ntank/src/vol1\ttype\tvolume\n",
+		},
+	}
 	res, err := Run(context.Background(), fake, Request{
 		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/tgt"),
 		DryRun: true, Intermediate: true, SnapMode: SnapNever,

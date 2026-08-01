@@ -15,7 +15,7 @@ import (
 type Request struct {
 	Source                  endpoint.Endpoint
 	Target                  endpoint.Endpoint
-	Props                   []string // empty → resolveListProps
+	Props                   []string // empty → resolveListProps (+ optional feature probe)
 	Cols                    []string // empty → expand default proplist
 	Depth                   int      // 0 = unlimited; zfs -d + pair filter
 	Include                 []string // --include patterns (comma lists / repeated)
@@ -25,6 +25,9 @@ type Request struct {
 	NoWritten               bool     // --no-written: list name,guid only
 	CheckTime               bool     // --time: append SOURCE/TARGET_LIST_TIME
 	PreserveSourceSnapshots bool     // retain source history for filtered backup planning
+	// SrcContext / TgtContext, when set, merge dataset props after list (backup path).
+	SrcContext *zfs.DatasetContext
+	TgtContext *zfs.DatasetContext
 }
 
 // Result is a completed match comparison.
@@ -46,9 +49,6 @@ var DefaultListProps = []string{"name", "guid", "written", "creation", "used"}
 
 // MinimalListProps when --no-written (or -p without written/size cols).
 var MinimalListProps = []string{"name", "guid"}
-
-// BackupListProps adds encryption context and IV-set identity for send flags.
-var BackupListProps = []string{"name", "guid", "written", "creation", "used", "type", "encryption", "ivsetguid", "receive_resume_token"}
 
 // RotateListProps includes origin for clone-lineage classification.
 var RotateListProps = []string{"name", "guid", "origin", "written", "snapshots_changed", "creation", "used", "type"}
@@ -74,7 +74,10 @@ func Compare(ctx context.Context, exec zfs.Executor, req Request) (*Result, erro
 			return nil, err
 		}
 	}
-	props := resolveListProps(req, cols)
+	props, err := resolveListProps(ctx, exec, req, cols)
+	if err != nil {
+		return nil, err
+	}
 
 	t0 := time.Now()
 	srcLines, err := exec.List(ctx, srcEp.String(), srcEp.Dataset, props, req.Depth)
@@ -113,6 +116,9 @@ func Compare(ctx context.Context, exec zfs.Executor, req Request) (*Result, erro
 	if req.Depth > 0 {
 		pairs = filterDepth(pairs, req.Depth)
 	}
+	if req.SrcContext != nil || req.TgtContext != nil {
+		ApplyDatasetContext(pairs, req.SrcContext, req.TgtContext)
+	}
 	sum := summaryOf(pairs)
 	out := Format(pairs, FormatOpts{
 		Cols:      cols,
@@ -139,19 +145,28 @@ func Compare(ctx context.Context, exec zfs.Executor, req Request) (*Result, erro
 }
 
 // resolveListProps picks zfs list -o columns (oracle add_written).
-func resolveListProps(req Request, cols []string) []string {
+// When cols need ivset and Props is empty, probes top-level source features once.
+func resolveListProps(ctx context.Context, exec zfs.Executor, req Request, cols []string) ([]string, error) {
 	if len(req.Props) > 0 {
-		return req.Props
+		return req.Props, nil
 	}
-	want := !req.NoWritten
+	wantWritten := !req.NoWritten
 	// LIST_WRITTEN + -p + proplist without written/size → skip slow props.
-	if want && req.Parsable && len(cols) > 0 && !colsNeedWritten(cols) {
-		want = false
+	if wantWritten && req.Parsable && len(cols) > 0 && !colsNeedWritten(cols) {
+		wantWritten = false
 	}
-	if want {
-		return DefaultListProps
+	if !colsNeedIVSet(cols) {
+		if wantWritten {
+			return DefaultListProps, nil
+		}
+		return MinimalListProps, nil
 	}
-	return MinimalListProps
+	// Optional feature requested: probe top-level only.
+	feat, err := zfs.ProbeFeatures(ctx, exec, req.Source.String(), req.Source.Dataset)
+	if err != nil {
+		return nil, fmt.Errorf("probe source features: %w", err)
+	}
+	return SnapListProps(feat, SnapListOpts{Written: wantWritten, IVSet: true}), nil
 }
 
 func colsNeedWritten(cols []string) bool {

@@ -10,6 +10,10 @@ import (
 type Fake struct {
 	// Lists maps key → full zfs list -Hpr style body (newline-separated).
 	Lists map[string]string
+	// Props maps key → zfs get -Hpr name,property,value body (newline-separated).
+	// When unset for a dataset that exists in Lists/Existing, GetProps returns
+	// empty lines (no optional features) so list-only tests keep working.
+	Props map[string]string
 	// Snapshots records dataset@snap names passed to Snapshot.
 	Snapshots []string
 	// Creates records datasets passed to Create.
@@ -22,6 +26,7 @@ type Fake struct {
 	Clones         []CloneCall
 	Renames        []RenameCall
 	ListErrors     map[string]error
+	PropErrors     map[string]error
 	BookmarkErrors map[string]error
 	PipeErrors     map[string]error
 }
@@ -52,6 +57,55 @@ func (f *Fake) List(_ context.Context, endpoint, dataset string, _ []string, _ i
 	return nil, fmt.Errorf("zfs fake: no list for endpoint=%q dataset=%q", endpoint, dataset)
 }
 
+func (f *Fake) GetProps(_ context.Context, endpoint, dataset string, _ string, _ int) ([]string, error) {
+	if err := f.PropErrors[dataset]; err != nil {
+		return nil, err
+	}
+	for _, key := range []string{endpoint, dataset, endpoint + ":" + dataset} {
+		if f.Props != nil {
+			if body, ok := f.Props[key]; ok {
+				return splitNonEmpty(body), nil
+			}
+		}
+	}
+	// Explicit Existing without Props: present, no optional features.
+	if f.Existing != nil && (f.Existing[dataset] || f.Existing[endpoint]) {
+		return nil, nil
+	}
+	// List-only fixtures: non-empty list dump ⇒ exists; empty body ⇒ missing target.
+	for _, key := range []string{endpoint, dataset, endpoint + ":" + dataset} {
+		if f.Lists != nil {
+			if body, ok := f.Lists[key]; ok {
+				if strings.TrimSpace(body) == "" {
+					return nil, fmt.Errorf("cannot open '%s': dataset does not exist", dataset)
+				}
+				return nil, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("cannot open '%s': dataset does not exist", dataset)
+}
+
+func (f *Fake) hasDataset(dataset string) bool {
+	if dataset == "" {
+		return false
+	}
+	if f.Existing != nil && f.Existing[dataset] {
+		return true
+	}
+	if f.Props != nil {
+		if _, ok := f.Props[dataset]; ok {
+			return true
+		}
+	}
+	if f.Lists != nil {
+		if body, ok := f.Lists[dataset]; ok && strings.TrimSpace(body) != "" {
+			return true
+		}
+	}
+	return false
+}
+
 func (f *Fake) Snapshot(_ context.Context, _, datasetSnap string, _ bool) error {
 	f.Snapshots = append(f.Snapshots, datasetSnap)
 	return nil
@@ -67,15 +121,7 @@ func (f *Fake) Create(_ context.Context, _, dataset string) error {
 }
 
 func (f *Fake) Exists(_ context.Context, _, dataset string) (bool, error) {
-	if f.Existing != nil && f.Existing[dataset] {
-		return true, nil
-	}
-	if f.Lists != nil {
-		if _, ok := f.Lists[dataset]; ok {
-			return true, nil
-		}
-	}
-	return false, nil
+	return f.hasDataset(dataset), nil
 }
 
 func (f *Fake) Bookmark(_ context.Context, endpoint, sourceSnap, bookmark string) error {

@@ -25,6 +25,11 @@ type Executor interface {
 	// depth 0 means unlimited; depth > 0 maps to zfs list -d.
 	List(ctx context.Context, endpoint, dataset string, props []string, depth int) ([]string, error)
 
+	// GetProps runs zfs get for filesystem/volume properties (PROPS template).
+	// props is typically "all". depth 0 unlimited; depth > 0 → -d (depth-1).
+	// Missing dataset returns an error containing "dataset does not exist".
+	GetProps(ctx context.Context, endpoint, dataset string, props string, depth int) ([]string, error)
+
 	// Snapshot runs zfs snapshot [-r] dataset@snap on the endpoint.
 	Snapshot(ctx context.Context, endpoint, datasetSnap string, recursive bool) error
 

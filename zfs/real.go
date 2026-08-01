@@ -74,6 +74,22 @@ func (r *Real) List(ctx context.Context, epStr, dataset string, props []string, 
 	return splitNonEmpty(string(out)), nil
 }
 
+func (r *Real) GetProps(ctx context.Context, epStr, dataset string, props string, depth int) ([]string, error) {
+	if dataset == "" {
+		return nil, fmt.Errorf("zfs get: empty dataset")
+	}
+	argv, err := cmdbuild.PropsArgv(props, depth, dataset)
+	if err != nil {
+		return nil, err
+	}
+	argv = r.rewriteBin(argv)
+	out, err := r.output(ctx, epStr, argv)
+	if err != nil {
+		return nil, fmt.Errorf("zfs get %s: %w", dataset, err)
+	}
+	return splitNonEmpty(string(out)), nil
+}
+
 func isMissingDataset(err error) bool {
 	if err == nil {
 		return false
