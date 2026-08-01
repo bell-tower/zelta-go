@@ -128,23 +128,15 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		}
 	}
 
-	// Phase 2: expensive snap list — only columns features allow.
+	// Phase 2: expensive snap list — snap/bookmark columns only (never dataset props).
 	// Awk: MATCH_IVSET only when target exists and source is encrypted.
+	// snapshots_changed / origin / type / encryption come from DatasetContext (get all);
+	// if the host lacks them, SNAP_TIME etc. simply cannot use them.
 	wantIVSet := tgtCtx.Exists && srcCtx.SourceEncrypted()
-	snapOpts := match.SnapListOpts{
-		Written:          true,
-		IVSet:            wantIVSet,
-		Origin:           !req.TargetOrigin.IsZero(),
-		SnapshotsChanged: req.SnapTime > 0 || req.SnapSize > 0,
-	}
-	// Prefer source feature flags; union target when present for resume tokens etc.
-	feat := srcCtx.Features
-	if tgtCtx.Exists {
-		feat.ReceiveResumeToken = feat.ReceiveResumeToken || tgtCtx.Features.ReceiveResumeToken
-		feat.Origin = feat.Origin || tgtCtx.Features.Origin
-		feat.SnapshotsChanged = feat.SnapshotsChanged || tgtCtx.Features.SnapshotsChanged
-	}
-	props := match.SnapListProps(feat, snapOpts)
+	props := match.SnapListProps(srcCtx.Features, match.SnapListOpts{
+		Written: true,
+		IVSet:   wantIVSet,
+	})
 
 	filteredIntermediate := req.Intermediate && (len(req.Include) > 0 || len(req.Exclude) > 0)
 	if filteredIntermediate && !req.TargetOrigin.IsZero() {

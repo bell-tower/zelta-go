@@ -16,11 +16,11 @@ func TestRunCloneAndBackupDryRun(t *testing.T) {
 	if err := os.WriteFile(cloneList, []byte("tank/source@base\tsnapshot\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	// Snap list with origin: name,guid,written,creation,used,origin
-	if err := os.WriteFile(backupSourceList, []byte("tank/clone\t10\t0\t100\t1K\ttank/source@base\ntank/clone@new\t11\t0\t200\t1K\t-\n"), 0o600); err != nil {
+	// Snap list: name,guid,written,creation,used — origin from get props only.
+	if err := os.WriteFile(backupSourceList, []byte("tank/clone\t10\t0\t100\t1K\ntank/clone@new\t11\t0\t200\t1K\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(originList, []byte("backup/source\t1\t0\t100\t1K\t-\nbackup/source@base\t2\t0\t200\t1K\t-\n"), 0o600); err != nil {
+	if err := os.WriteFile(originList, []byte("backup/source\t1\t0\t100\t1K\nbackup/source@base\t2\t0\t200\t1K\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	propsClone := filepath.Join(dir, "clone.props")
@@ -40,15 +40,14 @@ case "$*" in
   *"get"*"all backup/source") cat %q ;;
   *"get"*"all backup/clone") echo "cannot open 'backup/clone': dataset does not exist" >&2; exit 1 ;;
   *"get"*"all backup") echo "cannot open 'backup': dataset does not exist" >&2; exit 1 ;;
-  *"name,guid,written,creation,used,origin"*"tank/clone") cat %q ;;
-  *"name,guid,written,creation,used,origin"*"backup/source") cat %q ;;
-  *"name,guid,written,creation,used,origin"*"backup/clone") ;;
   *"name,guid,written,creation,used"*"tank/clone") cat %q ;;
+  *"name,guid,written,creation,used"*"backup/source") cat %q ;;
+  *"name,guid,written,creation,used"*"backup/clone") ;;
   *"name backup") echo "cannot open 'backup': dataset does not exist" >&2; exit 1 ;;
   *"name backup/clone") echo "cannot open 'backup/clone': dataset does not exist" >&2; exit 1 ;;
   *) echo "unexpected zfs argv: $*" >&2; exit 1 ;;
 esac
-`, cloneList, propsClone, propsOrigin, backupSourceList, originList, backupSourceList)
+`, cloneList, propsClone, propsOrigin, backupSourceList, originList)
 	if err := os.WriteFile(zfsPath, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}

@@ -355,12 +355,12 @@ func TestPlanTargetOriginUsesOriginSendBase(t *testing.T) {
 }
 
 func TestRunTargetOriginRequiresBackedUpOrigin(t *testing.T) {
-	// Snap list with origin: name,guid,written,creation,used,origin
+	// Origin is a dataset property (get); snap list is name,guid,written,creation,used only.
 	fake := &zfs.Fake{
 		Lists: map[string]string{
-			"tank/clone":      "tank/clone\t1\t0\t100\t1K\ttank/original@base\ntank/clone@clone-snap\t2\t0\t200\t1K\t-",
+			"tank/clone":      "tank/clone\t1\t0\t100\t1K\ntank/clone@clone-snap\t2\t0\t200\t1K\n",
 			"backup/clone":    "",
-			"backup/original": "backup/original\t1\t0\t100\t1K\t-\nbackup/original@base\t2\t0\t200\t1K\t-",
+			"backup/original": "backup/original\t1\t0\t100\t1K\nbackup/original@base\t2\t0\t200\t1K\n",
 		},
 		Props: map[string]string{
 			"tank/clone":      "tank/clone\ttype\tfilesystem\ntank/clone\torigin\ttank/original@base\n",

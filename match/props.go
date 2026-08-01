@@ -2,26 +2,20 @@ package match
 
 import "git.belltower.it/djbell/zelta-go/zfs"
 
-// SnapListOpts controls optional columns on the expensive snapshot list.
+// SnapListOpts controls optional columns on the expensive snapshot/bookmark list.
+// Dataset-only fields (encryption, type, origin, snapshots_changed, resume token)
+// must never appear here — they come from DatasetContext (zfs get all).
 type SnapListOpts struct {
-	Written           bool // written,creation,used
-	Origin            bool
-	SnapshotsChanged  bool
-	IVSet             bool // request ivsetguid when features allow
+	Written bool // written,creation,used on snaps (xfer sizing)
+	IVSet   bool // request ivsetguid when features allow (snap property)
 }
 
-// SnapListProps builds zfs list -o columns for snapshot/bookmark compare.
-// Dataset-only fields (encryption, type, resume token) come from DatasetContext.
+// SnapListProps builds zfs list -o columns for snapshot/bookmark compare only.
+// Keep this list small: thousands of snaps × wide props exhausts memory.
 func SnapListProps(feat zfs.Features, opts SnapListOpts) []string {
 	props := []string{"name", "guid"}
 	if opts.Written {
 		props = append(props, "written", "creation", "used")
-	}
-	if opts.Origin {
-		props = append(props, "origin")
-	}
-	if opts.SnapshotsChanged {
-		props = append(props, "snapshots_changed")
 	}
 	if opts.IVSet && feat.IVSetGUID {
 		props = append(props, "ivsetguid")
