@@ -17,9 +17,9 @@ func TestNewBackupResult(t *testing.T) {
 		Remote:   true,
 	}
 	tgt := endpoint.Endpoint{
-		Host:     "tgt.example.com",
-		Dataset:  "bpool/data",
-		Remote:   true,
+		Host:    "tgt.example.com",
+		Dataset: "bpool/data",
+		Remote:  true,
 	}
 	start := time.Date(2026, 7, 26, 10, 0, 0, 0, time.UTC)
 	end := time.Date(2026, 7, 26, 10, 5, 30, 0, time.UTC)
@@ -29,6 +29,7 @@ func TestNewBackupResult(t *testing.T) {
 		3, []string{"pool/ds@snap1", "pool/ds@snap2", "pool/ds2@snap1"},
 		nil, []string{"filter pattern info"},
 		start, end,
+		2496, 3, 0.09,
 	)
 
 	if r.OutputVersion.Command != "zelta backup" {
@@ -64,6 +65,12 @@ func TestNewBackupResult(t *testing.T) {
 	if r.ReplicationStreamsRecv != "3" {
 		t.Errorf("ReplicationStreamsRecv = %q", r.ReplicationStreamsRecv)
 	}
+	if r.ReplicationSize != "2496" {
+		t.Errorf("ReplicationSize = %q, want 2496", r.ReplicationSize)
+	}
+	if r.ReplicationTime != "0.09" {
+		t.Errorf("ReplicationTime = %q, want 0.09", r.ReplicationTime)
+	}
 	if len(r.SentStreams) != 3 {
 		t.Errorf("len(SentStreams) = %d", len(r.SentStreams))
 	}
@@ -84,12 +91,15 @@ func TestNewBackupResultErrors(t *testing.T) {
 	start := time.Now()
 	end := time.Now()
 
-	r := NewBackupResult(src, tgt, 0, nil, []string{"connection refused"}, nil, start, end)
+	r := NewBackupResult(src, tgt, 0, nil, []string{"connection refused"}, nil, start, end, 0, 0, 0)
 	if r.ReplicationErrorCode != "1" {
 		t.Errorf("ReplicationErrorCode = %q, want 1", r.ReplicationErrorCode)
 	}
 	if len(r.ErrorMessages) != 1 || r.ErrorMessages[0] != "connection refused" {
 		t.Errorf("ErrorMessages = %v", r.ErrorMessages)
+	}
+	if r.ReplicationSize != "" {
+		t.Errorf("ReplicationSize = %q, want empty", r.ReplicationSize)
 	}
 }
 
@@ -99,7 +109,7 @@ func TestBackupResultMarshal(t *testing.T) {
 	start := time.Date(2026, 7, 26, 12, 0, 0, 0, time.UTC)
 	end := time.Date(2026, 7, 26, 12, 1, 0, 0, time.UTC)
 
-	r := NewBackupResult(src, tgt, 2, []string{"pool/data@snap1", "pool/data@snap2"}, nil, nil, start, end)
+	r := NewBackupResult(src, tgt, 2, []string{"pool/data@snap1", "pool/data@snap2"}, nil, nil, start, end, 0, 2, 0)
 	data, err := r.Marshal()
 	if err != nil {
 		t.Fatal(err)

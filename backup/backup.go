@@ -286,10 +286,11 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 
 	var b strings.Builder
 	var errors []string
-	if req.OnLine != nil {
-		if tee, ok := exec.(stderrTee); ok {
-			tee.SetStderrLog(&lineWriter{fn: req.OnLine})
-		}
+	// Always capture pipe stderr for replication telemetry; forward each line
+	// to req.OnLine when a progress hook is set.
+	parser := &streamParser{onLine: req.OnLine}
+	if tee, ok := exec.(stderrTee); ok {
+		tee.SetStderrLog(&lineWriter{fn: parser.Line})
 	}
 
 	if req.DryRun {
@@ -320,8 +321,17 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		}
 		if work > 0 {
 			secs := execEndTime.Sub(execStart).Seconds()
-			// Byte accounting is still incomplete; shellspec accepts wildcard size.
-			b.WriteString(fmt.Sprintf("0B sent, %d streams received in %.0f seconds\n", work, secs))
+			streams := parser.streams
+			if streams == 0 {
+				streams = work
+			}
+			if parser.secs > 0 {
+				secs = parser.secs
+			}
+			// Awk parity: size/stream counts come from zfs send -P and
+			// zfs recv -v stderr; fall back to plan counts when the host
+			// omits them.
+			b.WriteString(fmt.Sprintf("%s sent, %d streams received in %g seconds\n", HumanBytes(parser.bytes), streams, secs))
 		}
 	}
 	if sum := plan.Summary(); sum != "" {
@@ -359,6 +369,7 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 			streamCount, sentStreams,
 			errors, messages,
 			startTime, execEndTime,
+			parser.bytes, parser.streams, parser.secs,
 		)
 	}
 	return res, nil

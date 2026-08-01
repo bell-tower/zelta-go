@@ -361,6 +361,9 @@ func (r *Real) RunPipeDirection(ctx context.Context, leftEp string, leftArgv []s
 	if r.StderrLog != nil {
 		leftCmd.Stderr = io.MultiWriter(&leftStderr, r.StderrLog)
 		rightCmd.Stderr = io.MultiWriter(&rightStderr, r.StderrLog)
+		// zfs recv -v messages go to stdout; tee them like the Awk oracle
+		// (pipeline stdout + 2>&1) instead of leaking to the parent stdout.
+		rightCmd.Stdout = r.StderrLog
 	} else {
 		leftCmd.Stderr = &leftStderr
 		rightCmd.Stderr = &rightStderr
@@ -486,7 +489,13 @@ func (r *Real) runWithStderrLog(ctx context.Context, cmd *exec.Cmd) ([]byte, err
 	var errBuf bytes.Buffer
 	done := make(chan error, 1)
 	go func() {
-		_, _ = io.Copy(&outBuf, stdout)
+		// zfs recv -v messages go to stdout; tee them into StderrLog so
+		// pipe progress (size/received lines) is captured like the Awk oracle.
+		if r.StderrLog != nil {
+			_, _ = io.Copy(io.MultiWriter(&outBuf, r.StderrLog), stdout)
+		} else {
+			_, _ = io.Copy(&outBuf, stdout)
+		}
 	}()
 	go func() {
 		if r.StderrLog != nil {
