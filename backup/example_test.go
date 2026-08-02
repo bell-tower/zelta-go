@@ -10,7 +10,7 @@ import (
 	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
-func ExampleRun_dryRun() {
+func ExampleRun_commands() {
 	ctx := context.Background()
 	f := &zfs.Fake{
 		Lists: map[string]string{
@@ -18,19 +18,26 @@ func ExampleRun_dryRun() {
 			"pool/tgt": "pool/tgt\t33333\t0\t2024-01-01 00:00:00\t-\tfilesystem\t-\t-\t-\npool/tgt@snap1\t22222\t1024\t2024-01-01 01:00:00\t4096\t-\t-\t-\t-",
 		},
 	}
-	res, err := backup.Run(ctx, f, backup.Request{
-		Source: endpoint.MustParse("pool/src"),
-		Target: endpoint.MustParse("pool/tgt"),
-		DryRun: true,
-		JSON:   true,
+	lines, err := backup.Commands(ctx, f, backup.Request{
+		Source:   endpoint.MustParse("pool/src"),
+		Target:   endpoint.MustParse("pool/tgt"),
+		SnapMode: backup.SnapNever,
 	})
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(res.ErrCode == backup.ErrCodeUpToDate || res.ErrCode == backup.ErrCodeNone)
-	fmt.Println(res.JSONReport != nil)
+	fmt.Println(len(lines))
+	plan, err := backup.Prepare(ctx, f, backup.Request{
+		Source:   endpoint.MustParse("pool/src"),
+		Target:   endpoint.MustParse("pool/tgt"),
+		SnapMode: backup.SnapNever,
+	})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(plan.Skip == 1)
 	// Output:
-	// true
+	// 0
 	// true
 }
 

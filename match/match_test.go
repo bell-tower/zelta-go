@@ -220,3 +220,35 @@ func TestCompareBasicOracle(t *testing.T) {
 		t.Fatalf("human summary: %q", hum.Output)
 	}
 }
+
+func TestCommands(t *testing.T) {
+	req := Request{
+		Source: endpoint.MustParse("root@debian:tank/src"),
+		Target: endpoint.MustParse("tank/tgt"),
+		Depth:  2,
+	}
+	lines, err := Commands(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lines) != 2 {
+		t.Fatalf("lines=%v", lines)
+	}
+	if lines[0] != "+ zfs list -H -t snapshot -o name,guid,written,creation,used -r -d 2 root@debian:tank/src" {
+		t.Fatalf("line0=%q", lines[0])
+	}
+	if lines[1] != "+ zfs list -H -t snapshot -o name,guid,written,creation,used -r -d 2 tank/tgt" {
+		t.Fatalf("line1=%q", lines[1])
+	}
+	// Single endpoint (oracle -n with one operand) + minimal props.
+	lines, err = Commands(Request{
+		Source: endpoint.MustParse("tank/src"),
+		Props:  MinimalListProps,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lines) != 1 || lines[0] != "+ zfs list -H -t snapshot -o name,guid tank/src" {
+		t.Fatalf("lines=%v", lines)
+	}
+}

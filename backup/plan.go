@@ -1,12 +1,14 @@
 package backup
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"git.belltower.it/djbell/zelta-go/cmdbuild"
 	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/match"
+	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
 // Kind is the planned action for one dataset pair.
@@ -397,4 +399,102 @@ func (p *Plan) Summary() string {
 		parts = append(parts, fmt.Sprintf("%d blocked", p.Block))
 	}
 	return strings.Join(parts, ", ")
+}
+
+// Commands returns the oracle-shaped dry-run "+ …" command lines for the plan:
+// the planned source snapshot (when SnapReason is set), one line per syncable
+// dataset's send|recv pipe, and bookmark verify/create lines. The second pass
+// of intermediate fulls is execute-time, matching the oracle dry-run.
+func (p *Plan) Commands(srcEp, tgtEp, direction string) ([]string, error) {
+	var out []string
+	if p.SnapReason != "" && p.SnapSavepoint != "" && len(p.SnapArgv) > 0 {
+		sh, err := zfs.SnapshotShell(srcEp, p.SnapArgv[len(p.SnapArgv)-1], hasRecursive(p.SnapArgv))
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, "+ "+sh)
+	}
+	for _, st := range p.Steps {
+		if st.Kind != KindFull && st.Kind != KindIncremental {
+			continue
+		}
+		body, err := zfs.PipeShellDirection(srcEp, tgtEp, st.Send, st.Recv, direction)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, "+ "+body)
+	}
+	for _, bm := range p.Bookmarks {
+		verify, err := zfs.CommandShell(bm.VerifyEndpoint, bm.Verify)
+		if err != nil {
+			return nil, err
+		}
+		create, err := zfs.CommandShell(bm.SourceEndpoint, bm.Create)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, "+ "+verify)
+		out = append(out, "+ "+create)
+	}
+	return out, nil
+}
+
+// StreamCount returns the number of send streams the plan would execute and
+// the received target dataset@snap names in order (JSON/telemetry parity).
+func (p *Plan) StreamCount() (int, []string) {
+	count := 0
+	var names []string
+	for _, st := range p.Steps {
+		if st.Kind != KindFull && st.Kind != KindIncremental {
+			continue
+		}
+		count++
+		names = append(names, st.TgtName+st.SourceEnd)
+	}
+	return count, names
+}
+
+// RunStep executes the i-th plan step: the send|recv pipes for one dataset,
+// including the second pass of an intermediate full. Snapshot and bookmark
+// steps are plan-level — Run executes them around the step loop; RunStep
+// callers handle plan.SnapArgv and plan.Bookmarks themselves.
+func (p *Plan) RunStep(ctx context.Context, exec zfs.Executor, req Request, i int) error {
+	if i < 0 || i >= len(p.Steps) {
+		return fmt.Errorf("backup: step %d out of range (plan has %d steps)", i, len(p.Steps))
+	}
+	if st := p.Steps[i]; st.Kind != KindFull && st.Kind != KindIncremental {
+		return fmt.Errorf("backup: step %d not executable (kind %d)", i, st.Kind)
+	}
+	return p.syncPair(ctx, exec, req, req.SyncDirection.PipeArg(), i, nil)
+}
+
+// syncPair executes one dataset's send|recv pipes, including the second pass
+// of an intermediate full, appending executed command lines to commands when
+// non-nil. Skip and blocked steps have no pipes and are no-ops (RunStep
+// validates the kind before calling).
+func (p *Plan) syncPair(ctx context.Context, exec zfs.Executor, req Request, direction string, i int, commands *[]string) error {
+	st := p.Steps[i]
+	if st.Kind != KindFull && st.Kind != KindIncremental {
+		return nil
+	}
+	if err := runStep(ctx, exec, req, st, direction, commands); err != nil {
+		return err
+	}
+	// Intermediate full: second pass match→latest (oracle run_zfs_sync twice).
+	if st.Kind == KindFull && st.FinalEnd != "" && st.FinalEnd != st.SourceEnd {
+		second := &Step{
+			DSSuffix:    st.DSSuffix,
+			Kind:        KindIncremental,
+			SourceStart: st.SourceEnd,
+			SourceEnd:   st.FinalEnd,
+			SrcName:     st.SrcName,
+			TgtName:     st.TgtName,
+			SrcType:     st.SrcType,
+		}
+		if err := buildCmds(second, req.Intermediate, p.Flags); err != nil {
+			return err
+		}
+		return runStep(ctx, exec, req, second, direction, commands)
+	}
+	return nil
 }

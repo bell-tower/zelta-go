@@ -300,10 +300,11 @@ func Format(steps []Step) string {
 	return b.String()
 }
 
-// FormatRemote renders a dry-run plan with endpoint-aware command wrappers.
-// Send/receive pairs use the same direction rules as backup dry-runs.
-func FormatRemote(steps []Step, source, target, direction string) (string, error) {
-	var b strings.Builder
+// Commands renders a plan's executable command lines (oracle "+ …" shape):
+// rename via target, snapshot via source, send|recv pairs via the pipe
+// direction rules. Nothing executes.
+func Commands(steps []Step, source, target, direction string) ([]string, error) {
+	var out []string
 	for i := 0; i < len(steps); i++ {
 		step := steps[i]
 		if len(step.Argv) == 0 {
@@ -313,30 +314,44 @@ func FormatRemote(steps []Step, source, target, direction string) (string, error
 		case "rename":
 			line, err := zfs.CommandShell(target, step.Argv)
 			if err != nil {
-				return "", err
+				return nil, err
 			}
-			b.WriteString(line)
+			out = append(out, line)
 		case "snapshot":
 			line, err := zfs.CommandShell(source, step.Argv)
 			if err != nil {
-				return "", err
+				return nil, err
 			}
-			b.WriteString(line)
+			out = append(out, line)
 		case "send":
 			if i+1 >= len(steps) || steps[i+1].Kind != "recv" {
-				return "", fmt.Errorf("rotate: send without receive for %q", step.DSSuffix)
+				return nil, fmt.Errorf("rotate: send without receive for %q", step.DSSuffix)
 			}
 			line, err := zfs.PipeShellDirection(source, target, step.Argv, steps[i+1].Argv, direction)
 			if err != nil {
-				return "", err
+				return nil, err
 			}
-			b.WriteString(line)
+			out = append(out, line)
 			i++
 		case "recv":
-			return "", fmt.Errorf("rotate: receive without send for %q", step.DSSuffix)
+			return nil, fmt.Errorf("rotate: receive without send for %q", step.DSSuffix)
 		default:
-			b.WriteString(zfs.SoftJoin(step.Argv))
+			out = append(out, zfs.SoftJoin(step.Argv))
 		}
+	}
+	return out, nil
+}
+
+// FormatRemote renders a dry-run plan with endpoint-aware command wrappers.
+// Send/receive pairs use the same direction rules as backup dry-runs.
+func FormatRemote(steps []Step, source, target, direction string) (string, error) {
+	lines, err := Commands(steps, source, target, direction)
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	for _, line := range lines {
+		b.WriteString(line)
 		b.WriteByte('\n')
 	}
 	return b.String(), nil

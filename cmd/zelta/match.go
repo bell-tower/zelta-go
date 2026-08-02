@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
+	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
 	"git.belltower.it/djbell/zelta-go/internal/zlog"
 	"git.belltower.it/djbell/zelta-go/match"
@@ -37,14 +37,31 @@ func runMatch(args []string) int {
 		if code != 0 {
 			return code
 		}
-		props := match.DefaultListProps
+		req := match.Request{Depth: depth}
 		noWritten := p.Env.Get("WRITTEN") == "0" && !p.Changed["LIST_WRITTEN"]
 		if noWritten {
-			props = match.MinimalListProps
+			req.Props = match.MinimalListProps
+		}
+		for _, op := range p.Operands {
+			ep, err := endpoint.Parse(op)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "zelta match: %v\n", err)
+				return 2
+			}
+			if req.Source.Dataset == "" {
+				req.Source = ep
+			} else {
+				req.Target = ep
+			}
+		}
+		lines, err := match.Commands(req)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "zelta match: %v\n", err)
+			return 2
 		}
 		if sink.Enabled(zlog.Notice) {
-			for _, op := range p.Operands {
-				fmt.Fprintln(os.Stdout, formatListCmd(op, props, depth))
+			for _, line := range lines {
+				fmt.Fprintln(os.Stdout, line)
 			}
 		}
 		return 0
@@ -103,19 +120,6 @@ func runMatch(args []string) int {
 	// Oracle: the whole table is LOG_NOTICE — `-q` silences it.
 	emitBlob(sink, res.Output)
 	return 0
-}
-
-// formatListCmd builds the oracle dry-run "+ zfs list ..." line for an endpoint.
-func formatListCmd(endpoint string, props []string, depth int) string {
-	var b strings.Builder
-	b.WriteString("+ zfs list -H -t snapshot -o ")
-	b.WriteString(strings.Join(props, ","))
-	if depth > 0 {
-		fmt.Fprintf(&b, " -r -d %d", depth)
-	}
-	b.WriteString(" ")
-	b.WriteString(endpoint)
-	return b.String()
 }
 
 func matchUsage() {

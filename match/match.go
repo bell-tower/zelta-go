@@ -53,6 +53,36 @@ var MinimalListProps = []string{"name", "guid"}
 // RotateListProps includes origin for clone-lineage classification.
 var RotateListProps = []string{"name", "guid", "origin", "written", "snapshots_changed", "creation", "used", "type"}
 
+// Commands returns the oracle-shaped dry-run "+ zfs list …" command lines for
+// the request without contacting any pool. Props default to DefaultListProps
+// (no feature probing, mirroring the oracle -n path); Source and Target lines
+// appear in request order, skipping endpoints with an empty dataset.
+func Commands(req Request) ([]string, error) {
+	if req.Depth < 0 {
+		return nil, fmt.Errorf("depth of '%d' invalid; must be positive", req.Depth)
+	}
+	props := req.Props
+	if len(props) == 0 {
+		props = DefaultListProps
+	}
+	var out []string
+	for _, ep := range []endpoint.Endpoint{req.Source, req.Target} {
+		if ep.Dataset == "" {
+			continue
+		}
+		var b strings.Builder
+		b.WriteString("+ zfs list -H -t snapshot -o ")
+		b.WriteString(strings.Join(props, ","))
+		if req.Depth > 0 {
+			fmt.Fprintf(&b, " -r -d %d", req.Depth)
+		}
+		b.WriteString(" ")
+		b.WriteString(ep.String())
+		out = append(out, b.String())
+	}
+	return out, nil
+}
+
 // Compare loads lists, pairs by ds_suffix/GUID, and renders columns.
 func Compare(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	srcEp := req.Source

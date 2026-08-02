@@ -2,7 +2,6 @@ package sdk_test
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -15,7 +14,7 @@ import (
 
 // External-module smoke: public packages only (no internal/).
 
-func TestBackupDryRun(t *testing.T) {
+func TestBackupCommandsAndRun(t *testing.T) {
 	ctx := context.Background()
 	f := &zfs.Fake{
 		Lists: map[string]string{
@@ -23,25 +22,36 @@ func TestBackupDryRun(t *testing.T) {
 			"pool/tgt": "pool/tgt\t33333\t0\t2024-01-01 00:00:00\t-\tfilesystem\t-\t-\t-\npool/tgt@snap1\t22222\t1024\t2024-01-01 01:00:00\t4096\t-\t-\t-\t-",
 		},
 	}
-	flags := backup.DefaultSendRecv()
 	req := backup.Request{
-		DryRun:   true,
 		Source:   endpoint.Endpoint{Dataset: "pool/src"},
 		Target:   endpoint.Endpoint{Dataset: "pool/tgt"},
 		SnapMode: backup.SnapNever,
-		Flags:    &flags,
-		JSON:     true,
 		OnLine:   func(string) {},
+	}
+	lines, err := backup.Commands(ctx, f, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lines) != 0 {
+		t.Fatalf("up-to-date pair must plan no commands, got %v", lines)
+	}
+	plan, err := backup.Prepare(ctx, f, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Skip != 1 {
+		t.Fatalf("plan skip=%d want 1", plan.Skip)
+	}
+	streams, sent := plan.StreamCount()
+	if streams != 0 || len(sent) != 0 {
+		t.Fatalf("streams=%d sent=%v", streams, sent)
 	}
 	res, err := backup.Run(ctx, f, req)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(res.Output, "skipped") {
-		t.Fatalf("expected dry-run output with skipped datasets, got: %q", res.Output)
-	}
-	if res.JSONReport == nil {
-		t.Fatal("expected JSONReport with JSON:true")
+	if res.ErrCode != backup.ErrCodeUpToDate {
+		t.Fatalf("errcode=%v", res.ErrCode)
 	}
 }
 
@@ -71,7 +81,6 @@ func TestBackupFromParseHelpers(t *testing.T) {
 		Target:        tgt,
 		SnapMode:      mode,
 		SyncDirection: dir,
-		DryRun:        true,
 	}
 	f := &zfs.Fake{Lists: map[string]string{
 		"pool/src": "pool/src\t1\t0\t1\t1K\tfilesystem\t-\t-\t-\npool/src@a\t2\t0\t2\t1K\t-\t-\t-\t-",

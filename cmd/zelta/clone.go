@@ -155,11 +155,11 @@ func runCloneAndBackup(p *opt.Parsed) int {
 		fmt.Fprintf(os.Stderr, "error: target: %v\n", err)
 		return 1
 	}
-	res, err := backup.Run(context.Background(), newReal(), backup.Request{
+	exec := newReal()
+	req := backup.Request{
 		Source:        src,
 		Target:        tgt,
 		TargetOrigin:  origin,
-		DryRun:        p.Env.Bool("DRYRUN", false),
 		Intermediate:  p.Env.Bool("SEND_INTR", true),
 		SnapMode:      snapMode,
 		SnapTime:      snapTime,
@@ -170,7 +170,27 @@ func runCloneAndBackup(p *opt.Parsed) int {
 		SyncDirection: syncDir,
 		Flags:         &flags,
 		CreateParent:  &createParent,
-	})
+	}
+	if p.Env.Bool("DRYRUN", false) {
+		plan, err := backup.Prepare(context.Background(), exec, req)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "zelta clone: backup: %v\n", err)
+			return 1
+		}
+		out, err := backup.FormatDryRunDirection(plan, src.String(), tgt.String(), syncDir.PipeArg())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "zelta clone: backup: %v\n", err)
+			return 1
+		}
+		if plan.Full+plan.Incr == 0 {
+			if sum := plan.Summary(); sum != "" {
+				out += sum + "\n"
+			}
+		}
+		emitBlob(sink, out)
+		return 0
+	}
+	res, err := backup.Run(context.Background(), exec, req)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta clone: backup: %v\n", err)
 		return 1

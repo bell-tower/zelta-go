@@ -3,8 +3,6 @@ package backup
 import (
 	"fmt"
 	"strings"
-
-	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
 // FormatDryRun prints oracle-ish banner + "+ …" lines for snap + first-pass steps.
@@ -23,26 +21,13 @@ func FormatDryRunDirection(p *Plan, srcEp, tgtEp, direction string) (string, err
 		b.WriteString(strings.Replace(p.SnapReason, "snapshotting: ", "would snapshot: ", 1))
 		b.WriteString(name)
 		b.WriteByte('\n')
-		dsSnap := p.SnapArgv[len(p.SnapArgv)-1]
-		sh, err := zfs.SnapshotShell(srcEp, dsSnap, hasRecursive(p.SnapArgv))
-		if err != nil {
-			return "", err
-		}
-		b.WriteString("+ ")
-		b.WriteString(sh)
-		b.WriteByte('\n')
 	}
-	for _, st := range p.Steps {
-		if st.Kind != KindFull && st.Kind != KindIncremental {
-			continue
-		}
-		// Oracle dry-run shows first pass only (second pass is execute-time).
-		body, err := zfs.PipeShellDirection(srcEp, tgtEp, st.Send, st.Recv, direction)
-		if err != nil {
-			return "", err
-		}
-		b.WriteString("+ ")
-		b.WriteString(body)
+	lines, err := p.Commands(srcEp, tgtEp, direction)
+	if err != nil {
+		return "", err
+	}
+	for _, line := range lines {
+		b.WriteString(line)
 		b.WriteByte('\n')
 	}
 	for _, st := range p.Steps {
@@ -50,22 +35,6 @@ func FormatDryRunDirection(p *Plan, srcEp, tgtEp, direction string) (string, err
 			continue
 		}
 		b.WriteString(st.Notice)
-		b.WriteByte('\n')
-	}
-	for _, bm := range p.Bookmarks {
-		verify, err := zfs.CommandShell(bm.VerifyEndpoint, bm.Verify)
-		if err != nil {
-			return "", err
-		}
-		create, err := zfs.CommandShell(bm.SourceEndpoint, bm.Create)
-		if err != nil {
-			return "", err
-		}
-		b.WriteString("+ ")
-		b.WriteString(verify)
-		b.WriteByte('\n')
-		b.WriteString("+ ")
-		b.WriteString(create)
 		b.WriteByte('\n')
 	}
 	return b.String(), nil

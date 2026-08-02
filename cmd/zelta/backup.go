@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"git.belltower.it/djbell/zelta-go/backup"
 	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
+	"git.belltower.it/djbell/zelta-go/report"
 )
 
 func runBackup(args []string) int {
@@ -82,10 +84,10 @@ func runBackup(args []string) int {
 
 	exec := newReal()
 	wireCommandEcho(exec, sink)
-	res, err := backup.Run(context.Background(), exec, backup.Request{
+	dryRun := p.Env.Bool("DRYRUN", false)
+	req := backup.Request{
 		Source:        src,
 		Target:        tgt,
-		DryRun:        p.Env.Bool("DRYRUN", false),
 		Intermediate:  p.Env.Bool("SEND_INTR", true),
 		SnapMode:      snapMode,
 		SnapName:      strings.TrimPrefix(p.Env.Get("SNAP_NAME"), "@"),
@@ -99,7 +101,32 @@ func runBackup(args []string) int {
 		CreateParent:  &createParent,
 		TargetOrigin:  origin,
 		JSON:          jsonMode,
-	})
+	}
+	if dryRun {
+		// Oracle -n: recon + plan, then render "+ …" commands without
+		// executing anything (Prepare may still create a missing parent).
+		plan, err := backup.Prepare(context.Background(), exec, req)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "zelta backup: %v\n", err)
+			return 1
+		}
+		out, err := backup.FormatDryRunDirection(plan, src.String(), tgt.String(), syncDir.PipeArg())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "zelta backup: %v\n", err)
+			return 1
+		}
+		if plan.Full+plan.Incr == 0 {
+			if sum := plan.Summary(); sum != "" {
+				out += sum + "\n"
+			}
+		}
+		emitBlob(sink, out)
+		if jsonMode {
+			printBackupJSON(plan, src, tgt, time.Now())
+		}
+		return 0
+	}
+	res, err := backup.Run(context.Background(), exec, req)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta backup: %v\n", err)
 		return 1
@@ -135,4 +162,22 @@ func runBackup(args []string) int {
 
 func backupUsage() {
 	fmt.Fprintln(os.Stderr, "usage: zelta backup [-n] [-Ii] [--snapshot|--no-snapshot] [--target-origin ENDPOINT] [--push|--pull|--no-pull] [-d depth] [-X pat] SOURCE TARGET")
+}
+
+// printBackupJSON emits the JSON report shape for a prepared plan. Used by
+// the dry-run path, where telemetry is zero because nothing executed.
+func printBackupJSON(plan *backup.Plan, src, tgt endpoint.Endpoint, startTime time.Time) {
+	streams, sent := plan.StreamCount()
+	var messages []string
+	for _, w := range plan.Warnings {
+		messages = append(messages, "warning: "+w)
+	}
+	data, err := json.Marshal(report.NewBackupResult(
+		src, tgt, streams, sent, nil, messages, startTime, time.Time{}, 0, 0, 0,
+	))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "zelta backup: JSON marshal: %v\n", err)
+		return
+	}
+	fmt.Println(string(data))
 }

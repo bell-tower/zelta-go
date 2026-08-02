@@ -83,6 +83,28 @@ func TestFormatRemoteUsesDirectionAwarePipe(t *testing.T) {
 	}
 }
 
+func TestCommandsMatchesFormatRemote(t *testing.T) {
+	steps := []Step{
+		{Kind: "rename", Argv: []string{"zfs", "rename", "-fp", "bpool/target", "bpool/target_base"}},
+		{Kind: "send", Argv: []string{"zfs", "send", "-I", "apool/src@base", "apool/src@new"}},
+		{Kind: "recv", Argv: []string{"zfs", "recv", "-s", "bpool/target"}},
+	}
+	lines, err := Commands(steps, "root@debian:apool/src", "root@vault:bpool/target", "PULL")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lines) != 2 {
+		t.Fatalf("lines=%v", lines)
+	}
+	out, err := FormatRemote(steps, "root@debian:apool/src", "root@vault:bpool/target", "PULL")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != lines[0]+"\n"+lines[1]+"\n" {
+		t.Fatalf("Commands/FormatRemote mismatch:\n%q\n%q", out, lines)
+	}
+}
+
 func TestPlanTreeAddsFullSourceOnlyChild(t *testing.T) {
 	steps, err := PlanTree(TreeRequest{
 		Source: endpoint.MustParse("tank/src"), Target: endpoint.MustParse("tank/target"), Intermediate: true, Flags: backup.DefaultSendRecv(),
