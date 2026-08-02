@@ -4,7 +4,7 @@ import "strings"
 
 // ErrCode classifies a backup outcome for programmatic handling.
 // Empty (ErrCodeNone) means no known failure pattern matched — not a guarantee
-// that streams were sent. Check Plan or JSONReport for transfer counts.
+// that streams were sent. Check Plan or Stats for transfer counts.
 type ErrCode string
 
 const (

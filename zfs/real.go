@@ -92,6 +92,15 @@ func (r *Real) List(ctx context.Context, epStr, dataset string, props []string, 
 	return splitNonEmpty(string(out)), nil
 }
 
+// Output runs argv on the endpoint (local or remote) and returns stdout.
+// Used by CLI-only verbs (e.g. report) that need non-LIST zfs shapes.
+func (r *Real) Output(ctx context.Context, epStr string, argv []string) ([]byte, error) {
+	if len(argv) == 0 {
+		return nil, fmt.Errorf("zfs output: empty argv")
+	}
+	return r.output(ctx, epStr, r.rewriteBin(argv))
+}
+
 func (r *Real) GetProps(ctx context.Context, epStr, dataset string, props string, depth int) ([]string, error) {
 	if dataset == "" {
 		return nil, fmt.Errorf("zfs get: empty dataset")

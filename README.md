@@ -46,7 +46,11 @@ Import path: `github.com/bell-tower/zelta-go/<package>`
 | `prune` | Read-only retention analysis |
 | `lineage` | Clone/revert planning |
 | `rotate` | Rotate lifecycle for divergent targets |
-| `report` | JSON output schema, column expansion |
+| `cmdbuild` | Command template → argv |
+| `zconf` | Policy conf keys |
+
+JSON schema and match column expansion live under `internal/report` (CLI
+output, not the public Action Library).
 
 ```go
 // Structured SSH (library consumers):

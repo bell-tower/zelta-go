@@ -13,11 +13,15 @@ import (
 const version = "Zelta 1.2.0 (Go)"
 
 func main() {
-	// argv[0] dispatch: zprune binary/symlink acts as "zelta zprune"
+	// argv[0] dispatch: zprune/zeport binary/symlink acts as "zelta <verb>"
 	if len(os.Args) > 0 {
 		switch filepath.Base(os.Args[0]) {
 		case "zprune":
 			args := []string{os.Args[0], "zprune"}
+			args = append(args, os.Args[1:]...)
+			os.Args = args
+		case "zeport":
+			args := []string{os.Args[0], "report"}
 			args = append(args, os.Args[1:]...)
 			os.Args = args
 		default:
@@ -65,6 +69,8 @@ func main() {
 		os.Exit(runPolicy(os.Args[2:]))
 	case "zprune":
 		os.Exit(runZprune(os.Args[2:]))
+	case "report", "zeport":
+		os.Exit(runReport(os.Args[2:]))
 	default:
 		fmt.Fprintf(os.Stderr, "unrecognized command: %q\n", os.Args[1])
 		usage()

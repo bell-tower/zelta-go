@@ -1,7 +1,9 @@
 package report
 
 import (
+	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -100,6 +102,40 @@ func TestNewBackupResultErrors(t *testing.T) {
 	}
 	if r.ReplicationSize != "" {
 		t.Errorf("ReplicationSize = %q, want empty", r.ReplicationSize)
+	}
+}
+
+func TestBackupResultScrubsCarriageReturns(t *testing.T) {
+	src := endpoint.Endpoint{
+		Raw:     "local\rhost:pool/source",
+		Host:    "local\rhost",
+		Dataset: "pool/source",
+		Remote:  true,
+	}
+	tgt := endpoint.Endpoint{Dataset: "pool/target"}
+	start := time.Now()
+	end := time.Now()
+	r := NewBackupResult(src, tgt, 0, nil,
+		[]string{"source dataset 'local\rhost:pool/source' does not exist"},
+		nil, start, end, 0, 0, 0)
+	if strings.Contains(r.SourceHost, "\r") || r.SourceHost != "localhost" {
+		t.Errorf("SourceHost = %q", r.SourceHost)
+	}
+	if strings.Contains(r.SourceEndpoint, "\r") || r.SourceEndpoint != "localhost:pool/source" {
+		t.Errorf("SourceEndpoint = %q", r.SourceEndpoint)
+	}
+	if len(r.ErrorMessages) != 1 || strings.Contains(r.ErrorMessages[0], "\r") {
+		t.Errorf("ErrorMessages = %v", r.ErrorMessages)
+	}
+	if !strings.Contains(r.ErrorMessages[0], "localhost:pool/source") {
+		t.Errorf("ErrorMessages[0] = %q", r.ErrorMessages[0])
+	}
+	data, err := r.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "\\r") || bytes.IndexByte(data, '\r') >= 0 {
+		t.Errorf("marshaled JSON still has CR: %s", data)
 	}
 }
 

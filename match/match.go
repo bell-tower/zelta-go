@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/bell-tower/zelta-go/endpoint"
-	"github.com/bell-tower/zelta-go/report"
+	"github.com/bell-tower/zelta-go/internal/report"
 	"github.com/bell-tower/zelta-go/zfs"
 )
 

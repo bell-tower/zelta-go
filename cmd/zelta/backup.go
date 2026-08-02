@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -11,7 +10,7 @@ import (
 	"github.com/bell-tower/zelta-go/backup"
 	"github.com/bell-tower/zelta-go/endpoint"
 	"github.com/bell-tower/zelta-go/internal/opt"
-	"github.com/bell-tower/zelta-go/report"
+	"github.com/bell-tower/zelta-go/internal/report"
 )
 
 func runBackup(args []string) int {
@@ -85,6 +84,7 @@ func runBackup(args []string) int {
 	exec := newReal()
 	wireCommandEcho(exec, sink)
 	dryRun := p.Env.Bool("DRYRUN", false)
+	startTime := time.Now()
 	req := backup.Request{
 		Source:        src,
 		Target:        tgt,
@@ -100,19 +100,29 @@ func runBackup(args []string) int {
 		Flags:         &flags,
 		CreateParent:  &createParent,
 		TargetOrigin:  origin,
-		JSON:          jsonMode,
 	}
 	if dryRun {
 		// Oracle -n: recon + plan, then render "+ …" commands without
 		// executing anything (Prepare may still create a missing parent).
 		plan, err := backup.Prepare(context.Background(), exec, req)
 		if err != nil {
+			// Oracle stop(): still emit JSON with errorMessages when --json.
 			fmt.Fprintf(os.Stderr, "zelta backup: %v\n", err)
+			if jsonMode {
+				emitBackupJSON(report.NewBackupResult(
+					src, tgt, 0, nil, []string{err.Error()}, nil, startTime, time.Now(), 0, 0, 0,
+				))
+			}
 			return 1
 		}
 		out, err := backup.FormatDryRunDirection(plan, src.String(), tgt.String(), syncDir.PipeArg())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "zelta backup: %v\n", err)
+			if jsonMode {
+				emitBackupJSON(report.NewBackupResult(
+					src, tgt, 0, nil, []string{err.Error()}, nil, startTime, time.Now(), 0, 0, 0,
+				))
+			}
 			return 1
 		}
 		if plan.Full+plan.Incr == 0 {
@@ -122,13 +132,25 @@ func runBackup(args []string) int {
 		}
 		emitBlob(sink, out)
 		if jsonMode {
-			printBackupJSON(plan, src, tgt, time.Now())
+			streams, sent := plan.StreamCount()
+			var messages []string
+			for _, w := range plan.Warnings {
+				messages = append(messages, "warning: "+w)
+			}
+			emitBackupJSON(report.NewBackupResult(
+				src, tgt, streams, sent, nil, messages, startTime, time.Time{}, 0, 0, 0,
+			))
 		}
 		return 0
 	}
 	res, err := backup.Run(context.Background(), exec, req)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta backup: %v\n", err)
+		if jsonMode {
+			emitBackupJSON(report.NewBackupResult(
+				src, tgt, 0, nil, []string{err.Error()}, nil, startTime, time.Now(), 0, 0, 0,
+			))
+		}
 		return 1
 	}
 	var filteredWarnings []string
@@ -143,13 +165,26 @@ func runBackup(args []string) int {
 	// silences them; json mode prefixes them to stderr; terminal mode
 	// prints them to stdout (dry-run and execute alike).
 	emitBlob(sink, res.Output)
-	if jsonMode && res.JSONReport != nil {
-		data, err := json.Marshal(res.JSONReport)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "zelta backup: JSON marshal: %v\n", err)
-			return 1
+	if jsonMode {
+		streams, sent := 0, []string(nil)
+		if res.Plan != nil {
+			streams, sent = res.Plan.StreamCount()
 		}
-		fmt.Println(string(data))
+		var messages []string
+		for _, w := range filteredWarnings {
+			messages = append(messages, "warning: "+w)
+		}
+		st, et := res.StartTime, res.EndTime
+		if st.IsZero() {
+			st = startTime
+		}
+		if et.IsZero() {
+			et = time.Now()
+		}
+		emitBackupJSON(report.NewBackupResult(
+			src, tgt, streams, sent, res.Errors, messages,
+			st, et, res.Stats.Bytes, res.Stats.Streams, res.Stats.Secs,
+		))
 	}
 	for _, msg := range res.Errors {
 		fmt.Fprintf(os.Stderr, "zelta backup: %s\n", msg)
@@ -164,17 +199,8 @@ func backupUsage() {
 	fmt.Fprintln(os.Stderr, "usage: zelta backup [-n] [-Ii] [--snapshot|--no-snapshot] [--target-origin ENDPOINT] [--push|--pull|--no-pull] [-d depth] [-X pat] SOURCE TARGET")
 }
 
-// printBackupJSON emits the JSON report shape for a prepared plan. Used by
-// the dry-run path, where telemetry is zero because nothing executed.
-func printBackupJSON(plan *backup.Plan, src, tgt endpoint.Endpoint, startTime time.Time) {
-	streams, sent := plan.StreamCount()
-	var messages []string
-	for _, w := range plan.Warnings {
-		messages = append(messages, "warning: "+w)
-	}
-	data, err := json.Marshal(report.NewBackupResult(
-		src, tgt, streams, sent, nil, messages, startTime, time.Time{}, 0, 0, 0,
-	))
+func emitBackupJSON(r *report.BackupResult) {
+	data, err := r.Marshal()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta backup: JSON marshal: %v\n", err)
 		return

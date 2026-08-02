@@ -12,7 +12,6 @@ import (
 	"github.com/bell-tower/zelta-go/cmdbuild"
 	"github.com/bell-tower/zelta-go/endpoint"
 	"github.com/bell-tower/zelta-go/match"
-	"github.com/bell-tower/zelta-go/report"
 	"github.com/bell-tower/zelta-go/zfs"
 )
 
@@ -72,8 +71,6 @@ type Request struct {
 	// SyncDirection: zero/DirectionPull (default), DirectionPush, DirectionProxy.
 	// Use ParseSyncDirection for CLI/env/JSON strings. Never reads process env.
 	SyncDirection SyncDirection
-	// JSON true → collect telemetry and populate JSONReport in Result.
-	JSON bool
 	// OnLine, when non-nil, is called for each line of zfs send/recv stderr
 	// output during execution. Useful for progress streaming.
 	OnLine func(line string)
@@ -95,8 +92,9 @@ type Result struct {
 	Stats zfs.PipeStats
 	// ErrCode classifies the backup outcome for programmatic handling.
 	ErrCode ErrCode
-	// JSONReport is set when req.JSON is true.
-	JSONReport *report.BackupResult
+	// StartTime / EndTime bracket the run for CLI presentation (JSON, logs).
+	StartTime time.Time
+	EndTime   time.Time
 }
 
 // Run matches source/target, plans snap+send/recv, executes every step
@@ -104,7 +102,6 @@ type Result struct {
 // see Prepare/Commands; for step-by-step execution see Plan.RunStep.
 func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	srcEp := req.Source
-	tgtEp := req.Target
 	startTime := time.Now()
 	plan, mres, err := prepare(ctx, exec, req)
 	if err != nil {
@@ -175,29 +172,17 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	}
 
 	res := &Result{
-		Match:    mres,
-		Plan:     plan,
-		Output:   b.String(),
-		Warnings: append([]string(nil), plan.Warnings...),
-		Errors:   errors,
-		Commands: commands,
-		Stats:    stats,
+		Match:     mres,
+		Plan:      plan,
+		Output:    b.String(),
+		Warnings:  append([]string(nil), plan.Warnings...),
+		Errors:    errors,
+		Commands:  commands,
+		Stats:     stats,
+		StartTime: startTime,
+		EndTime:   execEndTime,
 	}
 	res.ErrCode = ErrCodeFromOutput(res.Output)
-	if req.JSON {
-		streamCount, sentStreams := plan.StreamCount()
-		var messages []string
-		for _, w := range res.Warnings {
-			messages = append(messages, "warning: "+w)
-		}
-		res.JSONReport = report.NewBackupResult(
-			srcEp, tgtEp,
-			streamCount, sentStreams,
-			errors, messages,
-			startTime, execEndTime,
-			stats.Bytes, stats.Streams, stats.Secs,
-		)
-	}
 	return res, nil
 }
 

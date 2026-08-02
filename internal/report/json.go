@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/bell-tower/zelta-go/endpoint"
 )
 
 // BackupResult mirrors the upstream Awk `zelta backup --json` schema.
+// Process-output only — built by the CLI from backup.Result / plan fields.
 type BackupResult struct {
 	OutputVersion          OutputVersion `json:"output_version"`
 	StartTime              string        `json:"startTime,omitempty"`
@@ -49,6 +51,9 @@ type OutputVersion struct {
 // replicationSize is the raw byte count (Awk Summary parity); replicationTime
 // is the summed zfs recv -v stream seconds; streamsRecv is the recv-confirmed
 // stream count (0 falls back to streamsSent).
+//
+// String fields strip carriage returns (oracle json_val / json_string) so a
+// host like "local\rhost" never breaks single-line JSON consumers.
 func NewBackupResult(
 	src, tgt endpoint.Endpoint,
 	streamsSent int, sentStreams []string,
@@ -65,34 +70,34 @@ func NewBackupResult(
 		},
 	}
 	if src.User != "" {
-		r.SourceUser = src.User
+		r.SourceUser = scrubCR(src.User)
 	}
 	if src.Host != "" {
-		r.SourceHost = src.Host
+		r.SourceHost = scrubCR(src.Host)
 	}
 	if src.Dataset != "" {
-		r.SourceDataset = src.Dataset
+		r.SourceDataset = scrubCR(src.Dataset)
 	}
 	if src.Snapshot != "" {
-		r.SourceSnapshot = src.Snapshot
+		r.SourceSnapshot = scrubCR(src.Snapshot)
 	}
 	if s := src.String(); s != "" {
-		r.SourceEndpoint = s
+		r.SourceEndpoint = scrubCR(s)
 	}
 	if tgt.User != "" {
-		r.TargetUser = tgt.User
+		r.TargetUser = scrubCR(tgt.User)
 	}
 	if tgt.Host != "" {
-		r.TargetHost = tgt.Host
+		r.TargetHost = scrubCR(tgt.Host)
 	}
 	if tgt.Dataset != "" {
-		r.TargetDataset = tgt.Dataset
+		r.TargetDataset = scrubCR(tgt.Dataset)
 	}
 	if tgt.Snapshot != "" {
-		r.TargetSnapshot = tgt.Snapshot
+		r.TargetSnapshot = scrubCR(tgt.Snapshot)
 	}
 	if s := tgt.String(); s != "" {
-		r.TargetEndpoint = s
+		r.TargetEndpoint = scrubCR(s)
 	}
 	if streamsSent > 0 {
 		r.ReplicationStreamsSent = fmt.Sprintf("%d", streamsSent)
@@ -108,8 +113,9 @@ func NewBackupResult(
 	if replicationTime > 0 {
 		r.ReplicationTime = strconv.FormatFloat(replicationTime, 'g', -1, 64)
 	}
-	r.SentStreams = sentStreams
-	r.ErrorMessages = append(append([]string(nil), messages...), replicationErrors...)
+	r.SentStreams = scrubCRSlice(sentStreams)
+	errs := append(append([]string(nil), messages...), replicationErrors...)
+	r.ErrorMessages = scrubCRSlice(errs)
 	if !startTime.IsZero() {
 		r.StartTime = startTime.Format(time.RFC3339)
 	}
@@ -132,4 +138,20 @@ func NewBackupResult(
 // sentStreams, errorMessages).
 func (r *BackupResult) Marshal() ([]byte, error) {
 	return json.Marshal(r)
+}
+
+// scrubCR strips carriage returns like oracle json_val/json_string.
+func scrubCR(s string) string {
+	return strings.ReplaceAll(s, "\r", "")
+}
+
+func scrubCRSlice(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]string, len(in))
+	for i, s := range in {
+		out[i] = scrubCR(s)
+	}
+	return out
 }

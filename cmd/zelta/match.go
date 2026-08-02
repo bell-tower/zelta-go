@@ -9,7 +9,7 @@ import (
 	"github.com/bell-tower/zelta-go/internal/opt"
 	"github.com/bell-tower/zelta-go/internal/zlog"
 	"github.com/bell-tower/zelta-go/match"
-	"github.com/bell-tower/zelta-go/report"
+	"github.com/bell-tower/zelta-go/internal/report"
 )
 
 func runMatch(args []string) int {
