@@ -17,36 +17,36 @@ const (
 
 // Pair is one source/target dataset comparison row.
 type Pair struct {
-	DSSuffix              string
-	Match                 string
-	MatchIVSet            string
-	NumMatches            int
-	SrcName               string
-	TgtName               string
-	SrcOrigin             string
-	TgtOrigin             string
-	SrcFirst              string
-	TgtFirst              string
-	SrcLast               string
-	TgtLast               string
-	SrcNext               string
-	TgtNext               string
-	SrcWritten            string
-	SrcEncryption         string
-	TgtEncryption         string
-	TgtWritten            string
-	SrcSnapshotsChanged   string
-	TgtSnapshotsChanged   string
-	TgtReceiveResumeToken string
-	SrcType               string // filesystem | volume
-	TgtType               string
-	SrcSnaps              int
-	SrcSavepoints         []string
-	TgtSnaps              int
-	XferNum               int
-	XferSize              int64
-	NumBlocked            int
-	Info                  string
+	DSSuffix              string   `json:"ds_suffix,omitempty"`
+	Match                 string   `json:"match,omitempty"`
+	MatchIVSet            string   `json:"match_ivset,omitempty"`
+	NumMatches            int      `json:"num_matches,omitempty"`
+	SrcName               string   `json:"src_name,omitempty"`
+	TgtName               string   `json:"tgt_name,omitempty"`
+	SrcOrigin             string   `json:"src_origin,omitempty"`
+	TgtOrigin             string   `json:"tgt_origin,omitempty"`
+	SrcFirst              string   `json:"src_first,omitempty"`
+	TgtFirst              string   `json:"tgt_first,omitempty"`
+	SrcLast               string   `json:"src_last,omitempty"`
+	TgtLast               string   `json:"tgt_last,omitempty"`
+	SrcNext               string   `json:"src_next,omitempty"`
+	TgtNext               string   `json:"tgt_next,omitempty"`
+	SrcWritten            string   `json:"src_written,omitempty"`
+	SrcEncryption         string   `json:"src_encryption,omitempty"`
+	TgtEncryption         string   `json:"tgt_encryption,omitempty"`
+	TgtWritten            string   `json:"tgt_written,omitempty"`
+	SrcSnapshotsChanged   string   `json:"src_snapshots_changed,omitempty"`
+	TgtSnapshotsChanged   string   `json:"tgt_snapshots_changed,omitempty"`
+	TgtReceiveResumeToken string   `json:"tgt_receive_resume_token,omitempty"`
+	SrcType               string   `json:"src_type,omitempty"` // filesystem | volume
+	TgtType               string   `json:"tgt_type,omitempty"`
+	SrcSnaps              int      `json:"src_snaps,omitempty"`
+	SrcSavepoints         []string `json:"src_savepoints,omitempty"`
+	TgtSnaps              int      `json:"tgt_snaps,omitempty"`
+	XferNum               int      `json:"xfer_num,omitempty"`
+	XferSize              int64    `json:"xfer_size,omitempty"`
+	NumBlocked            int      `json:"num_blocked,omitempty"`
+	Info                  string   `json:"info,omitempty"`
 	status                pairStatus
 }
 

@@ -47,11 +47,12 @@ Import path: `github.com/bell-tower/zelta-go/<package>`
 | `lineage` | Clone/revert planning |
 | `rotate` | Rotate lifecycle for divergent targets |
 | `cmdbuild` | Command template → argv |
-| `zconf` | Policy conf keys |
+| `job` | Native JSON import/export of Requests + Results |
+| `zconf` | Policy conf → jobs (may move internal later) |
 
-JSON schema, match tables, dry-run banners, and human byte formatting live
-under `internal/report` (CLI output, not the public Action Library). Public
-packages expose typed Plans, `[]zfs.Command`, status codes, and telemetry.
+Match tables, dry-run banners, Awk-oracle `--json`, and human byte formatting
+live under `internal/report` (CLI output). Public packages expose typed Plans,
+`[]zfs.Command`, status codes, telemetry, and `job` documents.
 
 ```go
 // Structured SSH (library consumers):

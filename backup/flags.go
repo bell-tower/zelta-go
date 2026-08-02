@@ -5,19 +5,19 @@ import "strings"
 // SendRecv holds zfs send/recv flag fragments (oracle SEND_DEFAULT / RECV_*).
 // Constructible by external modules; CLI merges env via internal/opt.SendRecvFrom.
 type SendRecv struct {
-	SendDefault    string   // SEND_DEFAULT
-	RecvDefault    string   // RECV_DEFAULT (always prepended when set)
-	RecvTop        string   // RECV_TOP — full root only
-	RecvFS         string   // RECV_FS — full filesystem
-	RecvVol        string   // RECV_VOL — full volume
-	RecvPartial    string   // RECV_PARTIAL — when Resume
-	Resume         bool     // RESUME gates RecvPartial
-	RecvPropsAdd   []string // RECV_PROPS_ADD — repeated zfs recv -o properties
-	RecvPropsDel   []string // RECV_PROPS_DEL — repeated zfs recv -x properties
-	Bookmarks      bool     // create final-stream bookmarks after successful recv
-	BookmarkPrefix string
-	SendOverride   string // SEND_OVERRIDE — if set, replaces SendDefault
-	RecvOverride   string // RECV_OVERRIDE — if set, replaces all recv flags
+	SendDefault    string   `json:"send_default,omitempty"`
+	RecvDefault    string   `json:"recv_default,omitempty"`
+	RecvTop        string   `json:"recv_top,omitempty"`
+	RecvFS         string   `json:"recv_fs,omitempty"`
+	RecvVol        string   `json:"recv_vol,omitempty"`
+	RecvPartial    string   `json:"recv_partial,omitempty"`
+	Resume         bool     `json:"resume,omitempty"`
+	RecvPropsAdd   []string `json:"recv_props_add,omitempty"`
+	RecvPropsDel   []string `json:"recv_props_del,omitempty"`
+	Bookmarks      bool     `json:"bookmarks,omitempty"`
+	BookmarkPrefix string   `json:"bookmark_prefix,omitempty"`
+	SendOverride   string   `json:"send_override,omitempty"`
+	RecvOverride   string   `json:"recv_override,omitempty"`
 }
 
 // DefaultSendRecv returns built-in oracle defaults (bin/zelta : ${ZELTA_*=…}).

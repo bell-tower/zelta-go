@@ -7,6 +7,7 @@ import (
 
 	"github.com/bell-tower/zelta-go/backup"
 	"github.com/bell-tower/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/job"
 	"github.com/bell-tower/zelta-go/match"
 	"github.com/bell-tower/zelta-go/prune"
 	"github.com/bell-tower/zelta-go/zfs"
@@ -109,6 +110,37 @@ func TestMatchCompare(t *testing.T) {
 	}
 	if res == nil {
 		t.Fatal("expected non-nil result")
+	}
+}
+
+func TestJobImportExport(t *testing.T) {
+	doc := &job.Document{
+		Version: job.Version,
+		Items: []job.Item{
+			job.FromBackup(backup.Request{
+				Source:   endpoint.MustParse("pool/src"),
+				Target:   endpoint.MustParse("pool/tgt"),
+				SnapMode: backup.SnapNever,
+			}, nil),
+			job.FromMatch(match.Request{
+				Source: endpoint.MustParse("pool/src"),
+				Target: endpoint.MustParse("pool/tgt"),
+			}, nil),
+		},
+	}
+	raw, err := job.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := job.Unmarshal(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Items) != 2 {
+		t.Fatalf("items=%d", len(got.Items))
+	}
+	if got.Items[0].Backup == nil || got.Items[1].Match == nil {
+		t.Fatal("expected backup then match payloads")
 	}
 }
 

@@ -12,12 +12,12 @@ import (
 // (replicationSize, replicationStreamsReceived, replicationTime).
 type PipeStats struct {
 	// Bytes is the sum of "size N" headers from zfs send -P.
-	Bytes int64
+	Bytes int64 `json:"bytes,omitempty"`
 	// Streams is the number of "received … stream in N seconds" lines
 	// from zfs recv -v.
-	Streams int
+	Streams int `json:"streams,omitempty"`
 	// Secs is the summed per-stream seconds from zfs recv -v.
-	Secs float64
+	Secs float64 `json:"secs,omitempty"`
 }
 
 // PipeStatsReporter is implemented by executors that accumulate pipe
