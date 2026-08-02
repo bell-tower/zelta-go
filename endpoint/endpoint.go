@@ -137,3 +137,13 @@ func DSSuffix(root, full string) (string, error) {
 	}
 	return "/" + strings.TrimPrefix(full, prefix), nil
 }
+
+// SplitOrigin splits a clone origin "dataset@snap" into the dataset and the
+// "@snap" savepoint. ok is false when there is no usable "@" separator.
+func SplitOrigin(origin string) (dataset, savepoint string, ok bool) {
+	i := strings.LastIndex(origin, "@")
+	if i <= 0 || i == len(origin)-1 {
+		return "", "", false
+	}
+	return origin[:i], origin[i:], true
+}

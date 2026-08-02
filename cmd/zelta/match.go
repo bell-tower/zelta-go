@@ -81,7 +81,9 @@ func runMatch(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: target: %v\n", err)
 		return 1
 	}
-	res, err := match.Compare(context.Background(), newReal(), match.Request{
+	exec := newReal()
+	wireCommandEcho(exec, sink)
+	res, err := match.Compare(context.Background(), exec, match.Request{
 		Source:    src,
 		Target:    tgt,
 		Cols:      cols,
@@ -92,7 +94,6 @@ func runMatch(args []string) int {
 		Parsable:  p.Env.Bool("PARSABLE", false),
 		NoWritten: noWritten,
 		CheckTime: p.Env.Bool("CHECK_TIME", false),
-		Log:       sink,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta match: %v\n", err)

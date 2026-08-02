@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"git.belltower.it/djbell/zelta-go/cmdbuild"
+	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/match"
 )
 
@@ -190,7 +191,7 @@ func planPair(v PairView, intermediate bool, flags SendRecv) (*Step, error) {
 		return st, nil
 	}
 	if v.SrcOrigin != "" && v.TargetOrigin != "" {
-		originDS, originSnap, ok := splitOrigin(v.SrcOrigin)
+		originDS, originSnap, ok := endpoint.SplitOrigin(v.SrcOrigin)
 		if !ok {
 			return nil, fmt.Errorf("backup: invalid source clone origin %q", v.SrcOrigin)
 		}
@@ -281,7 +282,7 @@ func buildRecvCmd(st *Step, flags SendRecv) error {
 		return fmt.Errorf("backup: empty target name for %q", st.DSSuffix)
 	}
 	recv, err := cmdbuild.Build("RECV", map[string]string{
-		"flags": recvFlags(st, flags),
+		"flags": flags.RecvFlags(st.SrcType, st.DSSuffix == "", st.Kind == KindFull, st.Origin),
 		"ds":    st.TgtName,
 	})
 	if err != nil {
@@ -289,58 +290,6 @@ func buildRecvCmd(st *Step, flags SendRecv) error {
 	}
 	st.Recv = recv
 	return nil
-}
-
-// recvFlags: RECV_DEFAULT; full → TOP (root) + FS/VOL; + PARTIAL when Resume.
-// RECV_OVERRIDE replaces the whole fragment.
-func recvFlags(st *Step, f SendRecv) string {
-	if f.RecvOverride != "" {
-		return f.RecvOverride
-	}
-	var parts []string
-	if f.RecvDefault != "" {
-		parts = append(parts, f.RecvDefault)
-	}
-	if st.Origin != "" {
-		parts = append(parts, "-o origin="+st.Origin)
-	}
-	if st.Kind == KindFull {
-		if st.DSSuffix == "" && f.RecvTop != "" {
-			parts = append(parts, f.RecvTop)
-		}
-		switch st.SrcType {
-		case "volume":
-			if f.RecvVol != "" {
-				parts = append(parts, f.RecvVol)
-			}
-		default: // filesystem
-			if f.RecvFS != "" {
-				parts = append(parts, f.RecvFS)
-			}
-		}
-	}
-	for _, prop := range f.RecvPropsAdd {
-		if prop != "" {
-			parts = append(parts, "-o "+prop)
-		}
-	}
-	for _, prop := range f.RecvPropsDel {
-		if prop != "" {
-			parts = append(parts, "-x "+prop)
-		}
-	}
-	if f.Resume && f.RecvPartial != "" {
-		parts = append(parts, f.RecvPartial)
-	}
-	return strings.Join(parts, " ")
-}
-
-func splitOrigin(origin string) (string, string, bool) {
-	i := strings.LastIndex(origin, "@")
-	if i <= 0 || i == len(origin)-1 {
-		return "", "", false
-	}
-	return origin[:i], origin[i:], true
 }
 
 func (p *Plan) recount() {

@@ -1,5 +1,7 @@
 package backup
 
+import "strings"
+
 // SendRecv holds zfs send/recv flag fragments (oracle SEND_DEFAULT / RECV_*).
 // Constructible by external modules; CLI merges env via internal/opt.SendRecvFrom.
 type SendRecv struct {
@@ -37,4 +39,54 @@ func (s SendRecv) SendFlags() string {
 		return s.SendOverride
 	}
 	return s.SendDefault
+}
+
+// RecvFlags is the recv -flags fragment, in oracle order: RECV_DEFAULT;
+// fresh receives add TOP (root) + FS/VOL by source type; then RECV_PROPS_ADD,
+// RECV_PROPS_DEL, RECV_PARTIAL (when Resume), and finally -o origin.
+// RECV_OVERRIDE replaces the whole fragment.
+//
+// fresh marks a receive that starts a dataset on the target (no common
+// snapshot yet — full backup, rotate seed, clone origin). Pure incremental
+// receives pass fresh=false and skip the contextual TOP/FS/VOL properties.
+func (s SendRecv) RecvFlags(sourceType string, root, fresh bool, origin string) string {
+	if s.RecvOverride != "" {
+		return s.RecvOverride
+	}
+	var parts []string
+	if s.RecvDefault != "" {
+		parts = append(parts, s.RecvDefault)
+	}
+	if fresh {
+		if root && s.RecvTop != "" {
+			parts = append(parts, s.RecvTop)
+		}
+		switch sourceType {
+		case "volume":
+			if s.RecvVol != "" {
+				parts = append(parts, s.RecvVol)
+			}
+		default: // filesystem
+			if s.RecvFS != "" {
+				parts = append(parts, s.RecvFS)
+			}
+		}
+	}
+	for _, prop := range s.RecvPropsAdd {
+		if prop != "" {
+			parts = append(parts, "-o "+prop)
+		}
+	}
+	for _, prop := range s.RecvPropsDel {
+		if prop != "" {
+			parts = append(parts, "-x "+prop)
+		}
+	}
+	if s.Resume && s.RecvPartial != "" {
+		parts = append(parts, s.RecvPartial)
+	}
+	if origin != "" {
+		parts = append(parts, "-o origin="+origin)
+	}
+	return strings.Join(parts, " ")
 }

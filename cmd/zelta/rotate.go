@@ -246,14 +246,7 @@ func prepareRotateSnapshot(mode, requested, snapTime, snapSize string, pairs []*
 		return "", false, err
 	}
 	if !force && !disabled && (st > 0 || ss > 0) {
-		views := make([]backup.PairView, 0, len(pairs))
-		for _, pair := range pairs {
-			views = append(views, backup.PairView{
-				SrcName: pair.SrcName, SrcLast: pair.SrcLast, SrcWritten: pair.SrcWritten,
-				SrcSnapshotsChanged: pair.SrcSnapshotsChanged,
-			})
-		}
-		need = backup.ShouldSnapshotWithThresholds(backup.SnapIfNeeded, views, st, ss) != ""
+		need = backup.ShouldSnapshotWithThresholds(backup.SnapIfNeeded, backup.ViewsFromMatch(pairs), st, ss) != ""
 	}
 	for _, pair := range pairs {
 		if pair == nil || pair.SrcName == "" {

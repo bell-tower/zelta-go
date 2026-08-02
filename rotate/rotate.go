@@ -76,7 +76,7 @@ func FullSendCount(pairs []*match.Pair, targetRoot string, targetRows []zfs.List
 		if pair.Match != "" {
 			continue
 		}
-		if _, originSnap, ok := splitOrigin(pair.SrcOrigin); ok {
+		if _, originSnap, ok := endpoint.SplitOrigin(pair.SrcOrigin); ok {
 			tgtDS := joinDataset(targetRoot, pair.DSSuffix)
 			if hasSnapshot(targetRows, tgtDS+originSnap) {
 				continue
@@ -125,7 +125,7 @@ func PlanTree(req TreeRequest) ([]Step, error) {
 	// Lineage base for send planning (direct GUID match or verified clone origin).
 	lineageSnap := root.Match
 	if lineageSnap == "" {
-		_, originSnap, ok := splitOrigin(root.SrcOrigin)
+		_, originSnap, ok := endpoint.SplitOrigin(root.SrcOrigin)
 		if !ok || !hasSnapshot(req.TargetRows, joinDataset(tgt.Dataset, root.DSSuffix)+originSnap) {
 			return nil, fmt.Errorf("rotate has no verified common snapshot or source origin")
 		}
@@ -185,7 +185,7 @@ func planPair(sourceRoot, targetRoot, preserved string, pair *match.Pair, req Tr
 	fromOrigin := false
 	if matchName != "" {
 		sourceStart = sourceDataset + matchName
-	} else if originDS, originSnap, ok := splitOrigin(pair.SrcOrigin); ok && hasSnapshot(req.TargetRows, targetDataset+originSnap) {
+	} else if originDS, originSnap, ok := endpoint.SplitOrigin(pair.SrcOrigin); ok && hasSnapshot(req.TargetRows, targetDataset+originSnap) {
 		matchName = originSnap
 		sourceStart = originDS + originSnap
 		fromOrigin = true
@@ -204,7 +204,7 @@ func planPair(sourceRoot, targetRoot, preserved string, pair *match.Pair, req Tr
 			return nil, err
 		}
 		seedRecv, err := cmdbuild.Build("RECV", map[string]string{
-			"flags": recvFlags(req.Flags, pair.SrcType, pair.DSSuffix == ""),
+			"flags": req.Flags.RecvFlags(pair.SrcType, pair.DSSuffix == "", true, ""),
 			"ds":    targetDataset,
 		})
 		if err != nil {
@@ -227,15 +227,11 @@ func planPair(sourceRoot, targetRoot, preserved string, pair *match.Pair, req Tr
 		return nil, err
 	}
 	recv, err := cmdbuild.Build("RECV", map[string]string{
-		"flags": recvFlags(req.Flags, pair.SrcType, pair.DSSuffix == ""),
+		"flags": req.Flags.RecvFlags(pair.SrcType, pair.DSSuffix == "", true, origin),
 		"ds":    targetDataset,
 	})
 	if err != nil {
 		return nil, err
-	}
-	if origin != "" {
-		end := len(recv) - 1
-		recv = append(recv[:end], append([]string{"-o", "origin=" + origin}, recv[end:]...)...)
 	}
 	return append(steps,
 		Step{Kind: "send", Argv: send, DSSuffix: pair.DSSuffix},
@@ -275,7 +271,7 @@ func Plan(req Request) ([]Step, error) {
 	}
 	var targetRows []zfs.ListRow
 	if req.OriginVerified {
-		if _, originSnap, ok := splitOrigin(req.SourceOrigin); ok {
+		if _, originSnap, ok := endpoint.SplitOrigin(req.SourceOrigin); ok {
 			targetRows = []zfs.ListRow{{Name: req.Target.Dataset + originSnap}}
 		}
 	}
@@ -285,53 +281,11 @@ func Plan(req Request) ([]Step, error) {
 	})
 }
 
-func splitOrigin(origin string) (string, string, bool) {
-	i := strings.LastIndex(origin, "@")
-	if i <= 0 || i == len(origin)-1 {
-		return "", "", false
-	}
-	return origin[:i], origin[i:], true
-}
-
 func incrFlag(intermediate bool) string {
 	if intermediate {
 		return "-I"
 	}
 	return "-i"
-}
-
-func recvFlags(f backup.SendRecv, sourceType string, root bool) string {
-	if f.RecvOverride != "" {
-		return f.RecvOverride
-	}
-	var parts []string
-	if f.RecvDefault != "" {
-		parts = append(parts, f.RecvDefault)
-	}
-	if root && f.RecvTop != "" {
-		parts = append(parts, f.RecvTop)
-	}
-	if sourceType == "volume" {
-		if f.RecvVol != "" {
-			parts = append(parts, f.RecvVol)
-		}
-	} else if f.RecvFS != "" {
-		parts = append(parts, f.RecvFS)
-	}
-	for _, prop := range f.RecvPropsAdd {
-		if prop != "" {
-			parts = append(parts, "-o "+prop)
-		}
-	}
-	for _, prop := range f.RecvPropsDel {
-		if prop != "" {
-			parts = append(parts, "-x "+prop)
-		}
-	}
-	if f.Resume && f.RecvPartial != "" {
-		parts = append(parts, f.RecvPartial)
-	}
-	return strings.Join(parts, " ")
 }
 
 func Format(steps []Step) string {

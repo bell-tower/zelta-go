@@ -80,7 +80,9 @@ func runBackup(args []string) int {
 		}
 	}
 
-	res, err := backup.Run(context.Background(), newReal(), backup.Request{
+	exec := newReal()
+	wireCommandEcho(exec, sink)
+	res, err := backup.Run(context.Background(), exec, backup.Request{
 		Source:        src,
 		Target:        tgt,
 		DryRun:        p.Env.Bool("DRYRUN", false),
@@ -97,7 +99,6 @@ func runBackup(args []string) int {
 		CreateParent:  &createParent,
 		TargetOrigin:  origin,
 		JSON:          jsonMode,
-		Log:           sink,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta backup: %v\n", err)

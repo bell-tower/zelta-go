@@ -6,8 +6,10 @@ import (
 	"strconv"
 	"strings"
 
+	"git.belltower.it/djbell/zelta-go/endpoint"
 	"git.belltower.it/djbell/zelta-go/internal/opt"
 	"git.belltower.it/djbell/zelta-go/internal/zlog"
+	"git.belltower.it/djbell/zelta-go/zfs"
 )
 
 // newLogSink builds the leveled log sink from parsed options (oracle
@@ -42,5 +44,17 @@ func emitBlob(s *zlog.Sink, out string) {
 			continue
 		}
 		s.Notice(line)
+	}
+}
+
+// wireCommandEcho hooks the executor's per-command callback to the sink
+// (oracle LOG_DEBUG "`command`" echoes). Consumer-side: the library reports
+// nothing; the CLI decides what chatter reaches the user.
+func wireCommandEcho(real *zfs.Real, sink *zlog.Sink) {
+	if real == nil || sink == nil {
+		return
+	}
+	real.LogCmd = func(ep endpoint.Endpoint, argv []string) {
+		sink.Debug(zfs.CommandDebug(ep, argv))
 	}
 }

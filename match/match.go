@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/internal/zlog"
 	"git.belltower.it/djbell/zelta-go/report"
 	"git.belltower.it/djbell/zelta-go/zfs"
 )
@@ -26,9 +25,6 @@ type Request struct {
 	NoWritten               bool     // --no-written: list name,guid only
 	CheckTime               bool     // --time: append SOURCE/TARGET_LIST_TIME
 	PreserveSourceSnapshots bool     // retain source history for filtered backup planning
-	// Log, when non-nil, receives info/debug messages (oracle report()
-	// LOG_INFO/LOG_DEBUG) filtered and formatted by the sink.
-	Log *zlog.Sink
 	// SrcContext / TgtContext, when set, merge dataset props after list (backup path).
 	SrcContext *zfs.DatasetContext
 	TgtContext *zfs.DatasetContext
@@ -84,20 +80,6 @@ func Compare(ctx context.Context, exec zfs.Executor, req Request) (*Result, erro
 	}
 
 	t0 := time.Now()
-	// Oracle: LOG_INFO "listing source: ID", LOG_DEBUG "`src list cmd`"
-	// (command echoes fire from the executor's LogCmd hook at run time; the
-	// hook is restored so nested callers keep their own sink — backup's
-	// inner match runs at notice level like ipc-run --log-level=2).
-	if req.Log != nil {
-		req.Log.Info("listing source: " + srcEp.String())
-		if real, ok := exec.(*zfs.Real); ok {
-			prev := real.LogCmd
-			real.LogCmd = func(ep endpoint.Endpoint, argv []string) {
-				req.Log.Debug(zfs.CommandDebug(ep, argv))
-			}
-			defer func() { real.LogCmd = prev }()
-		}
-	}
 	srcLines, err := exec.List(ctx, srcEp.String(), srcEp.Dataset, props, req.Depth)
 	if err != nil {
 		return nil, fmt.Errorf("list source: %w", err)
@@ -105,9 +87,6 @@ func Compare(ctx context.Context, exec zfs.Executor, req Request) (*Result, erro
 	srcDur := time.Since(t0).Seconds()
 
 	t1 := time.Now()
-	if req.Log != nil {
-		req.Log.Info("listing target: " + tgtEp.String())
-	}
 	tgtLines, err := exec.List(ctx, tgtEp.String(), tgtEp.Dataset, props, req.Depth)
 	if err != nil {
 		return nil, fmt.Errorf("list target: %w", err)

@@ -794,7 +794,7 @@ func TestSyncDirectionWarningAndPipes(t *testing.T) {
 		}
 	}
 	fake := mk() // re-run execute to capture pipe direction
-	_, err = Run(context.Background(), fake, Request{
+	res, err = Run(context.Background(), fake, Request{
 		Source: endpoint.MustParse("root@debian:tank/src"), Target: endpoint.MustParse("root@vault:tank/tgt"),
 		DryRun: false, Intermediate: true, SnapMode: SnapNever,
 		SyncDirection: DirectionPush,
@@ -804,6 +804,9 @@ func TestSyncDirectionWarningAndPipes(t *testing.T) {
 	}
 	if len(fake.Pipes) != 1 || fake.Pipes[0].Direction != "PUSH" {
 		t.Fatalf("pipes=%+v", fake.Pipes)
+	}
+	if len(res.Commands) != 1 || !strings.Contains(res.Commands[0], "zfs send") || !strings.Contains(res.Commands[0], "zfs recv") {
+		t.Fatalf("commands=%v", res.Commands)
 	}
 
 	// dry-run PULL shape
