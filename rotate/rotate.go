@@ -204,7 +204,7 @@ func planPair(sourceRoot, targetRoot, preserved string, pair *match.Pair, req Tr
 			return nil, err
 		}
 		seedRecv, err := cmdbuild.Build("RECV", map[string]string{
-			"flags": req.Flags.RecvFlags(pair.SrcType, pair.DSSuffix == "", true, ""),
+			"flags": req.Flags.RecvFlags(pair.SrcType, pair.DSSuffix == "", true),
 			"ds":    targetDataset,
 		})
 		if err != nil {
@@ -227,11 +227,19 @@ func planPair(sourceRoot, targetRoot, preserved string, pair *match.Pair, req Tr
 		return nil, err
 	}
 	recv, err := cmdbuild.Build("RECV", map[string]string{
-		"flags": req.Flags.RecvFlags(pair.SrcType, pair.DSSuffix == "", true, origin),
+		"flags": req.Flags.RecvFlags(pair.SrcType, pair.DSSuffix == "", true),
 		"ds":    targetDataset,
 	})
 	if err != nil {
 		return nil, err
+	}
+	if origin != "" {
+		// "-o origin=…" as its own argv pair before the target: the value may
+		// contain spaces (dataset names with spaces) and must stay a single
+		// element. A single "-o origin=…" token would make zfs recv read the
+		// space after -o as part of the property name.
+		end := len(recv) - 1
+		recv = append(recv[:end], append([]string{"-o", "origin=" + origin}, recv[end:]...)...)
 	}
 	return append(steps,
 		Step{Kind: "send", Argv: send, DSSuffix: pair.DSSuffix},

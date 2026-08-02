@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/bell-tower/zelta-go/backup"
+	"strings"
 	"testing"
 
 	"github.com/bell-tower/zelta-go/endpoint"
@@ -37,6 +38,43 @@ func TestVerifiedSourceOriginPlanUsesOriginForSend(t *testing.T) {
 	// Preserve = TGT latest (@other); recv -o origin still uses lineage snap @base on that preserve.
 	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_other\nzfs send -P -L -c -e -i tank/original@base tank/clone@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s -o origin=tank/target_other@base tank/target\n" {
 		t.Fatalf("format=%q", got)
+	}
+}
+
+func TestCloneOriginRecvKeepsSpaceInDatasetName(t *testing.T) {
+	// Origin values may contain spaces (dataset names with spaces, like the
+	// "space name" fixtures). The value must stay a single argv element after
+	// -o, so zfs recv never sees "too many arguments" or a mangled property.
+	steps, err := Plan(Request{
+		Source: endpoint.MustParse("tank/clone space"), Target: endpoint.MustParse("tank/target space"),
+		SourceOrigin: "tank/original space@base", OriginVerified: true,
+		SourceLast: "@new", TargetLast: "@other", Intermediate: false, Flags: backup.DefaultSendRecv(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Preserve suffix is TGT latest (@other) → preserved root "tank/target space_other".
+	var recv []string
+	for _, step := range steps {
+		if step.Kind == "recv" {
+			recv = step.Argv
+		}
+	}
+	if recv == nil {
+		t.Fatal("no recv step")
+	}
+	var originValues []string
+	for i, arg := range recv {
+		if arg == "-o" && i+1 < len(recv) && strings.HasPrefix(recv[i+1], "origin=") {
+			originValues = append(originValues, recv[i+1])
+		}
+	}
+	if len(originValues) != 1 || originValues[0] != "origin=tank/target space_other@base" {
+		t.Fatalf("origin value not a single argv element: %v", recv)
+	}
+	// Last element must be the target dataset, intact.
+	if last := recv[len(recv)-1]; last != "tank/target space" {
+		t.Fatalf("recv target argv = %q; recv=%v", last, recv)
 	}
 }
 

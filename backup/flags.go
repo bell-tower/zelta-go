@@ -43,13 +43,21 @@ func (s SendRecv) SendFlags() string {
 
 // RecvFlags is the recv -flags fragment, in oracle order: RECV_DEFAULT;
 // fresh receives add TOP (root) + FS/VOL by source type; then RECV_PROPS_ADD,
-// RECV_PROPS_DEL, RECV_PARTIAL (when Resume), and finally -o origin.
-// RECV_OVERRIDE replaces the whole fragment.
+// RECV_PROPS_DEL, and RECV_PARTIAL (when Resume). RECV_OVERRIDE replaces the
+// whole fragment.
+//
+// The clone-origin receive property (-o origin=…) is NOT part of this
+// whitespace-joined fragment. Callers insert it as its own argv pair
+// (["-o", "origin=…"]) just before the target dataset after building the recv
+// argv, because origin values may contain spaces (dataset names with spaces):
+// a "-o origin=…" token with an embedded space would make zfs recv read the
+// space after -o as part of the property name, and a whitespace-joined
+// fragment would be split apart by tokenization.
 //
 // fresh marks a receive that starts a dataset on the target (no common
 // snapshot yet — full backup, rotate seed, clone origin). Pure incremental
 // receives pass fresh=false and skip the contextual TOP/FS/VOL properties.
-func (s SendRecv) RecvFlags(sourceType string, root, fresh bool, origin string) string {
+func (s SendRecv) RecvFlags(sourceType string, root, fresh bool) string {
 	if s.RecvOverride != "" {
 		return s.RecvOverride
 	}
@@ -84,9 +92,6 @@ func (s SendRecv) RecvFlags(sourceType string, root, fresh bool, origin string) 
 	}
 	if s.Resume && s.RecvPartial != "" {
 		parts = append(parts, s.RecvPartial)
-	}
-	if origin != "" {
-		parts = append(parts, "-o origin="+origin)
 	}
 	return strings.Join(parts, " ")
 }

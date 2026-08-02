@@ -78,6 +78,8 @@ func runPolicy(args []string) int {
 		return 1
 	}
 
+	propagateLogLevels(p, filtered)
+
 	if p.Env.Bool("DRYRUN", false) {
 		jsonMode := p.Env.Get("LOG_MODE") == "json"
 		if jsonMode {
@@ -91,9 +93,9 @@ func runPolicy(args []string) int {
 		}
 		logLevel, _ := strconv.Atoi(p.Env.Get("LOG_LEVEL"))
 		if logLevel >= 3 {
-			fmt.Print(policy.FormatCommands(filtered))
+			emitBlob(sink, policy.FormatCommands(filtered))
 		} else {
-			fmt.Print(policy.FormatTable(filtered, p.Env.Bool("NO_HEADER", false)))
+			emitBlob(sink, policy.FormatTable(filtered, p.Env.Bool("NO_HEADER", false)))
 		}
 		return 0
 	}
@@ -123,6 +125,25 @@ func countSites(jobs []policy.Job) int {
 		m[j.Site] = true
 	}
 	return len(m)
+}
+
+// propagateLogLevels forwards the parent policy's effective log settings to
+// each child backup job unless the job already sets them (oracle parity: the
+// policy launcher exports ZELTA_LOG_LEVEL / ZELTA_LOG_MODE / ZELTA_LOG_COMMAND
+// so child `zelta backup` processes inherit verbosity and json mode; per-job
+// options override the inherited values).
+func propagateLogLevels(p *opt.Parsed, jobs []policy.Job) {
+	for i := range jobs {
+		o := jobs[i].Options
+		for _, k := range []string{"LOG_LEVEL", "LOG_MODE", "LOG_COMMAND"} {
+			if o[k] != "" {
+				continue
+			}
+			if v := p.Env.Get(k); v != "" {
+				o[k] = v
+			}
+		}
+	}
 }
 
 var builtInDefaults = map[string]string{

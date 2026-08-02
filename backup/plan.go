@@ -283,12 +283,21 @@ func buildRecvCmd(st *Step, flags SendRecv) error {
 	if st.TgtName == "" {
 		return fmt.Errorf("backup: empty target name for %q", st.DSSuffix)
 	}
-	recv, err := cmdbuild.Build("RECV", map[string]string{
-		"flags": flags.RecvFlags(st.SrcType, st.DSSuffix == "", st.Kind == KindFull, st.Origin),
+	vars := map[string]string{
+		"flags": flags.RecvFlags(st.SrcType, st.DSSuffix == "", st.Kind == KindFull),
 		"ds":    st.TgtName,
-	})
+	}
+	recv, err := cmdbuild.Build("RECV", vars)
 	if err != nil {
 		return err
+	}
+	if st.Origin != "" {
+		// "-o origin=…" as its own argv pair before the target: the value may
+		// contain spaces (dataset names with spaces) and must stay a single
+		// element. A single "-o origin=…" token would make zfs recv read the
+		// space after -o as part of the property name.
+		end := len(recv) - 1
+		recv = append(recv[:end], append([]string{"-o", "origin=" + st.Origin}, recv[end:]...)...)
 	}
 	st.Recv = recv
 	return nil
