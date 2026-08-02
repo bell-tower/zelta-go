@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // PipeStats reports send/recv replication telemetry accumulated from zfs
@@ -58,11 +59,14 @@ func parseStatsLine(st *PipeStats, line string) {
 // stats accumulator, and forwards complete lines to StderrLog when set.
 type pipeSink struct {
 	exec *Real
+	mu   sync.Mutex
 	buf  []byte
 }
 
 func (s *pipeSink) Write(p []byte) (int, error) {
 	n := len(p)
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.buf = append(s.buf, p...)
 	for {
 		i := bytes.IndexByte(s.buf, '\n')
