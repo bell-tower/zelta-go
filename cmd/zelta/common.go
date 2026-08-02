@@ -4,11 +4,27 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/bell-tower/zelta-go/endpoint"
 	"github.com/bell-tower/zelta-go/internal/opt"
 	"github.com/bell-tower/zelta-go/internal/zlog"
+	"github.com/bell-tower/zelta-go/zfs"
 )
+
+// formatPlusCommands renders structured commands as oracle "+ …\n" dry-run text.
+func formatPlusCommands(cmds []zfs.Command) (string, error) {
+	var b strings.Builder
+	for _, c := range cmds {
+		line, err := c.ShellLine()
+		if err != nil {
+			return "", err
+		}
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return b.String(), nil
+}
 
 // parseEndpoint maps a CLI operand/env string to endpoint.Endpoint.
 // Empty s returns a zero endpoint and nil error.

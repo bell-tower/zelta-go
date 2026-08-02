@@ -3,12 +3,12 @@ package backup
 import (
 	"context"
 	"fmt"
-	"github.com/bell-tower/zelta-go/endpoint"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/bell-tower/zelta-go/endpoint"
 	"github.com/bell-tower/zelta-go/match"
 	"github.com/bell-tower/zelta-go/zfs"
 )
@@ -55,7 +55,7 @@ func TestPlanFullAndIncr(t *testing.T) {
 	if p.Full != 1 || p.Incr != 1 || p.Skip != 1 || p.Block != 1 {
 		t.Fatalf("counts full=%d incr=%d skip=%d block=%d", p.Full, p.Incr, p.Skip, p.Block)
 	}
-	out, err := FormatDryRun(p, "tank/src", "tank/tgt")
+	out, err := formatDryRun(p, endpoint.MustParse("tank/src"), endpoint.MustParse("tank/tgt"), "PULL")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +240,7 @@ func TestRecvFlagsTopFull(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := FormatDryRun(p, "tank/src", "tank/tgt")
+	out, err := formatDryRun(p, endpoint.MustParse("tank/src"), endpoint.MustParse("tank/tgt"), "PULL")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +267,7 @@ func TestIntermediateFullFirstPass(t *testing.T) {
 	if st.SourceEnd != "@snap1" || st.FinalEnd != "@latest" {
 		t.Fatalf("end=%q final=%q", st.SourceEnd, st.FinalEnd)
 	}
-	out, err := FormatDryRun(p, "tank/src", "tank/tgt")
+	out, err := formatDryRun(p, endpoint.MustParse("tank/src"), endpoint.MustParse("tank/tgt"), "PULL")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,7 +296,7 @@ func TestIntermediateFullExecuteTwoPass(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(fake.Pipes) != 2 {
-		t.Fatalf("want 2 pipes (full+incr), got %d; plan=%+v out=%q", len(fake.Pipes), res.Plan.Steps, res.Output)
+		t.Fatalf("want 2 pipes (full+incr), got %d; plan=%+v out=%q", len(fake.Pipes), res.Plan.Steps, "" /* output moved to CLI */)
 	}
 	// First: full @snap1; second: -I @snap1 @latest
 	joined := strings.Join(fake.Pipes[0].Left, " ") + " || " + strings.Join(fake.Pipes[1].Left, " ")
@@ -372,7 +372,7 @@ func TestPlanIncrementalFlag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := FormatDryRun(p, "tank/src", "tank/tgt")
+	out, err := formatDryRun(p, endpoint.MustParse("tank/src"), endpoint.MustParse("tank/tgt"), "PULL")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -396,7 +396,7 @@ func TestPlanTargetOriginUsesOriginSendBase(t *testing.T) {
 	if len(p.Steps) != 1 || p.Steps[0].Kind != KindIncremental {
 		t.Fatalf("steps=%+v", p.Steps)
 	}
-	out, err := FormatDryRun(p, "tank/clone", "backup/clone")
+	out, err := formatDryRun(p, endpoint.MustParse("tank/clone"), endpoint.MustParse("backup/clone"), "PULL")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -416,7 +416,7 @@ func dryRun(t *testing.T, exec zfs.Executor, req Request) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := FormatDryRunDirection(plan, req.Source.String(), req.Target.String(), req.SyncDirection.PipeArg())
+	out, err := formatDryRun(plan, req.Source, req.Target, req.SyncDirection.PipeArg())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -470,7 +470,7 @@ func TestApplySnapUpToDate(t *testing.T) {
 	if p.Incr != 1 {
 		t.Fatalf("expected incr after snap, got incr=%d", p.Incr)
 	}
-	out, err := FormatDryRun(p, "tank/src", "tank/tgt")
+	out, err := formatDryRun(p, endpoint.MustParse("tank/src"), endpoint.MustParse("tank/tgt"), "PULL")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -730,7 +730,7 @@ func TestVolumeRecvFlags(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := FormatDryRun(p, "tank/src", "tank/tgt")
+	out, err := formatDryRun(p, endpoint.MustParse("tank/src"), endpoint.MustParse("tank/tgt"), "PULL")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -852,8 +852,15 @@ func TestSyncDirectionWarningAndPipes(t *testing.T) {
 	if len(fake.Pipes) != 1 || fake.Pipes[0].Direction != "PUSH" {
 		t.Fatalf("pipes=%+v", fake.Pipes)
 	}
-	if len(res.Commands) != 1 || !strings.Contains(res.Commands[0], "zfs send") || !strings.Contains(res.Commands[0], "zfs recv") {
+	if len(res.Commands) != 1 {
 		t.Fatalf("commands=%v", res.Commands)
+	}
+	sh, err := res.Commands[0].ShellLine()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(sh, "zfs send") || !strings.Contains(sh, "zfs recv") {
+		t.Fatalf("command=%q", sh)
 	}
 
 	// dry-run PULL shape
@@ -881,7 +888,7 @@ func TestOptSendRecvFlags(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := FormatDryRun(p, "tank/src", "tank/tgt")
+	out, err := formatDryRun(p, endpoint.MustParse("tank/src"), endpoint.MustParse("tank/tgt"), "PULL")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -992,7 +999,7 @@ func TestBookmarkDryRunUsesLatestIntermediateSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := FormatDryRun(plan, "root@src:tank/src", "root@dst:tank/tgt")
+	out, err := formatDryRun(plan, endpoint.MustParse("root@src:tank/src"), endpoint.MustParse("root@dst:tank/tgt"), "PULL")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1160,4 +1167,34 @@ func TestFilteredBookmarksOnlyLatestPerDataset(t *testing.T) {
 	if len(got) != 1 || !strings.HasSuffix(got[0].Create[len(got[0].Create)-1], "dst_b") {
 		t.Fatalf("bookmarks=%v", got)
 	}
+}
+
+func formatDryRun(p *Plan, src, tgt endpoint.Endpoint, direction string) (string, error) {
+	var b strings.Builder
+	if n := p.Full + p.Incr; n > 0 {
+		b.WriteString(fmt.Sprintf("would sync %d datasets\n", n))
+	}
+	if p.SnapReason != "" && p.SnapSavepoint != "" && len(p.SnapArgv) > 0 {
+		name := strings.TrimPrefix(p.SnapSavepoint, "@")
+		b.WriteString(strings.Replace(p.SnapReason, "snapshotting: ", "would snapshot: ", 1))
+		b.WriteString(name)
+		b.WriteByte('\n')
+	}
+	for _, c := range p.Commands(src, tgt, direction) {
+		line, err := c.ShellLine()
+		if err != nil {
+			return "", err
+		}
+		b.WriteString("+ ")
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	for _, st := range p.Steps {
+		if st.Kind != KindBlocked || st.Notice == "" {
+			continue
+		}
+		b.WriteString(st.Notice)
+		b.WriteByte('\n')
+	}
+	return b.String(), nil
 }

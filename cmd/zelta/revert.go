@@ -78,7 +78,7 @@ func runRevert(args []string) int {
 		return 1
 	}
 	if p.Env.Bool("DRYRUN", false) {
-		out, err := lineage.FormatRemote(steps, current.String())
+		out, err := formatPlusCommands(lineage.Commands(steps, current))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "zelta revert: %v\n", err)
 			return 1

@@ -49,8 +49,9 @@ Import path: `github.com/bell-tower/zelta-go/<package>`
 | `cmdbuild` | Command template → argv |
 | `zconf` | Policy conf keys |
 
-JSON schema and match column expansion live under `internal/report` (CLI
-output, not the public Action Library).
+JSON schema, match tables, dry-run banners, and human byte formatting live
+under `internal/report` (CLI output, not the public Action Library). Public
+packages expose typed Plans, `[]zfs.Command`, status codes, and telemetry.
 
 ```go
 // Structured SSH (library consumers):

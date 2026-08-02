@@ -46,7 +46,7 @@ func runPlanGolden(t *testing.T, dir string) {
 	})
 	got := ""
 	if err == nil {
-		got = Format(steps)
+		got = formatSteps(steps)
 	} else {
 		got = "ERROR: " + err.Error() + "\n"
 	}

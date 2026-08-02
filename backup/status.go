@@ -31,10 +31,46 @@ func (c ErrCode) Blocked() bool {
 	return c != ErrCodeNone && c != ErrCodeUpToDate
 }
 
+// ErrCodeFromPlan classifies a plan from step kinds and notices (library path).
+// Prefer this over ErrCodeFromOutput for all new code.
+func ErrCodeFromPlan(p *Plan) ErrCode {
+	if p == nil {
+		return ErrCodeNone
+	}
+	for _, st := range p.Steps {
+		if st == nil {
+			continue
+		}
+		if st.Kind == KindBlocked {
+			if c := classifyNotice(st.Notice); c != ErrCodeNone {
+				return c
+			}
+			if c := classifyNotice(st.Info); c != ErrCodeNone {
+				return c
+			}
+			// Generic blocked without a known pattern still signals divergence-ish stop.
+			if strings.Contains(strings.ToLower(st.Notice+st.Info), "diverg") {
+				return ErrCodeDiverged
+			}
+		}
+		if st.Notice == "no source snapshot to send" {
+			return ErrCodeNoSourceSnapshot
+		}
+	}
+	if p.Full+p.Incr == 0 && p.Skip > 0 {
+		return ErrCodeUpToDate
+	}
+	return ErrCodeNone
+}
+
 // ErrCodeFromOutput classifies backup human/log output.
-// Pattern set aligned with Sylve's classifyBackupOutput.
+// Legacy adapter for external scrapers (e.g. Sylve); library paths use ErrCodeFromPlan.
 func ErrCodeFromOutput(output string) ErrCode {
-	lower := strings.ToLower(output)
+	return classifyNotice(output)
+}
+
+func classifyNotice(s string) ErrCode {
+	lower := strings.ToLower(s)
 	switch {
 	case strings.Contains(lower, "no common snapshot (diverged)"):
 		return ErrCodeNoCommonSnapshot

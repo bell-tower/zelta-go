@@ -42,7 +42,7 @@ func TestPruneNoGuard(t *testing.T) {
 		t.Fatal(err)
 	}
 	// num=1 keeps first snap after match (@new). @mid,@old prune → contiguous range.
-	out := res.Output
+	out := res.Format()
 	// oracle range: "@oldest%newest" (e.g. @snap1%zelta_…)
 	if !strings.Contains(out, "apool/treetop@old%mid") {
 		t.Fatalf("range:\n%s", out)
@@ -66,7 +66,7 @@ func TestPruneTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := res.Output
+	out := res.Format()
 	if !strings.Contains(out, "apool/treetop@old") {
 		t.Fatalf("old should prune:\n%s", out)
 	}
@@ -92,8 +92,8 @@ func TestPruneGuardUnsynced(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(res.Output, "apool/treetop@old%mid") {
-		t.Fatalf("unsynced should prune guarded history:\n%s", res.Output)
+	if !strings.Contains(res.Format(), "apool/treetop@old%mid") {
+		t.Fatalf("unsynced should prune guarded history:\n%s", res.Format())
 	}
 }
 
@@ -112,7 +112,7 @@ func TestPruneGuardLatest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := res.Output
+	out := res.Format()
 	if strings.Contains(out, "treetop@old") {
 		t.Fatalf("num=1 keeps @old:\n%s", out)
 	}
@@ -128,11 +128,11 @@ func TestPruneGuardLatest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(res.Output, "apool/treetop@old") {
-		t.Fatalf("num=0 prunes @old:\n%s", res.Output)
+	if !strings.Contains(res.Format(), "apool/treetop@old") {
+		t.Fatalf("num=0 prunes @old:\n%s", res.Format())
 	}
-	if strings.Contains(res.Output, "treetop@mid") || strings.Contains(res.Output, "treetop@new") {
-		t.Fatalf("newer than match never analyzed:\n%s", res.Output)
+	if strings.Contains(res.Format(), "treetop@mid") || strings.Contains(res.Format(), "treetop@new") {
+		t.Fatalf("newer than match never analyzed:\n%s", res.Format())
 	}
 }
 
@@ -146,14 +146,14 @@ func TestPruneNoRangesVisual(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(res.Output, "%") {
-		t.Fatalf("no-ranges:\n%s", res.Output)
+	if strings.Contains(res.Format(), "%") {
+		t.Fatalf("no-ranges:\n%s", res.Format())
 	}
 	// oldest first
-	idxOld := strings.Index(res.Output, "treetop@old")
-	idxMid := strings.Index(res.Output, "treetop@mid")
+	idxOld := strings.Index(res.Format(), "treetop@old")
+	idxMid := strings.Index(res.Format(), "treetop@mid")
 	if idxOld < 0 || idxMid < 0 || idxOld > idxMid {
-		t.Fatalf("order:\n%s", res.Output)
+		t.Fatalf("order:\n%s", res.Format())
 	}
 
 	res2, err := Run(context.Background(), fakeExec(t, ""), Request{
@@ -163,8 +163,8 @@ func TestPruneNoRangesVisual(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(res2.Output, "❌") || !strings.Contains(res2.Output, "🔹") {
-		t.Fatalf("visual:\n%s", res2.Output)
+	if !strings.Contains(res2.Format(), "❌") || !strings.Contains(res2.Format(), "🔹") {
+		t.Fatalf("visual:\n%s", res2.Format())
 	}
 }
 
@@ -178,8 +178,8 @@ func TestPruneDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Output != "" {
-		t.Fatalf("defaults should keep all:\n%s", res.Output)
+	if res.Format() != "" {
+		t.Fatalf("defaults should keep all:\n%s", res.Format())
 	}
 }
 
@@ -192,7 +192,7 @@ func TestPruneFilteredSnapsKept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := res.Output
+	out := res.Format()
 	if strings.Contains(out, "treetop@old") {
 		t.Fatalf("excluded snap must be kept:\n%s", out)
 	}

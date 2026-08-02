@@ -91,7 +91,7 @@ func runPrune(args []string) int {
 	if res.Keeping != "" {
 		sink.Info("keeping: " + res.Keeping)
 	}
-	emitBlob(sink, res.Output)
+	emitBlob(sink, res.Format())
 	return 0
 }
 

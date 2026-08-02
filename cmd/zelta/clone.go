@@ -9,6 +9,7 @@ import (
 	"github.com/bell-tower/zelta-go/backup"
 	"github.com/bell-tower/zelta-go/endpoint"
 	"github.com/bell-tower/zelta-go/internal/opt"
+	"github.com/bell-tower/zelta-go/internal/report"
 	"github.com/bell-tower/zelta-go/lineage"
 	"github.com/bell-tower/zelta-go/zfs"
 )
@@ -84,7 +85,7 @@ func runCloneParsed(p *opt.Parsed) int {
 		return 1
 	}
 	if p.Env.Bool("DRYRUN", false) {
-		out, err := lineage.FormatRemote(steps, p.Operands[1])
+		out, err := formatPlusCommands(lineage.Commands(steps, tgt))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "zelta clone: %v\n", err)
 			return 1
@@ -177,13 +178,13 @@ func runCloneAndBackup(p *opt.Parsed) int {
 			fmt.Fprintf(os.Stderr, "zelta clone: backup: %v\n", err)
 			return 1
 		}
-		out, err := backup.FormatDryRunDirection(plan, src.String(), tgt.String(), syncDir.PipeArg())
+		out, err := report.FormatBackupDryRun(plan, src, tgt, syncDir.PipeArg())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "zelta clone: backup: %v\n", err)
 			return 1
 		}
 		if plan.Full+plan.Incr == 0 {
-			if sum := plan.Summary(); sum != "" {
+			if sum := report.PlanSummary(plan); sum != "" {
 				out += sum + "\n"
 			}
 		}
@@ -196,7 +197,7 @@ func runCloneAndBackup(p *opt.Parsed) int {
 		return 1
 	}
 	printWarns(sink, res.Warnings)
-	emitBlob(sink, res.Output)
+	emitBlob(sink, report.FormatBackupRun(res))
 	for _, msg := range res.Errors {
 		fmt.Fprintf(os.Stderr, "zelta clone: backup: %s\n", msg)
 	}

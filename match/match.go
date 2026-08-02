@@ -7,39 +7,35 @@ import (
 	"time"
 
 	"github.com/bell-tower/zelta-go/endpoint"
-	"github.com/bell-tower/zelta-go/internal/report"
 	"github.com/bell-tower/zelta-go/zfs"
 )
 
-// Request is a match comparison.
+// Request is a match comparison (analysis only — no presentation dials).
 type Request struct {
 	Source                  endpoint.Endpoint
 	Target                  endpoint.Endpoint
-	Props                   []string // empty → resolveListProps (+ optional feature probe)
-	Cols                    []string // empty → expand default proplist
-	Depth                   int      // 0 = unlimited; zfs -d + pair filter
-	Include                 []string // --include patterns (comma lists / repeated)
-	Exclude                 []string // -X / --exclude patterns
-	Scripting               bool     // -H
-	Parsable                bool     // -p
-	NoWritten               bool     // --no-written: list name,guid only
-	CheckTime               bool     // --time: append SOURCE/TARGET_LIST_TIME
-	PreserveSourceSnapshots bool     // retain source history for filtered backup planning
+	Props                   []string // empty → resolveListProps
+	// Cols hints which display columns the caller cares about (affects list
+	// prop selection for written/ivset). Presentation is CLI-owned.
+	Cols                    []string
+	Depth                   int // 0 = unlimited; zfs -d + pair filter
+	Include                 []string
+	Exclude                 []string
+	NoWritten               bool // list name,guid only when props unset
+	PreserveSourceSnapshots bool // retain source history for filtered backup planning
 	// SrcContext / TgtContext, when set, merge dataset props after list (backup path).
 	SrcContext *zfs.DatasetContext
 	TgtContext *zfs.DatasetContext
 }
 
-// Result is a completed match comparison.
+// Result is a completed match comparison (typed data only).
 type Result struct {
 	Source      endpoint.Endpoint
 	Target      endpoint.Endpoint
 	SrcRows     []zfs.ListRow
 	TgtRows     []zfs.ListRow
 	Pairs       []*Pair
-	Summary     string
-	Output      string
-	Warnings    []string // filter parse warnings (oracle stderr)
+	Warnings    []string // filter parse warnings
 	SrcListTime float64  // seconds; 0 if not measured / negligible
 	TgtListTime float64
 }
@@ -53,11 +49,10 @@ var MinimalListProps = []string{"name", "guid"}
 // RotateListProps includes origin for clone-lineage classification.
 var RotateListProps = []string{"name", "guid", "origin", "written", "snapshots_changed", "creation", "used", "type"}
 
-// Commands returns the oracle-shaped dry-run "+ zfs list …" command lines for
-// the request without contacting any pool. Props default to DefaultListProps
-// (no feature probing, mirroring the oracle -n path); Source and Target lines
-// appear in request order, skipping endpoints with an empty dataset.
-func Commands(req Request) ([]string, error) {
+// Commands returns structured dry-run list operations without contacting any pool.
+// Props default to DefaultListProps (no feature probing). Source and Target
+// lines appear in request order, skipping endpoints with an empty dataset.
+func Commands(req Request) ([]zfs.Command, error) {
 	if req.Depth < 0 {
 		return nil, fmt.Errorf("depth of '%d' invalid; must be positive", req.Depth)
 	}
@@ -65,25 +60,27 @@ func Commands(req Request) ([]string, error) {
 	if len(props) == 0 {
 		props = DefaultListProps
 	}
-	var out []string
+	var out []zfs.Command
 	for _, ep := range []endpoint.Endpoint{req.Source, req.Target} {
 		if ep.Dataset == "" {
 			continue
 		}
-		var b strings.Builder
-		b.WriteString("+ zfs list -H -t snapshot -o ")
-		b.WriteString(strings.Join(props, ","))
+		argv := []string{"zfs", "list", "-H", "-t", "snapshot", "-o", strings.Join(props, ",")}
 		if req.Depth > 0 {
-			fmt.Fprintf(&b, " -r -d %d", req.Depth)
+			argv = append(argv, "-r", "-d", fmt.Sprintf("%d", req.Depth))
 		}
-		b.WriteString(" ")
-		b.WriteString(ep.String())
-		out = append(out, b.String())
+		// Oracle dry-run embeds the full endpoint string as the list target.
+		argv = append(argv, ep.String())
+		out = append(out, zfs.Command{
+			Kind:     zfs.CmdList,
+			Endpoint: ep,
+			Argv:     argv,
+		})
 	}
 	return out, nil
 }
 
-// Compare loads lists, pairs by ds_suffix/GUID, and renders columns.
+// Compare loads lists and pairs by ds_suffix/GUID. Callers render presentation.
 func Compare(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	srcEp := req.Source
 	tgtEp := req.Target
@@ -96,15 +93,7 @@ func Compare(ctx context.Context, exec zfs.Executor, req Request) (*Result, erro
 	if req.Depth < 0 {
 		return nil, fmt.Errorf("depth of '%d' invalid; must be positive", req.Depth)
 	}
-	cols := req.Cols
-	var err error
-	if len(cols) == 0 {
-		cols, err = report.ExpandProplist("")
-		if err != nil {
-			return nil, err
-		}
-	}
-	props, err := resolveListProps(ctx, exec, req, cols)
+	props, err := resolveListProps(ctx, exec, req)
 	if err != nil {
 		return nil, err
 	}
@@ -149,16 +138,6 @@ func Compare(ctx context.Context, exec zfs.Executor, req Request) (*Result, erro
 	if req.SrcContext != nil || req.TgtContext != nil {
 		ApplyDatasetContext(pairs, req.SrcContext, req.TgtContext)
 	}
-	sum := summaryOf(pairs)
-	out := Format(pairs, FormatOpts{
-		Cols:      cols,
-		SrcLeaf:   leafOf(srcEp.Dataset),
-		Scripting: req.Scripting,
-		Parsable:  req.Parsable,
-	})
-	if req.CheckTime {
-		out += formatListTimes(srcDur, tgtDur)
-	}
 
 	return &Result{
 		Source:      srcEp,
@@ -166,8 +145,6 @@ func Compare(ctx context.Context, exec zfs.Executor, req Request) (*Result, erro
 		SrcRows:     srcRows,
 		TgtRows:     tgtRows,
 		Pairs:       pairs,
-		Summary:     sum,
-		Output:      out,
 		Warnings:    append([]string(nil), filt.Warnings...),
 		SrcListTime: srcDur,
 		TgtListTime: tgtDur,
@@ -176,22 +153,21 @@ func Compare(ctx context.Context, exec zfs.Executor, req Request) (*Result, erro
 
 // resolveListProps picks zfs list -o columns (oracle add_written).
 // When cols need ivset and Props is empty, probes top-level source features once.
-func resolveListProps(ctx context.Context, exec zfs.Executor, req Request, cols []string) ([]string, error) {
+func resolveListProps(ctx context.Context, exec zfs.Executor, req Request) ([]string, error) {
 	if len(req.Props) > 0 {
 		return req.Props, nil
 	}
 	wantWritten := !req.NoWritten
-	// LIST_WRITTEN + -p + proplist without written/size → skip slow props.
-	if wantWritten && req.Parsable && len(cols) > 0 && !colsNeedWritten(cols) {
+	// LIST_WRITTEN + proplist without written/size → skip slow props.
+	if wantWritten && len(req.Cols) > 0 && !colsNeedWritten(req.Cols) {
 		wantWritten = false
 	}
-	if !colsNeedIVSet(cols) {
+	if !colsNeedIVSet(req.Cols) {
 		if wantWritten {
 			return DefaultListProps, nil
 		}
 		return MinimalListProps, nil
 	}
-	// Optional feature requested: probe top-level only.
 	feat, err := zfs.ProbeFeatures(ctx, exec, req.Source.String(), req.Source.Dataset)
 	if err != nil {
 		return nil, fmt.Errorf("probe source features: %w", err)
@@ -207,29 +183,6 @@ func colsNeedWritten(cols []string) bool {
 		}
 	}
 	return false
-}
-
-func formatListTimes(src, tgt float64) string {
-	var b strings.Builder
-	// Oracle: if (list_time) print — skip exact zero.
-	if src > 0 {
-		fmt.Fprintf(&b, "SOURCE_LIST_TIME:\t%s\n", formatSeconds(src))
-	}
-	if tgt > 0 {
-		fmt.Fprintf(&b, "TARGET_LIST_TIME:\t%s\n", formatSeconds(tgt))
-	}
-	return b.String()
-}
-
-func formatSeconds(s float64) string {
-	// time -p style: trim trailing zeros but keep at least one decimal when needed.
-	t := fmt.Sprintf("%.2f", s)
-	t = strings.TrimRight(t, "0")
-	t = strings.TrimRight(t, ".")
-	if t == "" {
-		return "0"
-	}
-	return t
 }
 
 // dsDepth: root "" → 1; "/a" → 2; "/a/b" → 3.

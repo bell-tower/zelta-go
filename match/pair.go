@@ -210,31 +210,6 @@ func setInfo(pairs []*Pair) {
 	}
 }
 
-func summaryOf(pairs []*Pair) string {
-	var up, sync, blocked int
-	for _, p := range pairs {
-		switch {
-		case p.Info == "up-to-date":
-			up++
-		case strings.HasPrefix(p.Info, "syncable"):
-			sync++
-		case strings.HasPrefix(p.Info, "blocked") || p.Info == "no source (target only)":
-			blocked++
-		}
-	}
-	var parts []string
-	if up > 0 {
-		parts = append(parts, strconv.Itoa(up)+" up-to-date")
-	}
-	if sync > 0 {
-		parts = append(parts, strconv.Itoa(sync)+" syncable")
-	}
-	if blocked > 0 {
-		parts = append(parts, strconv.Itoa(blocked)+" blocked")
-	}
-	return strings.Join(parts, ", ")
-}
-
 func isTruthyWritten(w string) bool {
 	if w == "" || w == "-" {
 		return false

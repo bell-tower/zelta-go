@@ -389,63 +389,48 @@ func applySnapToStep(st *Step, savepoint string, intermediate bool, flags SendRe
 	return buildCmds(st, intermediate, flags)
 }
 
-// Summary is a short human line.
-func (p *Plan) Summary() string {
-	var parts []string
-	if p.SnapSavepoint != "" {
-		parts = append(parts, "snapshot "+p.SnapSavepoint)
-	}
-	if p.Full > 0 {
-		parts = append(parts, fmt.Sprintf("%d full", p.Full))
-	}
-	if p.Incr > 0 {
-		parts = append(parts, fmt.Sprintf("%d incremental", p.Incr))
-	}
-	if p.Skip > 0 {
-		parts = append(parts, fmt.Sprintf("%d skipped", p.Skip))
-	}
-	if p.Block > 0 {
-		parts = append(parts, fmt.Sprintf("%d blocked", p.Block))
-	}
-	return strings.Join(parts, ", ")
-}
-
-// Commands returns the oracle-shaped dry-run "+ …" command lines for the plan:
-// the planned source snapshot (when SnapReason is set), one line per syncable
-// dataset's send|recv pipe, and bookmark verify/create lines. The second pass
-// of intermediate fulls is execute-time, matching the oracle dry-run.
-func (p *Plan) Commands(srcEp, tgtEp, direction string) ([]string, error) {
-	var out []string
+// Commands returns structured dry-run operations for the plan: the planned
+// source snapshot (when SnapReason is set), one send|recv per syncable
+// dataset, and bookmark verify/create ops. The second pass of intermediate
+// fulls is execute-time, matching the oracle dry-run. Shell rendering is
+// CLI-owned (zfs.Command.ShellLine).
+func (p *Plan) Commands(src, tgt endpoint.Endpoint, direction string) []zfs.Command {
+	var out []zfs.Command
 	if p.SnapReason != "" && p.SnapSavepoint != "" && len(p.SnapArgv) > 0 {
-		sh, err := zfs.SnapshotShell(srcEp, p.SnapArgv[len(p.SnapArgv)-1], hasRecursive(p.SnapArgv))
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, "+ "+sh)
+		out = append(out, zfs.Command{
+			Kind:     zfs.CmdSnapshot,
+			Endpoint: src,
+			Argv:     append([]string(nil), p.SnapArgv...),
+		})
 	}
 	for _, st := range p.Steps {
 		if st.Kind != KindFull && st.Kind != KindIncremental {
 			continue
 		}
-		body, err := zfs.PipeShellDirection(srcEp, tgtEp, st.Send, st.Recv, direction)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, "+ "+body)
+		out = append(out, zfs.Command{
+			Kind:      zfs.CmdSendRecv,
+			Source:    src,
+			Target:    tgt,
+			Send:      append([]string(nil), st.Send...),
+			Recv:      append([]string(nil), st.Recv...),
+			Direction: direction,
+		})
 	}
 	for _, bm := range p.Bookmarks {
-		verify, err := zfs.CommandShell(bm.VerifyEndpoint, bm.Verify)
-		if err != nil {
-			return nil, err
-		}
-		create, err := zfs.CommandShell(bm.SourceEndpoint, bm.Create)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, "+ "+verify)
-		out = append(out, "+ "+create)
+		vEp, _ := endpoint.Parse(bm.VerifyEndpoint)
+		sEp, _ := endpoint.Parse(bm.SourceEndpoint)
+		out = append(out, zfs.Command{
+			Kind:     zfs.CmdOther,
+			Endpoint: vEp,
+			Argv:     append([]string(nil), bm.Verify...),
+		})
+		out = append(out, zfs.Command{
+			Kind:     zfs.CmdBookmark,
+			Endpoint: sEp,
+			Argv:     append([]string(nil), bm.Create...),
+		})
 	}
-	return out, nil
+	return out
 }
 
 // StreamCount returns the number of send streams the plan would execute and
@@ -481,7 +466,7 @@ func (p *Plan) RunStep(ctx context.Context, exec zfs.Executor, req Request, i in
 // of an intermediate full, appending executed command lines to commands when
 // non-nil. Skip and blocked steps have no pipes and are no-ops (RunStep
 // validates the kind before calling).
-func (p *Plan) syncPair(ctx context.Context, exec zfs.Executor, req Request, direction string, i int, commands *[]string) error {
+func (p *Plan) syncPair(ctx context.Context, exec zfs.Executor, req Request, direction string, i int, commands *[]zfs.Command) error {
 	st := p.Steps[i]
 	if st.Kind != KindFull && st.Kind != KindIncremental {
 		return nil

@@ -1,4 +1,4 @@
-package match
+package match_test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/bell-tower/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/match"
 	"github.com/bell-tower/zelta-go/internal/report"
 	"github.com/bell-tower/zelta-go/zfs"
 )
@@ -78,17 +79,14 @@ func runGoldenCase(t *testing.T, dir string) {
 		src: string(srcList),
 		tgt: string(tgtList),
 	}}
-	res, err := Compare(context.Background(), fake, Request{
+	res, err := match.Compare(context.Background(), fake, match.Request{
 		Source:    endpoint.MustParse(src),
 		Target:    endpoint.MustParse(tgt),
 		Cols:      cols,
 		Depth:     depth,
 		Include:   include,
 		Exclude:   exclude,
-		Scripting: scripting,
-		Parsable:  parsable,
 		NoWritten: noWritten,
-		CheckTime: checkTime,
 	})
 	gotErr := ""
 	gotExit := 0
@@ -106,7 +104,11 @@ func runGoldenCase(t *testing.T, dir string) {
 
 	gotOut := ""
 	if res != nil {
-		gotOut = res.Output
+		gotOut = report.FormatMatch(res.Pairs, report.MatchFormatOpts{
+			Cols: cols, SrcLeaf: report.DatasetLeaf(endpoint.MustParse(src).Dataset),
+			Scripting: scripting, Parsable: parsable,
+			CheckTime: checkTime, SrcListTime: res.SrcListTime, TgtListTime: res.TgtListTime,
+		})
 	}
 	if gotOut != wantOut {
 		t.Errorf("stdout mismatch\ngot:\n%s\nwant:\n%s", gotOut, wantOut)

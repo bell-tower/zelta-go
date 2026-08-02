@@ -40,12 +40,15 @@ var (
 	TargetListProps = []string{"name", "guid", "written", "creation", "used", "referenced"}
 )
 
-// Result carries analysis + rendered output.
+// Result carries prune analysis. Presentation is CLI-owned (see Format).
 type Result struct {
-	Output   string
 	Warnings []string
-	Keeping  string // "keeping: …" (LOG_INFO; CLI prints on -v)
+	// Keeping is the kept-ranges literal for LOG_INFO ("keeping: a@x,…").
+	Keeping  string
 	datasets []*dsSnaps
+	// render hints captured from Request for Format.
+	noRanges bool
+	visual   bool
 }
 
 // Candidates returns the snapshot names to destroy (dataset@snap), oldest first,
@@ -126,9 +129,18 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	analyze(src, tgt, sel, guard, now)
 
 	return &Result{
-		Output:   formatOutput(src, req),
 		Keeping:  keptRangesString(src),
 		Warnings: append([]string(nil), filt.Warnings...),
 		datasets: src,
+		noRanges: req.NoRanges,
+		visual:   req.Visual,
 	}, nil
+}
+
+// Format renders prune candidates (oldest-first per dataset). CLI presentation.
+func (r *Result) Format() string {
+	if r == nil {
+		return ""
+	}
+	return formatOutput(r.datasets, Request{NoRanges: r.noRanges, Visual: r.visual})
 }

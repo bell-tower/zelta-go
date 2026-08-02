@@ -297,36 +297,28 @@ func poolOf(dataset string) string {
 	return dataset
 }
 
-// Format renders a plan in the same one-command-per-line style as dry-run
-// output elsewhere in the Go port.
-func Format(steps []Step) string {
-	var lines []string
-	for _, step := range steps {
-		if len(step.Argv) > 0 {
-			lines = append(lines, strings.Join(step.Argv, " "))
-		}
-	}
-	if len(lines) == 0 {
-		return ""
-	}
-	return strings.Join(lines, "\n") + "\n"
-}
-
-// FormatRemote renders each lineage command on its dataset endpoint. Clone
-// and revert are local ZFS operations on one host, so no pipe direction is
-// involved.
-func FormatRemote(steps []Step, endpointName string) (string, error) {
-	var b strings.Builder
+// Commands returns structured lineage operations (clone/revert) for the plan.
+// Clone and revert are single-host ZFS ops — no pipe direction.
+func Commands(steps []Step, ep endpoint.Endpoint) []zfs.Command {
+	var out []zfs.Command
 	for _, step := range steps {
 		if len(step.Argv) == 0 {
 			continue
 		}
-		line, err := zfs.CommandShell(endpointName, step.Argv)
-		if err != nil {
-			return "", err
+		kind := zfs.CmdOther
+		switch step.Kind {
+		case "clone":
+			kind = zfs.CmdClone
+		case "rename":
+			kind = zfs.CmdRename
+		case "snapshot":
+			kind = zfs.CmdSnapshot
 		}
-		b.WriteString(line)
-		b.WriteByte('\n')
+		out = append(out, zfs.Command{
+			Kind:     kind,
+			Endpoint: ep,
+			Argv:     append([]string(nil), step.Argv...),
+		})
 	}
-	return b.String(), nil
+	return out
 }

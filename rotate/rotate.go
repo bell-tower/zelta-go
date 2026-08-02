@@ -296,23 +296,10 @@ func incrFlag(intermediate bool) string {
 	return "-i"
 }
 
-func Format(steps []Step) string {
-	var b strings.Builder
-	for _, step := range steps {
-		if len(step.Argv) == 0 {
-			continue
-		}
-		b.WriteString(strings.Join(step.Argv, " "))
-		b.WriteByte('\n')
-	}
-	return b.String()
-}
-
-// Commands renders a plan's executable command lines (oracle "+ …" shape):
-// rename via target, snapshot via source, send|recv pairs via the pipe
-// direction rules. Nothing executes.
-func Commands(steps []Step, source, target, direction string) ([]string, error) {
-	var out []string
+// Commands returns structured operations for a rotate plan: rename via target,
+// snapshot via source, send|recv pairs via pipe direction. Nothing executes.
+func Commands(steps []Step, source, target endpoint.Endpoint, direction string) ([]zfs.Command, error) {
+	var out []zfs.Command
 	for i := 0; i < len(steps); i++ {
 		step := steps[i]
 		if len(step.Argv) == 0 {
@@ -320,49 +307,40 @@ func Commands(steps []Step, source, target, direction string) ([]string, error) 
 		}
 		switch step.Kind {
 		case "rename":
-			line, err := zfs.CommandShell(target, step.Argv)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, line)
+			out = append(out, zfs.Command{
+				Kind:     zfs.CmdRename,
+				Endpoint: target,
+				Argv:     append([]string(nil), step.Argv...),
+			})
 		case "snapshot":
-			line, err := zfs.CommandShell(source, step.Argv)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, line)
+			out = append(out, zfs.Command{
+				Kind:     zfs.CmdSnapshot,
+				Endpoint: source,
+				Argv:     append([]string(nil), step.Argv...),
+			})
 		case "send":
 			if i+1 >= len(steps) || steps[i+1].Kind != "recv" {
 				return nil, fmt.Errorf("rotate: send without receive for %q", step.DSSuffix)
 			}
-			line, err := zfs.PipeShellDirection(source, target, step.Argv, steps[i+1].Argv, direction)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, line)
+			out = append(out, zfs.Command{
+				Kind:      zfs.CmdSendRecv,
+				Source:    source,
+				Target:    target,
+				Send:      append([]string(nil), step.Argv...),
+				Recv:      append([]string(nil), steps[i+1].Argv...),
+				Direction: direction,
+			})
 			i++
 		case "recv":
 			return nil, fmt.Errorf("rotate: receive without send for %q", step.DSSuffix)
 		default:
-			out = append(out, zfs.SoftJoin(step.Argv))
+			out = append(out, zfs.Command{
+				Kind: zfs.CmdOther,
+				Argv: append([]string(nil), step.Argv...),
+			})
 		}
 	}
 	return out, nil
-}
-
-// FormatRemote renders a dry-run plan with endpoint-aware command wrappers.
-// Send/receive pairs use the same direction rules as backup dry-runs.
-func FormatRemote(steps []Step, source, target, direction string) (string, error) {
-	lines, err := Commands(steps, source, target, direction)
-	if err != nil {
-		return "", err
-	}
-	var b strings.Builder
-	for _, line := range lines {
-		b.WriteString(line)
-		b.WriteByte('\n')
-	}
-	return b.String(), nil
 }
 
 // Execute applies a previously validated plan. Send and receive steps are

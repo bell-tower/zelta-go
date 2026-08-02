@@ -3,10 +3,10 @@ package rotate
 import (
 	"context"
 	"errors"
-	"github.com/bell-tower/zelta-go/backup"
 	"strings"
 	"testing"
 
+	"github.com/bell-tower/zelta-go/backup"
 	"github.com/bell-tower/zelta-go/endpoint"
 	"github.com/bell-tower/zelta-go/match"
 	"github.com/bell-tower/zelta-go/zfs"
@@ -21,7 +21,7 @@ func TestDirectDivergencePlan(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Preserve suffix is TGT latest (@other), not match (@base) — Awk rename_dataset.
-	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_other\nzfs send -P -L -c -e tank/src@base\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\n" {
+	if got := formatSteps(steps); got != "zfs rename -fp tank/target tank/target_other\nzfs send -P -L -c -e tank/src@base\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\n" {
 		t.Fatalf("format=%q", got)
 	}
 }
@@ -36,7 +36,7 @@ func TestVerifiedSourceOriginPlanUsesOriginForSend(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Preserve = TGT latest (@other); recv -o origin still uses lineage snap @base on that preserve.
-	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_other\nzfs send -P -L -c -e -i tank/original@base tank/clone@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s -o origin=tank/target_other@base tank/target\n" {
+	if got := formatSteps(steps); got != "zfs rename -fp tank/target tank/target_other\nzfs send -P -L -c -e -i tank/original@base tank/clone@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s -o origin=tank/target_other@base tank/target\n" {
 		t.Fatalf("format=%q", got)
 	}
 }
@@ -104,42 +104,36 @@ func TestPlanAllowsTargetAtTheCommonMatch(t *testing.T) {
 	}
 }
 
-func TestFormatRemoteUsesDirectionAwarePipe(t *testing.T) {
+func TestCommandsShellLines(t *testing.T) {
 	steps := []Step{
 		{Kind: "rename", Argv: []string{"zfs", "rename", "-fp", "bpool/target", "bpool/target_base"}},
 		{Kind: "send", Argv: []string{"zfs", "send", "-I", "apool/src@base", "apool/src@new"}},
 		{Kind: "recv", Argv: []string{"zfs", "recv", "-s", "bpool/target"}},
 	}
-	out, err := FormatRemote(steps, "root@debian:apool/src", "root@vault:bpool/target", "PULL")
+	src := endpoint.MustParse("root@debian:apool/src")
+	tgt := endpoint.MustParse("root@vault:bpool/target")
+	cmds, err := Commands(steps, src, tgt, "PULL")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "ssh -n root@vault 'zfs rename -fp bpool/target bpool/target_base'\n" +
-		"ssh -n root@vault \"ssh -n root@debian zfs send -I apool/src@base apool/src@new | zfs recv -s bpool/target\"\n"
-	if out != want {
-		t.Fatalf("format=%q, want %q", out, want)
+	if len(cmds) != 2 {
+		t.Fatalf("cmds=%v", cmds)
 	}
-}
-
-func TestCommandsMatchesFormatRemote(t *testing.T) {
-	steps := []Step{
-		{Kind: "rename", Argv: []string{"zfs", "rename", "-fp", "bpool/target", "bpool/target_base"}},
-		{Kind: "send", Argv: []string{"zfs", "send", "-I", "apool/src@base", "apool/src@new"}},
-		{Kind: "recv", Argv: []string{"zfs", "recv", "-s", "bpool/target"}},
-	}
-	lines, err := Commands(steps, "root@debian:apool/src", "root@vault:bpool/target", "PULL")
+	line0, err := cmds[0].ShellLine()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(lines) != 2 {
-		t.Fatalf("lines=%v", lines)
-	}
-	out, err := FormatRemote(steps, "root@debian:apool/src", "root@vault:bpool/target", "PULL")
+	line1, err := cmds[1].ShellLine()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out != lines[0]+"\n"+lines[1]+"\n" {
-		t.Fatalf("Commands/FormatRemote mismatch:\n%q\n%q", out, lines)
+	want0 := "ssh -n root@vault 'zfs rename -fp bpool/target bpool/target_base'"
+	want1 := "ssh -n root@vault \"ssh -n root@debian zfs send -I apool/src@base apool/src@new | zfs recv -s bpool/target\""
+	if line0 != want0 {
+		t.Fatalf("line0=%q want %q", line0, want0)
+	}
+	if line1 != want1 {
+		t.Fatalf("line1=%q want %q", line1, want1)
 	}
 }
 
@@ -154,7 +148,7 @@ func TestPlanTreeAddsFullSourceOnlyChild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_other\nzfs send -P -L -c -e tank/src@base\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e tank/src/child@child\nzfs recv -v -u -x mountpoint -o canmount=noauto -s tank/target/child\n" {
+	if got := formatSteps(steps); got != "zfs rename -fp tank/target tank/target_other\nzfs send -P -L -c -e tank/src@base\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e tank/src/child@child\nzfs recv -v -u -x mountpoint -o canmount=noauto -s tank/target/child\n" {
 		t.Fatalf("format=%q", got)
 	}
 }
@@ -171,7 +165,7 @@ func TestPlanTreeUsesVerifiedChildOrigin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Format(steps); got != "zfs rename -fp tank/target tank/target_other\nzfs send -P -L -c -e tank/src@base\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/original/child@child-base tank/src/child@child-new\nzfs recv -v -u -x mountpoint -o canmount=noauto -s -o origin=tank/target_other/child@child-base tank/target/child\n" {
+	if got := formatSteps(steps); got != "zfs rename -fp tank/target tank/target_other\nzfs send -P -L -c -e tank/src@base\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/src@base tank/src@new\nzfs recv -v -o readonly=on -u -x mountpoint -o canmount=noauto -s tank/target\nzfs send -P -L -c -e -I tank/original/child@child-base tank/src/child@child-new\nzfs recv -v -u -x mountpoint -o canmount=noauto -s -o origin=tank/target_other/child@child-base tank/target/child\n" {
 		t.Fatalf("format=%q", got)
 	}
 }
@@ -339,4 +333,16 @@ func (f *failPipeFake) RunPipeDirection(ctx context.Context, leftEp string, left
 		return errors.New("injected receive failure")
 	}
 	return f.Fake.RunPipeDirection(ctx, leftEp, leftArgv, rightEp, rightArgv, direction)
+}
+
+func formatSteps(steps []Step) string {
+	var b strings.Builder
+	for _, step := range steps {
+		if len(step.Argv) == 0 {
+			continue
+		}
+		b.WriteString(strings.Join(step.Argv, " "))
+		b.WriteByte('\n')
+	}
+	return b.String()
 }

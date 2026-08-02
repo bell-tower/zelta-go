@@ -89,7 +89,7 @@ func runZprune(args []string) int {
 		return 1
 	}
 	printWarns(sink, res.Warnings)
-	emitBlob(sink, res.Output)
+	emitBlob(sink, res.Format())
 
 	candidates := res.Candidates()
 	if len(candidates) == 0 {

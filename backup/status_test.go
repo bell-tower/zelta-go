@@ -33,3 +33,17 @@ func TestErrCodeBlocked(t *testing.T) {
 		t.Fatal("failure codes must be blocked")
 	}
 }
+
+func TestErrCodeFromPlan(t *testing.T) {
+	if got := ErrCodeFromPlan(&Plan{Skip: 1}); got != ErrCodeUpToDate {
+		t.Fatalf("skip-only: %q", got)
+	}
+	if got := ErrCodeFromPlan(&Plan{Steps: []*Step{{
+		Kind: KindBlocked, Notice: "blocked sync: target has local writes",
+	}}}); got != ErrCodeTargetLocalWrites {
+		t.Fatalf("blocked local writes: %q", got)
+	}
+	if got := ErrCodeFromPlan(&Plan{Full: 1}); got != ErrCodeNone {
+		t.Fatalf("work planned: %q", got)
+	}
+}

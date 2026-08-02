@@ -33,14 +33,14 @@ func TestResolveListProps(t *testing.T) {
 	fake := &zfs.Fake{Lists: map[string]string{"tank/src": "tank/src\tg1\n"}}
 	full := strings.Join(DefaultListProps, ",")
 	min := strings.Join(MinimalListProps, ",")
-	got, err := resolveListProps(ctx, fake, Request{Source: endpoint.MustParse("tank/src")}, DefaultCols)
+	got, err := resolveListProps(ctx, fake, Request{Source: endpoint.MustParse("tank/src")})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if strings.Join(got, ",") != full {
 		t.Fatalf("default props=%s", got)
 	}
-	got, err = resolveListProps(ctx, fake, Request{Source: endpoint.MustParse("tank/src"), NoWritten: true}, DefaultCols)
+	got, err = resolveListProps(ctx, fake, Request{Source: endpoint.MustParse("tank/src"), NoWritten: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,32 +48,19 @@ func TestResolveListProps(t *testing.T) {
 		t.Fatalf("nowritten props=%s", got)
 	}
 	// -p without written cols skips slow props
-	got, err = resolveListProps(ctx, fake, Request{Source: endpoint.MustParse("tank/src"), Parsable: true}, DefaultCols)
+	got, err = resolveListProps(ctx, fake, Request{Source: endpoint.MustParse("tank/src"), Cols: []string{"ds_suffix", "match", "src_last", "tgt_last", "info"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if strings.Join(got, ",") != min {
 		t.Fatalf("parsable default cols props=%s want min", got)
 	}
-	got, err = resolveListProps(ctx, fake, Request{Source: endpoint.MustParse("tank/src"), Parsable: true}, []string{"ds_suffix", "xfer_size"})
+	got, err = resolveListProps(ctx, fake, Request{Source: endpoint.MustParse("tank/src"), Cols: []string{"ds_suffix", "xfer_size"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if strings.Join(got, ",") != full {
 		t.Fatalf("parsable xfer_size props=%s want full", got)
-	}
-}
-
-func TestFormatListTimes(t *testing.T) {
-	s := formatListTimes(0.33, 0.60)
-	if !strings.Contains(s, "SOURCE_LIST_TIME:\t0.33\n") {
-		t.Fatalf("src: %q", s)
-	}
-	if !strings.Contains(s, "TARGET_LIST_TIME:\t0.6\n") {
-		t.Fatalf("tgt: %q", s)
-	}
-	if formatListTimes(0, 0) != "" {
-		t.Fatal("zero times should be empty")
 	}
 }
 
@@ -85,7 +72,6 @@ func TestCompareFake(t *testing.T) {
 	res, err := Compare(context.Background(), fake, Request{
 		Source:    endpoint.MustParse("tank/src"),
 		Target:    endpoint.MustParse("tank/tgt"),
-		Scripting: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -100,8 +86,8 @@ func TestCompareFake(t *testing.T) {
 		t.Fatalf("info=%q", res.Pairs[0].Info)
 	}
 	want := "\t@a\t@a\t@a\tup-to-date\n"
-	if res.Output != want {
-		t.Fatalf("output=%q want=%q", res.Output, want)
+	if formatScriptingPairs(res.Pairs) != want {
+		t.Fatalf("output=%q want=%q", formatScriptingPairs(res.Pairs), want)
 	}
 }
 
@@ -154,7 +140,6 @@ func TestCompareDefaultNoIVSetProbe(t *testing.T) {
 	res, err := Compare(context.Background(), fake, Request{
 		Source:    endpoint.MustParse("app2:zroot"),
 		Target:    endpoint.MustParse("vault:backup/zroot"),
-		Scripting: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -196,14 +181,13 @@ func TestCompareBasicOracle(t *testing.T) {
 	res, err := Compare(context.Background(), fake, Request{
 		Source:    endpoint.MustParse("tank/src"),
 		Target:    endpoint.MustParse("tank/tgt"),
-		Scripting: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := "\t@b\t@b\t@b\tup-to-date\n/child\t\t@a\t\tsyncable (full)\n"
-	if res.Output != want {
-		t.Fatalf("got:\n%s\nwant:\n%s", res.Output, want)
+	if formatScriptingPairs(res.Pairs) != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", formatScriptingPairs(res.Pairs), want)
 	}
 
 	hum, err := Compare(context.Background(), fake, Request{
@@ -213,11 +197,9 @@ func TestCompareBasicOracle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(hum.Output, "[src]") {
-		t.Fatalf("human missing leaf: %q", hum.Output)
-	}
-	if !strings.Contains(hum.Output, "1 up-to-date, 1 syncable") {
-		t.Fatalf("human summary: %q", hum.Output)
+	// Human table rendering lives in internal/report; assert analysis fields here.
+	if hum.Pairs[0].Info != "up-to-date" || hum.Pairs[1].Info != "syncable (full)" {
+		t.Fatalf("pairs=%+v", []*Pair{hum.Pairs[0], hum.Pairs[1]})
 	}
 }
 
@@ -227,28 +209,69 @@ func TestCommands(t *testing.T) {
 		Target: endpoint.MustParse("tank/tgt"),
 		Depth:  2,
 	}
-	lines, err := Commands(req)
+	cmds, err := Commands(req)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(lines) != 2 {
-		t.Fatalf("lines=%v", lines)
+	if len(cmds) != 2 {
+		t.Fatalf("cmds=%v", cmds)
 	}
-	if lines[0] != "+ zfs list -H -t snapshot -o name,guid,written,creation,used -r -d 2 root@debian:tank/src" {
-		t.Fatalf("line0=%q", lines[0])
+	line0, err := cmds[0].ShellLine()
+	if err != nil {
+		t.Fatal(err)
 	}
-	if lines[1] != "+ zfs list -H -t snapshot -o name,guid,written,creation,used -r -d 2 tank/tgt" {
-		t.Fatalf("line1=%q", lines[1])
+	if line0 != "zfs list -H -t snapshot -o name,guid,written,creation,used -r -d 2 root@debian:tank/src" {
+		t.Fatalf("line0=%q", line0)
+	}
+	line1, err := cmds[1].ShellLine()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if line1 != "zfs list -H -t snapshot -o name,guid,written,creation,used -r -d 2 tank/tgt" {
+		t.Fatalf("line1=%q", line1)
 	}
 	// Single endpoint (oracle -n with one operand) + minimal props.
-	lines, err = Commands(Request{
+	cmds, err = Commands(Request{
 		Source: endpoint.MustParse("tank/src"),
 		Props:  MinimalListProps,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(lines) != 1 || lines[0] != "+ zfs list -H -t snapshot -o name,guid tank/src" {
-		t.Fatalf("lines=%v", lines)
+	if len(cmds) != 1 {
+		t.Fatalf("cmds=%v", cmds)
 	}
+	line, err := cmds[0].ShellLine()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if line != "zfs list -H -t snapshot -o name,guid tank/src" {
+		t.Fatalf("line=%q", line)
+	}
+}
+
+func formatScriptingPairs(pairs []*Pair) string {
+	cols := []string{"ds_suffix", "match", "src_last", "tgt_last", "info"}
+	var b strings.Builder
+	for _, p := range pairs {
+		for i, c := range cols {
+			if i > 0 {
+				b.WriteByte('\t')
+			}
+			switch c {
+			case "ds_suffix":
+				b.WriteString(p.DSSuffix)
+			case "match":
+				b.WriteString(p.Match)
+			case "src_last":
+				b.WriteString(p.SrcLast)
+			case "tgt_last":
+				b.WriteString(p.TgtLast)
+			case "info":
+				b.WriteString(p.Info)
+			}
+		}
+		b.WriteByte('\n')
+	}
+	return b.String()
 }

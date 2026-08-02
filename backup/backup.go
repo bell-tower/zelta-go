@@ -77,17 +77,15 @@ type Request struct {
 }
 
 // Result is the structured outcome of a backup run: match, plan, executed
-// command transcript, telemetry, and classified status. Consumers render
-// their own output from these fields; the library never logs.
+// commands, telemetry, and classified status. Consumers render their own
+// output from these fields; the library never logs or formats human prose.
 type Result struct {
 	Match    *match.Result
 	Plan     *Plan
-	Output   string
 	Warnings []string // filter warnings from match
 	Errors   []string // non-fatal replication errors
-	// Commands lists each send/receive pipe command line actually executed,
-	// in order. Raw command output for consumer display.
-	Commands []string
+	// Commands lists each send/receive pipe actually executed, in order.
+	Commands []zfs.Command
 	// Stats carries send/recv replication telemetry (zero when nothing ran).
 	Stats zfs.PipeStats
 	// ErrCode classifies the backup outcome for programmatic handling.
@@ -117,9 +115,8 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	}
 	direction := req.SyncDirection.PipeArg()
 
-	var b strings.Builder
 	var errors []string
-	var commands []string
+	var commands []zfs.Command
 	// Pipe telemetry lives in the executor (zfs.Real parses send/recv output
 	// internally); reset stale counters and forward raw lines to req.OnLine.
 	var stats zfs.PipeStats
@@ -132,13 +129,6 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 		}
 	}
 
-	work := plan.Full + plan.Incr
-	total := work + plan.Skip + plan.Block
-	// Oracle: announce sync only when there is work; pure up-to-date skips it.
-	if work > 0 && total > 0 {
-		b.WriteString(fmt.Sprintf("syncing %d datasets\n", total))
-	}
-	execStart := time.Now()
 	for i := range plan.Steps {
 		if err := plan.syncPair(ctx, exec, req, direction, i, &commands); err != nil {
 			return nil, err
@@ -149,40 +139,18 @@ func Run(ctx context.Context, exec zfs.Executor, req Request) (*Result, error) {
 	if reporter, ok := exec.(zfs.PipeStatsReporter); ok {
 		stats = reporter.TakeStats()
 	}
-	if work == 0 && plan.Skip > 0 {
-		if plan.Skip == 1 {
-			b.WriteString("dataset up-to-date\n")
-		} else {
-			b.WriteString(fmt.Sprintf("%d datasets up-to-date\n", plan.Skip))
-		}
-	}
-	if work > 0 {
-		secs := execEndTime.Sub(execStart).Seconds()
-		streams := work
-		if stats.Streams > 0 {
-			streams = stats.Streams
-		}
-		if stats.Secs > 0 {
-			secs = stats.Secs
-		}
-		// Awk parity: size/stream counts come from zfs send -P and
-		// zfs recv -v output; fall back to plan counts when the executor
-		// does not report them.
-		b.WriteString(fmt.Sprintf("%s sent, %d streams received in %g seconds\n", HumanBytes(stats.Bytes), streams, secs))
-	}
 
 	res := &Result{
 		Match:     mres,
 		Plan:      plan,
-		Output:    b.String(),
 		Warnings:  append([]string(nil), plan.Warnings...),
 		Errors:    errors,
 		Commands:  commands,
 		Stats:     stats,
 		StartTime: startTime,
 		EndTime:   execEndTime,
+		ErrCode:   ErrCodeFromPlan(plan),
 	}
-	res.ErrCode = ErrCodeFromOutput(res.Output)
 	return res, nil
 }
 
@@ -203,16 +171,16 @@ func Prepare(ctx context.Context, exec zfs.Executor, req Request) (*Plan, error)
 }
 
 // Commands runs the read-only recon needed to produce backup's command list —
-// match runs lazily inside, exactly as in Run — and returns the oracle-shaped
-// "+ …" command lines without executing anything. The first pass of
-// intermediate fulls is shown; the second pass is execute-time, matching the
-// oracle dry-run. For the plan behind the lines, see Prepare.
-func Commands(ctx context.Context, exec zfs.Executor, req Request) ([]string, error) {
+// match runs lazily inside, exactly as in Run — and returns structured
+// commands without executing anything. The first pass of intermediate fulls
+// is shown; the second pass is execute-time, matching the oracle dry-run.
+// For the plan behind the commands, see Prepare.
+func Commands(ctx context.Context, exec zfs.Executor, req Request) ([]zfs.Command, error) {
 	plan, _, err := prepare(ctx, exec, req)
 	if err != nil {
 		return nil, err
 	}
-	return plan.Commands(req.Source.String(), req.Target.String(), req.SyncDirection.PipeArg())
+	return plan.Commands(req.Source, req.Target, req.SyncDirection.PipeArg()), nil
 }
 
 // prepare runs the recon and planning shared by Run, Prepare and Commands.
@@ -269,8 +237,6 @@ func prepare(ctx context.Context, exec zfs.Executor, req Request) (*Plan, *match
 		Include:                 req.Include,
 		Exclude:                 req.Exclude,
 		Props:                   props,
-		Scripting:               true,
-		Parsable:                true,
 		PreserveSourceSnapshots: filteredIntermediate,
 		SrcContext:              srcCtx,
 		TgtContext:              tgtCtx,
@@ -511,14 +477,19 @@ func createBookmarks(ctx context.Context, exec zfs.Executor, req Request, plan *
 	return errors
 }
 
-func runStep(ctx context.Context, exec zfs.Executor, req Request, st *Step, direction string, commands *[]string) error {
+func runStep(ctx context.Context, exec zfs.Executor, req Request, st *Step, direction string, commands *[]zfs.Command) error {
 	if len(st.Send) == 0 || len(st.Recv) == 0 {
 		return fmt.Errorf("backup: empty send/recv for %q", st.DSSuffix)
 	}
-	// Record the composed pipe command for consumer display (oracle
-	// LOG_DEBUG "`<pipe command>`" echo — consumers render it if they want).
-	if sh, err := zfs.PipeShellDirection(req.Source.String(), req.Target.String(), st.Send, st.Recv, direction); err == nil && commands != nil {
-		*commands = append(*commands, sh)
+	if commands != nil {
+		*commands = append(*commands, zfs.Command{
+			Kind:      zfs.CmdSendRecv,
+			Source:    req.Source,
+			Target:    req.Target,
+			Send:      append([]string(nil), st.Send...),
+			Recv:      append([]string(nil), st.Recv...),
+			Direction: direction,
+		})
 	}
 	if err := exec.RunPipeDirection(ctx, req.Source.String(), st.Send, req.Target.String(), st.Recv, direction); err != nil {
 		return fmt.Errorf("sync %s: %w", st.DSSuffix, err)

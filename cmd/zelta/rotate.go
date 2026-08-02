@@ -11,6 +11,7 @@ import (
 	"github.com/bell-tower/zelta-go/cmdbuild"
 	"github.com/bell-tower/zelta-go/endpoint"
 	"github.com/bell-tower/zelta-go/internal/opt"
+	"github.com/bell-tower/zelta-go/internal/report"
 	"github.com/bell-tower/zelta-go/match"
 	"github.com/bell-tower/zelta-go/rotate"
 )
@@ -45,7 +46,7 @@ func runRotate(args []string) int {
 	}
 	m, err := match.Compare(context.Background(), exec, match.Request{
 		Source: src, Target: tgt, Props: match.RotateListProps,
-		Scripting: true, Parsable: true,
+
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
@@ -141,7 +142,12 @@ func runRotate(args []string) int {
 		sink.Warning(fmt.Sprintf("insufficient snapshots; performing full backup for %d datasets", fullCount))
 	}
 	if p.Env.Bool("DRYRUN", false) {
-		out, err := rotate.FormatRemote(steps, src.String(), tgt.String(), request.SyncDirection.PipeArg())
+		cmds, err := rotate.Commands(steps, src, tgt, request.SyncDirection.PipeArg())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
+			return 1
+		}
+		out, err := formatPlusCommands(cmds)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "zelta rotate: %v\n", err)
 			return 1
@@ -166,7 +172,7 @@ func runRotate(args []string) int {
 	}
 	_, err = match.Compare(context.Background(), exec, match.Request{
 		Source: src, Target: tgt, Props: match.RotateListProps,
-		Scripting: true, Parsable: true,
+
 	})
 	if err != nil {
 		sink.Warning(fmt.Sprintf("rotate confirmation: %v", err))
@@ -184,7 +190,7 @@ func runRotate(args []string) int {
 			secs = s.Secs
 		}
 		// Awk parity: size/stream counts come from zfs send -P and zfs recv -v.
-		fmt.Fprintf(os.Stdout, "%s sent, %d streams received in %g seconds\n", backup.HumanBytes(s.Bytes), streams, secs)
+		fmt.Fprintf(os.Stdout, "%s sent, %d streams received in %g seconds\n", report.HumanBytes(s.Bytes), streams, secs)
 	}
 	if len(execution.Failures) > 0 {
 		printRotateFailures(execution.Failures)

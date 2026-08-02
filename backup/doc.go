@@ -1,16 +1,17 @@
 // Package backup plans and runs ZFS send/recv replication.
 //
-// Build a Request from memory (integrator) or via public Parse helpers (CLI/JSON):
+// Lifecycle: Prepare (lazy match) → Plan.Commands / RunStep → Run.
+// Results are typed (Plan, []zfs.Command, ErrCode, PipeStats); the CLI owns
+// human/JSON presentation.
 //
 //	src := endpoint.Endpoint{Dataset: "tank/src"}
 //	tgt := endpoint.Endpoint{Host: "backup", Dataset: "tank/tgt", Remote: true}
-//	res, err := backup.Run(ctx, &zfs.Real{SSH: zfs.SSHConfig{…}}, backup.Request{
-//	    Source: src, Target: tgt,
-//	    SnapMode: backup.SnapIfNeeded,
-//	    Flags:    &flags, // flags := backup.DefaultSendRecv(); customize
+//	plan, err := backup.Prepare(ctx, exec, backup.Request{
+//	    Source: src, Target: tgt, SnapMode: backup.SnapIfNeeded,
 //	})
+//	cmds := plan.Commands(src, tgt, backup.DirectionPull.PipeArg())
+//	res, err := backup.Run(ctx, exec, req)
 //
-// Dry-run prints snap + send|recv; execute runs Snapshot + RunPipe.
 // Action paths never read process env. String import: ParseSnapMode,
 // ParseSnapTime, ParseSnapSize, ParseSyncDirection, endpoint.Parse.
 package backup

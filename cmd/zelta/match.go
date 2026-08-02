@@ -7,9 +7,9 @@ import (
 
 	"github.com/bell-tower/zelta-go/endpoint"
 	"github.com/bell-tower/zelta-go/internal/opt"
+	"github.com/bell-tower/zelta-go/internal/report"
 	"github.com/bell-tower/zelta-go/internal/zlog"
 	"github.com/bell-tower/zelta-go/match"
-	"github.com/bell-tower/zelta-go/internal/report"
 )
 
 func runMatch(args []string) int {
@@ -54,14 +54,19 @@ func runMatch(args []string) int {
 				req.Target = ep
 			}
 		}
-		lines, err := match.Commands(req)
+		cmds, err := match.Commands(req)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "zelta match: %v\n", err)
 			return 2
 		}
 		if sink.Enabled(zlog.Notice) {
-			for _, line := range lines {
-				fmt.Fprintln(os.Stdout, line)
+			for _, c := range cmds {
+				line, err := c.ShellLine()
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "zelta match: %v\n", err)
+					return 2
+				}
+				fmt.Fprintln(os.Stdout, "+ "+line)
 			}
 		}
 		return 0
@@ -100,6 +105,9 @@ func runMatch(args []string) int {
 	}
 	exec := newReal()
 	wireCommandEcho(exec, sink)
+	scripting := p.Env.Bool("SCRIPTING_MODE", false)
+	parsable := p.Env.Bool("PARSABLE", false)
+	checkTime := p.Env.Bool("CHECK_TIME", false)
 	res, err := match.Compare(context.Background(), exec, match.Request{
 		Source:    src,
 		Target:    tgt,
@@ -107,10 +115,7 @@ func runMatch(args []string) int {
 		Depth:     depth,
 		Include:   p.Env.List("INCLUDE"),
 		Exclude:   p.Env.List("EXCLUDE"),
-		Scripting: p.Env.Bool("SCRIPTING_MODE", false),
-		Parsable:  p.Env.Bool("PARSABLE", false),
 		NoWritten: noWritten,
-		CheckTime: p.Env.Bool("CHECK_TIME", false),
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "zelta match: %v\n", err)
@@ -118,7 +123,16 @@ func runMatch(args []string) int {
 	}
 	printWarns(sink, res.Warnings)
 	// Oracle: the whole table is LOG_NOTICE — `-q` silences it.
-	emitBlob(sink, res.Output)
+	out := report.FormatMatch(res.Pairs, report.MatchFormatOpts{
+		Cols:        cols,
+		SrcLeaf:     report.DatasetLeaf(src.Dataset),
+		Scripting:   scripting,
+		Parsable:    parsable,
+		CheckTime:   checkTime,
+		SrcListTime: res.SrcListTime,
+		TgtListTime: res.TgtListTime,
+	})
+	emitBlob(sink, out)
 	return 0
 }
 

@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/bell-tower/zelta-go/endpoint"
 	"github.com/bell-tower/zelta-go/zfs"
 )
 
@@ -31,7 +33,7 @@ func TestClonePlanSelectsLatestSnapshotPerDataset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Format(steps); got != "zfs clone -p -o readonly=off tank/src@new tank/clone\nzfs clone -p -o readonly=off tank/src/child@new tank/clone/child\n" {
+	if got := formatSteps(steps); got != "zfs clone -p -o readonly=off tank/src@new tank/clone\nzfs clone -p -o readonly=off tank/src/child@new tank/clone/child\n" {
 		t.Fatalf("format=%q", got)
 	}
 }
@@ -60,7 +62,7 @@ func TestRevertPreservesBeforeClone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Format(steps); got != "zfs rename -fp tank/live tank/live_daily\nzfs clone -p -o readonly=off tank/live_daily@daily tank/live\nzfs snapshot -r tank/live@after\n" {
+	if got := formatSteps(steps); got != "zfs rename -fp tank/live tank/live_daily\nzfs clone -p -o readonly=off tank/live_daily@daily tank/live\nzfs snapshot -r tank/live@after\n" {
 		t.Fatalf("format=%q", got)
 	}
 }
@@ -74,7 +76,7 @@ func TestRevertPlanSelectsRootAndChildSnapshots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Format(steps); got != "zfs rename -fp tank/live tank/live_root-new\nzfs clone -p -o readonly=off tank/live_root-new@root-new tank/live\nzfs clone -p -o readonly=off tank/live_root-new/child@child-new tank/live/child\nzfs snapshot -r tank/live@after\n" {
+	if got := formatSteps(steps); got != "zfs rename -fp tank/live tank/live_root-new\nzfs clone -p -o readonly=off tank/live_root-new@root-new tank/live\nzfs clone -p -o readonly=off tank/live_root-new/child@child-new tank/live/child\nzfs snapshot -r tank/live@after\n" {
 		t.Fatalf("format=%q", got)
 	}
 }
@@ -105,16 +107,21 @@ func TestCloneTreatsLocalhostAsLocal(t *testing.T) {
 	}
 }
 
-func TestFormatRemoteWrapsLineageCommands(t *testing.T) {
+func TestCommandsShellLines(t *testing.T) {
 	steps, err := Clone(CloneRequest{Source: "root@debian:apool/src@daily", Target: "root@debian:apool/clone"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := FormatRemote(steps, "root@debian:apool/clone")
+	ep := endpoint.MustParse("root@debian:apool/clone")
+	cmds := Commands(steps, ep)
+	if len(cmds) != 1 {
+		t.Fatalf("cmds=%v", cmds)
+	}
+	out, err := cmds[0].ShellLine()
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "ssh -n root@debian 'zfs clone -p -o readonly=off apool/src@daily apool/clone'\n"
+	want := "ssh -n root@debian 'zfs clone -p -o readonly=off apool/src@daily apool/clone'"
 	if out != want {
 		t.Fatalf("format=%q want %q", out, want)
 	}
@@ -155,4 +162,16 @@ func (f *failCloneFake) Clone(ctx context.Context, endpoint, sourceSnap, dataset
 		return errors.New("injected clone failure")
 	}
 	return f.Fake.Clone(ctx, endpoint, sourceSnap, dataset)
+}
+
+func formatSteps(steps []Step) string {
+	var b strings.Builder
+	for _, step := range steps {
+		if len(step.Argv) == 0 {
+			continue
+		}
+		b.WriteString(strings.Join(step.Argv, " "))
+		b.WriteByte('\n')
+	}
+	return b.String()
 }

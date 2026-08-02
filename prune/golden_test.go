@@ -79,7 +79,7 @@ func runPruneGolden(t *testing.T, dir string) {
 	if runErr != nil {
 		gotErr, gotExit = runErr.Error()+"\n", 1
 	} else if res != nil {
-		gotOut = res.Output
+		gotOut = res.Format()
 	}
 	wantOut := readOptional(t, filepath.Join(dir, "expected.out"))
 	wantErr := readOptional(t, filepath.Join(dir, "expected.err"))

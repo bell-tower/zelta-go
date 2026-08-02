@@ -115,7 +115,7 @@ func runBackup(args []string) int {
 			}
 			return 1
 		}
-		out, err := backup.FormatDryRunDirection(plan, src.String(), tgt.String(), syncDir.PipeArg())
+		out, err := report.FormatBackupDryRun(plan, src, tgt, syncDir.PipeArg())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "zelta backup: %v\n", err)
 			if jsonMode {
@@ -126,7 +126,7 @@ func runBackup(args []string) int {
 			return 1
 		}
 		if plan.Full+plan.Incr == 0 {
-			if sum := plan.Summary(); sum != "" {
+			if sum := report.PlanSummary(plan); sum != "" {
 				out += sum + "\n"
 			}
 		}
@@ -161,10 +161,8 @@ func runBackup(args []string) int {
 		filteredWarnings = append(filteredWarnings, w)
 	}
 	printWarns(sink, filteredWarnings)
-	// Oracle: syncing/up-to-date/+ command lines are LOG_NOTICE — `-q`
-	// silences them; json mode prefixes them to stderr; terminal mode
-	// prints them to stdout (dry-run and execute alike).
-	emitBlob(sink, res.Output)
+	// Oracle: syncing/up-to-date lines are LOG_NOTICE — `-q` silences them.
+	emitBlob(sink, report.FormatBackupRun(res))
 	if jsonMode {
 		streams, sent := 0, []string(nil)
 		if res.Plan != nil {

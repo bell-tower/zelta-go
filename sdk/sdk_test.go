@@ -28,12 +28,12 @@ func TestBackupCommandsAndRun(t *testing.T) {
 		SnapMode: backup.SnapNever,
 		OnLine:   func(string) {},
 	}
-	lines, err := backup.Commands(ctx, f, req)
+	cmds, err := backup.Commands(ctx, f, req)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(lines) != 0 {
-		t.Fatalf("up-to-date pair must plan no commands, got %v", lines)
+	if len(cmds) != 0 {
+		t.Fatalf("up-to-date pair must plan no commands, got %v", cmds)
 	}
 	plan, err := backup.Prepare(ctx, f, req)
 	if err != nil {

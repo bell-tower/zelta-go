@@ -18,7 +18,7 @@ func ExampleRun_commands() {
 			"pool/tgt": "pool/tgt\t33333\t0\t2024-01-01 00:00:00\t-\tfilesystem\t-\t-\t-\npool/tgt@snap1\t22222\t1024\t2024-01-01 01:00:00\t4096\t-\t-\t-\t-",
 		},
 	}
-	lines, err := backup.Commands(ctx, f, backup.Request{
+	cmds, err := backup.Commands(ctx, f, backup.Request{
 		Source:   endpoint.MustParse("pool/src"),
 		Target:   endpoint.MustParse("pool/tgt"),
 		SnapMode: backup.SnapNever,
@@ -26,7 +26,7 @@ func ExampleRun_commands() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(len(lines))
+	fmt.Println(len(cmds))
 	plan, err := backup.Prepare(ctx, f, backup.Request{
 		Source:   endpoint.MustParse("pool/src"),
 		Target:   endpoint.MustParse("pool/tgt"),
