@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"git.belltower.it/djbell/zelta-go/internal/conf"
+	"github.com/bell-tower/zelta-go/internal/conf"
 )
 
 const version = "Zelta 1.2.0 (Go)"

@@ -1,3 +1,3 @@
-module git.belltower.it/djbell/zelta-go
+module github.com/bell-tower/zelta-go
 
 go 1.22

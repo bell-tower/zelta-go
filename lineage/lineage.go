@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"git.belltower.it/djbell/zelta-go/cmdbuild"
-	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/cmdbuild"
+	"github.com/bell-tower/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 // Step is one local argv operation in a dry-run plan.

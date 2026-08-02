@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"git.belltower.it/djbell/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/endpoint"
 )
 
 // Features reports which optional ZFS properties appeared in a dataset get.

@@ -3,8 +3,8 @@ package main
 import (
 	"strings"
 
-	"git.belltower.it/djbell/zelta-go/internal/opt"
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/internal/opt"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 // newReal builds a production executor from CLI/env (zelta.env already injected).

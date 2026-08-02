@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"git.belltower.it/djbell/zelta-go/data"
+	"github.com/bell-tower/zelta-go/data"
 )
 
 // Remote roles from cmds.tsv column 2 (oracle REMOTE_SEND / REMOTE_RECV / REMOTE_DEFAULT).

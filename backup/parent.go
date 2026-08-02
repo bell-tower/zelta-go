@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 // parentDataset strips the last path component (oracle validate_target_parent_dataset).

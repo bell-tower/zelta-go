@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"git.belltower.it/djbell/zelta-go/match"
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/match"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 // snap is one source snapshot row (source snaps only; bookmarks skipped).

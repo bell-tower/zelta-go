@@ -5,9 +5,9 @@ import (
 	"os"
 	"strconv"
 
-	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/internal/opt"
-	"git.belltower.it/djbell/zelta-go/internal/zlog"
+	"github.com/bell-tower/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/internal/opt"
+	"github.com/bell-tower/zelta-go/internal/zlog"
 )
 
 // parseEndpoint maps a CLI operand/env string to endpoint.Endpoint.

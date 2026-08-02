@@ -3,7 +3,7 @@ package zfs_test
 import (
 	"fmt"
 
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 func ExampleSSHConfig_Argv() {

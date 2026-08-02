@@ -1,16 +1,16 @@
 package rotate
 
 import (
-	"git.belltower.it/djbell/zelta-go/backup"
-	"git.belltower.it/djbell/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/backup"
+	"github.com/bell-tower/zelta-go/endpoint"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 
-	"git.belltower.it/djbell/zelta-go/match"
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/match"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 func TestPlanGoldens(t *testing.T) {

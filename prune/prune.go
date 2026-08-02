@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/match"
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/match"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 // Request is a read-only prune analysis.

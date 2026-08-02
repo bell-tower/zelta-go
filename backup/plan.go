@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"git.belltower.it/djbell/zelta-go/cmdbuild"
-	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/match"
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/cmdbuild"
+	"github.com/bell-tower/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/match"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 // Kind is the planned action for one dataset pair.

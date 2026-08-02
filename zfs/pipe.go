@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"git.belltower.it/djbell/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/endpoint"
 )
 
 // PipeShell formats a dry-run "+ …" body (no leading "+ ") for send|recv.

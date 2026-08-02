@@ -1,6 +1,6 @@
 package match
 
-import "git.belltower.it/djbell/zelta-go/zfs"
+import "github.com/bell-tower/zelta-go/zfs"
 
 // SnapListOpts controls optional columns on the expensive snapshot/bookmark list.
 // Dataset-only fields (encryption, type, origin, snapshots_changed, resume token)

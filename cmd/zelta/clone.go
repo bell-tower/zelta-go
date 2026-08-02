@@ -6,11 +6,11 @@ import (
 	"os"
 	"strings"
 
-	"git.belltower.it/djbell/zelta-go/backup"
-	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/internal/opt"
-	"git.belltower.it/djbell/zelta-go/lineage"
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/backup"
+	"github.com/bell-tower/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/internal/opt"
+	"github.com/bell-tower/zelta-go/lineage"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 func runClone(args []string) int {

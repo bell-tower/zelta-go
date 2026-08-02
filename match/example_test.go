@@ -3,10 +3,10 @@ package match_test
 import (
 	"context"
 	"fmt"
-	"git.belltower.it/djbell/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/endpoint"
 
-	"git.belltower.it/djbell/zelta-go/match"
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/match"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 func ExampleCompare() {

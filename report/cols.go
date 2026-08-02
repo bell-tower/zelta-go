@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"git.belltower.it/djbell/zelta-go/data"
+	"github.com/bell-tower/zelta-go/data"
 )
 
 // DefaultProplist is the default -o list before synonym expansion.

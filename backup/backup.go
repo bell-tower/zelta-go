@@ -9,11 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"git.belltower.it/djbell/zelta-go/cmdbuild"
-	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/match"
-	"git.belltower.it/djbell/zelta-go/report"
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/cmdbuild"
+	"github.com/bell-tower/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/match"
+	"github.com/bell-tower/zelta-go/report"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 // stderrTee is implemented by *zfs.Real so progress hooks work without

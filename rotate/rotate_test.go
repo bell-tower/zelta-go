@@ -3,12 +3,12 @@ package rotate
 import (
 	"context"
 	"errors"
-	"git.belltower.it/djbell/zelta-go/backup"
+	"github.com/bell-tower/zelta-go/backup"
 	"testing"
 
-	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/match"
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/match"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 func TestDirectDivergencePlan(t *testing.T) {

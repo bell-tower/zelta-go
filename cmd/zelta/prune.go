@@ -6,8 +6,8 @@ import (
 	"os"
 	"strconv"
 
-	"git.belltower.it/djbell/zelta-go/internal/opt"
-	"git.belltower.it/djbell/zelta-go/prune"
+	"github.com/bell-tower/zelta-go/internal/opt"
+	"github.com/bell-tower/zelta-go/prune"
 )
 
 func runPrune(args []string) int {

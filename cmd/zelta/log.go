@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"strings"
 
-	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/internal/opt"
-	"git.belltower.it/djbell/zelta-go/internal/zlog"
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/internal/opt"
+	"github.com/bell-tower/zelta-go/internal/zlog"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 // newLogSink builds the leveled log sink from parsed options (oracle

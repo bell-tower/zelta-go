@@ -3,14 +3,14 @@ package backup
 import (
 	"context"
 	"fmt"
-	"git.belltower.it/djbell/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/endpoint"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
-	"git.belltower.it/djbell/zelta-go/match"
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/match"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 func defFlags() SendRecv { return DefaultSendRecv() }

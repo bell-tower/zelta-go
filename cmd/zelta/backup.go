@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"git.belltower.it/djbell/zelta-go/backup"
-	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/internal/opt"
-	"git.belltower.it/djbell/zelta-go/report"
+	"github.com/bell-tower/zelta-go/backup"
+	"github.com/bell-tower/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/internal/opt"
+	"github.com/bell-tower/zelta-go/report"
 )
 
 func runBackup(args []string) int {

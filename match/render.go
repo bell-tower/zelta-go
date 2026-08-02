@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"git.belltower.it/djbell/zelta-go/report"
+	"github.com/bell-tower/zelta-go/report"
 )
 
 // DefaultCols is the default -o list after synonym expansion.

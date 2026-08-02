@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 func TestGolden(t *testing.T) {

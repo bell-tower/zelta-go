@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"git.belltower.it/djbell/zelta-go/backup"
-	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/match"
-	"git.belltower.it/djbell/zelta-go/prune"
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/backup"
+	"github.com/bell-tower/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/match"
+	"github.com/bell-tower/zelta-go/prune"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 // External-module smoke: public packages only (no internal/).

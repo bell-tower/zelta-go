@@ -3,10 +3,10 @@ package prune_test
 import (
 	"context"
 	"fmt"
-	"git.belltower.it/djbell/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/endpoint"
 
-	"git.belltower.it/djbell/zelta-go/prune"
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/prune"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 func ExampleRun() {

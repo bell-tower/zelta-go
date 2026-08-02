@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 func TestClonePlan(t *testing.T) {

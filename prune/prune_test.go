@@ -2,12 +2,12 @@ package prune
 
 import (
 	"context"
-	"git.belltower.it/djbell/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/endpoint"
 	"strings"
 	"testing"
 	"time"
 
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 func pt(d time.Duration) *time.Duration { return &d }

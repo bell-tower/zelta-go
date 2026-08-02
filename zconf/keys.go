@@ -4,7 +4,7 @@ import (
 	"strings"
 	"sync"
 
-	"git.belltower.it/djbell/zelta-go/data"
+	"github.com/bell-tower/zelta-go/data"
 )
 
 type keyInfo struct {

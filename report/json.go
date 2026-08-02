@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"git.belltower.it/djbell/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/endpoint"
 )
 
 // BackupResult mirrors the upstream Awk `zelta backup --json` schema.

@@ -1,6 +1,6 @@
 package opt
 
-import "git.belltower.it/djbell/zelta-go/backup"
+import "github.com/bell-tower/zelta-go/backup"
 
 // SendRecv is the public send/recv flag type (re-exported for CLI callers).
 type SendRecv = backup.SendRecv

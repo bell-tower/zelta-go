@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"git.belltower.it/djbell/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/endpoint"
 )
 
 func TestGroupByDataset(t *testing.T) {

@@ -4,13 +4,13 @@ package rotate
 import (
 	"context"
 	"fmt"
-	"git.belltower.it/djbell/zelta-go/backup"
+	"github.com/bell-tower/zelta-go/backup"
 	"strings"
 
-	"git.belltower.it/djbell/zelta-go/cmdbuild"
-	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/match"
-	"git.belltower.it/djbell/zelta-go/zfs"
+	"github.com/bell-tower/zelta-go/cmdbuild"
+	"github.com/bell-tower/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/match"
+	"github.com/bell-tower/zelta-go/zfs"
 )
 
 type Request struct {

@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"git.belltower.it/djbell/zelta-go/backup"
-	"git.belltower.it/djbell/zelta-go/cmdbuild"
-	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/internal/opt"
-	"git.belltower.it/djbell/zelta-go/match"
-	"git.belltower.it/djbell/zelta-go/rotate"
+	"github.com/bell-tower/zelta-go/backup"
+	"github.com/bell-tower/zelta-go/cmdbuild"
+	"github.com/bell-tower/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/internal/opt"
+	"github.com/bell-tower/zelta-go/match"
+	"github.com/bell-tower/zelta-go/rotate"
 )
 
 func runRotate(args []string) int {

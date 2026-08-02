@@ -1,6 +1,6 @@
 package opt
 
-import "git.belltower.it/djbell/zelta-go/data"
+import "github.com/bell-tower/zelta-go/data"
 
 // Row is one opts.tsv entry (oracle zelta-args.awk table).
 type Row = data.Row

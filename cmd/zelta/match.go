@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 
-	"git.belltower.it/djbell/zelta-go/endpoint"
-	"git.belltower.it/djbell/zelta-go/internal/opt"
-	"git.belltower.it/djbell/zelta-go/internal/zlog"
-	"git.belltower.it/djbell/zelta-go/match"
-	"git.belltower.it/djbell/zelta-go/report"
+	"github.com/bell-tower/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/internal/opt"
+	"github.com/bell-tower/zelta-go/internal/zlog"
+	"github.com/bell-tower/zelta-go/match"
+	"github.com/bell-tower/zelta-go/report"
 )
 
 func runMatch(args []string) int {

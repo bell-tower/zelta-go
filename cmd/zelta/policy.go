@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"git.belltower.it/djbell/zelta-go/internal/conf"
-	"git.belltower.it/djbell/zelta-go/internal/opt"
-	"git.belltower.it/djbell/zelta-go/internal/policy"
+	"github.com/bell-tower/zelta-go/internal/conf"
+	"github.com/bell-tower/zelta-go/internal/opt"
+	"github.com/bell-tower/zelta-go/internal/policy"
 )
 
 func runPolicy(args []string) int {

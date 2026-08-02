@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"git.belltower.it/djbell/zelta-go/endpoint"
+	"github.com/bell-tower/zelta-go/endpoint"
 )
 
 func TestNewBackupResult(t *testing.T) {

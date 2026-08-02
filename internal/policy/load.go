@@ -1,8 +1,8 @@
 package policy
 
 import (
-	"git.belltower.it/djbell/zelta-go/data"
-	"git.belltower.it/djbell/zelta-go/zconf"
+	"github.com/bell-tower/zelta-go/data"
+	"github.com/bell-tower/zelta-go/zconf"
 )
 
 // Job is the resolved backup-pair type from a policy document (re-export).
