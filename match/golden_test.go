@@ -15,7 +15,7 @@ import (
 )
 
 func TestGolden(t *testing.T) {
-	root := filepath.Join("..", "..", "testdata", "golden", "match")
+	root := filepath.Join("..", "testdata", "golden", "match")
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		if os.IsNotExist(err) {
