@@ -217,7 +217,8 @@ func (r *runner) lock(ep endpoint.Endpoint) error {
 // the tree.
 func (r *runner) unlock(ep endpoint.Endpoint) error {
 	names := listArgs("name", ep.DS, "-s", "createtxg")
-	mounts := listArgs("name,canmount,mounted", ep.DS, "-s", "createtxg")
+	// Mount top down: a parent's name always sorts before its descendants.
+	mounts := listArgs("name,canmount,mounted", ep.DS, "-s", "name")
 	inherit := r.zfs(ep, command.Word("inherit"), command.Word("readonly"), command.Name(ep.DS))
 	if err := r.must(inherit, codeReadonly, "failed to clear readonly; dataset is not safely unlocked"); err != nil {
 		return err

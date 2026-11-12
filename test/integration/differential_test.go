@@ -23,6 +23,7 @@ var (
 	timestampSnap  = regexp.MustCompile(`@zelta_\d{4}-\d\d-\d\d_\d\d\.\d\d\.\d\d`)
 	seconds        = regexp.MustCompile(`in [0-9.]+ seconds`)
 	quotedSnapshot = regexp.MustCompile(`zfs snapshot -r '([^']*)'`)
+	mountTree      = regexp.MustCompile(`(?m)^.*zfs mount -R .*\n?`)
 )
 
 func canonical(s string) string {
@@ -32,6 +33,9 @@ func canonical(s string) string {
 	s = quotedSnapshot.ReplaceAllString(s, "zfs snapshot -r $1")
 	// The shell logger dropped backslashes; zelta-go keeps them.
 	s = strings.ReplaceAll(s, `\ `, " ")
+	// zelta-go tries "zfs mount -R" before mounting top down; Awk only mounts
+	// top down. See doc/COMPATIBILITY.md.
+	s = mountTree.ReplaceAllString(s, "")
 	return strings.Join(normalize(s), "\n")
 }
 

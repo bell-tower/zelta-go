@@ -60,11 +60,11 @@ func TestUnlockDryRun(t *testing.T) {
 		"+ zfs inherit readonly 'pool/svc'",
 		"+ zfs list -Hpr -o name -t filesystem -s createtxg 'pool/svc' | xargs -n1 zfs set canmount=on",
 		"+ zfs mount -R 'pool/svc'",
-		`+ zfs list -Hpr -o name,canmount,mounted -t filesystem -s createtxg 'pool/svc' | while read ds canmount mounted; do [ "$canmount" != off ] && [ "$mounted" != yes ] && zfs mount "$ds"; done`,
+		`+ zfs list -Hpr -o name,canmount,mounted -t filesystem -s name 'pool/svc' | while read ds canmount mounted; do [ "$canmount" != off ] && [ "$mounted" != yes ] && zfs mount "$ds"; done`,
 		`+ ssh -n h "zfs inherit readonly 'pool/x'"`,
 		`+ ssh -n h "zfs list -Hpr -o name -t filesystem -s createtxg 'pool/x' | xargs -n1 zfs set canmount=on"`,
 		`+ ssh -n h "zfs mount -R 'pool/x'"`,
-		`+ ssh -n h "zfs list -Hpr -o name,canmount,mounted -t filesystem -s createtxg 'pool/x' | while read ds canmount mounted; do [ "$canmount" != off ] && [ "$mounted" != yes ] && zfs mount "$ds"; done"`)
+		`+ ssh -n h "zfs list -Hpr -o name,canmount,mounted -t filesystem -s name 'pool/x' | while read ds canmount mounted; do [ "$canmount" != off ] && [ "$mounted" != yes ] && zfs mount "$ds"; done"`)
 }
 
 func TestFailoverDryRun(t *testing.T) {
@@ -80,7 +80,7 @@ func TestFailoverDryRun(t *testing.T) {
 		`+ ssh -n b "zfs inherit readonly 'pool/svc'"`,
 		`+ ssh -n b "zfs list -Hpr -o name -t filesystem -s createtxg 'pool/svc' | xargs -n1 zfs set canmount=on"`,
 		`+ ssh -n b "zfs mount -R 'pool/svc'"`,
-		`+ ssh -n b "zfs list -Hpr -o name,canmount,mounted -t filesystem -s createtxg 'pool/svc' | while read ds canmount mounted; do [ "$canmount" != off ] && [ "$mounted" != yes ] && zfs mount "$ds"; done"`)
+		`+ ssh -n b "zfs list -Hpr -o name,canmount,mounted -t filesystem -s name 'pool/svc' | while read ds canmount mounted; do [ "$canmount" != off ] && [ "$mounted" != yes ] && zfs mount "$ds"; done"`)
 	if len(tr.Fake.Calls) != 0 {
 		t.Errorf("dry run executed %v", tr.Fake.Calls)
 	}
@@ -165,7 +165,7 @@ func TestLockFailures(t *testing.T) {
 
 const (
 	unlockNames  = "zfs list -Hpr -o name -t filesystem -s createtxg 'pool/svc'"
-	unlockMounts = "zfs list -Hpr -o name,canmount,mounted -t filesystem -s createtxg 'pool/svc'"
+	unlockMounts = "zfs list -Hpr -o name,canmount,mounted -t filesystem -s name 'pool/svc'"
 )
 
 func TestUnlockRun(t *testing.T) {
