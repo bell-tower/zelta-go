@@ -169,24 +169,42 @@ const (
 )
 
 func TestUnlockRun(t *testing.T) {
-	tr := app.NewTest("unlock", nil)
-	tr.Fake.On("zfs inherit readonly 'pool/svc'", execx.Out())
-	tr.Fake.On(unlockNames, execx.Out("pool/svc", "pool/svc/a"))
-	tr.Fake.On("zfs set canmount=on 'pool/svc'", execx.Out())
-	tr.Fake.On("zfs set canmount=on 'pool/svc/a'", execx.Out())
-	tr.Fake.On("zfs mount -R 'pool/svc'", execx.Fail(2, "invalid option 'R'"))
-	tr.Fake.On(unlockMounts, execx.Out("pool/svc\ton\tno", "pool/svc/a\toff\tno", "pool/svc/b\tnoauto\tyes", "pool/svc/c\tnoauto\tno", "short\trow"))
-	tr.Fake.On("zfs mount 'pool/svc'", execx.Out())
-	tr.Fake.On("zfs mount 'pool/svc/c'", execx.Out())
-	err := Unlock(ctx, tr.Runtime, []string{"pool/svc"})
+	// unlock runs "zelta unlock pool/svc" with the given "zfs mount -R" result.
+	unlock := func(mountR execx.Result) (*app.TestRuntime, error) {
+		tr := app.NewTest("unlock", nil)
+		tr.Fake.On("zfs inherit readonly 'pool/svc'", execx.Out())
+		tr.Fake.On(unlockNames, execx.Out("pool/svc", "pool/svc/a"))
+		tr.Fake.On("zfs set canmount=on 'pool/svc'", execx.Out())
+		tr.Fake.On("zfs set canmount=on 'pool/svc/a'", execx.Out())
+		tr.Fake.On("zfs mount -R 'pool/svc'", mountR)
+		tr.Fake.On(unlockMounts, execx.Out("pool/svc\ton\tno", "pool/svc/a\toff\tno", "pool/svc/b\tnoauto\tyes", "pool/svc/c\tnoauto\tno", "short\trow"))
+		tr.Fake.On("zfs mount 'pool/svc'", execx.Out())
+		tr.Fake.On("zfs mount 'pool/svc/c'", execx.Out())
+		return tr, Unlock(ctx, tr.Runtime, []string{"pool/svc"})
+	}
+
+	// OpenZFS 2.2 has no -R; mounting each dataset is not an error.
+	tr, err := unlock(execx.Fail(2, "invalid option 'R'", "usage:"))
+	if err != nil {
+		t.Fatalf("without mount -R: %v", err)
+	}
+	if got := len(tr.Fake.CallsMatching("zfs mount '")); got != 2 {
+		t.Errorf("mount calls = %v", tr.Fake.Calls)
+	}
+	if tr.Err.String() != "" || tr.RawErr.String() != "" {
+		t.Errorf("without mount -R: stderr = %q, zfs output = %q", tr.Err.String(), tr.RawErr.String())
+	}
+
+	tr, err = unlock(execx.Fail(1, "cannot mount 'pool/svc': mountpoint busy"))
 	if code(err) != 1 {
 		t.Fatalf("err = %v", err)
 	}
 	if got := len(tr.Fake.CallsMatching("zfs mount '")); got != 2 {
 		t.Errorf("mount calls = %v", tr.Fake.Calls)
 	}
-	if !strings.Contains(tr.Err.String(), "error: failed recursive mount during unlock: zfs mount -R 'pool/svc'") {
-		t.Errorf("stderr = %q", tr.Err.String())
+	if !strings.Contains(tr.Err.String(), "error: failed recursive mount during unlock: zfs mount -R 'pool/svc'") ||
+		!strings.Contains(tr.RawErr.String(), "mountpoint busy") {
+		t.Errorf("stderr = %q, zfs output = %q", tr.Err.String(), tr.RawErr.String())
 	}
 
 	tr = app.NewTest("unlock", nil)

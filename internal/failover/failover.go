@@ -7,6 +7,7 @@ package failover
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -68,14 +69,20 @@ func (r *runner) zfs(ep endpoint.Endpoint, args ...command.Arg) command.Cmd {
 // exec shows a command in dry-run mode, or runs it, passing its output
 // through like system(3) would. It reports success.
 func (r *runner) exec(c command.Cmd) bool {
-	if r.dry() {
-		r.rt.Log.Noticef("+ %s", c.String())
-		return true
-	}
-	r.rt.Log.Infof("+ %s", c.String())
-	res := r.rt.Exec.Run(r.ctx, c)
+	res := r.run(c)
 	r.forward(res.Lines)
 	return res.OK()
+}
+
+// run shows a command in dry-run mode, where it succeeds without running, or
+// runs it and returns its result without passing its output through.
+func (r *runner) run(c command.Cmd) execx.Result {
+	if r.dry() {
+		r.rt.Log.Noticef("+ %s", c.String())
+		return execx.Result{}
+	}
+	r.rt.Log.Infof("+ %s", c.String())
+	return r.rt.Exec.Run(r.ctx, c)
 }
 
 func (r *runner) forward(lines []execx.Line) {
@@ -98,13 +105,35 @@ func (r *runner) must(c command.Cmd, code int, msg string) error {
 
 // try runs a command whose failure is reported but not fatal.
 func (r *runner) try(c command.Cmd, msg string) {
-	if r.exec(c) {
-		return
+	if !r.exec(c) {
+		r.mountFailed(c, msg)
 	}
+}
+
+// mountFailed reports a failed mount or unmount, which is not fatal.
+func (r *runner) mountFailed(c command.Cmd, msg string) {
 	r.rt.Log.Errorf("%s: %s", msg, c.String())
 	if codeMount > r.code {
 		r.code = codeMount
 	}
+}
+
+// mountTree runs "zfs mount -R" on ep's tree. OpenZFS 2.2 has no -R and
+// rejects it; the per-dataset mounts that follow do the same work, so unlike
+// Zelta 1.2 that is not reported as a failure.
+func (r *runner) mountTree(ep endpoint.Endpoint) {
+	c := r.zfs(ep, command.Word("mount"), command.Word("-R"), command.Name(ep.DS))
+	res := r.run(c)
+	if res.OK() {
+		r.forward(res.Lines)
+		return
+	}
+	if slices.ContainsFunc(res.Stderr(), func(s string) bool { return strings.Contains(s, "invalid option 'R'") }) {
+		r.rt.Log.Infof("zfs mount -R is not supported; mounting each dataset")
+		return
+	}
+	r.forward(res.Lines)
+	r.mountFailed(c, "failed recursive mount during unlock")
 }
 
 // rows runs a listing and returns its tab-separated stdout rows; other
@@ -202,7 +231,7 @@ func (r *runner) unlock(ep endpoint.Endpoint) error {
 			}
 		}
 	}
-	r.try(r.zfs(ep, command.Word("mount"), command.Word("-R"), command.Name(ep.DS)), "failed recursive mount during unlock")
+	r.mountTree(ep)
 	if r.dry() {
 		r.rt.Log.Noticef("+ %s", r.script(ep, zfs.Local(mounts...).String()+
 			` | while read ds canmount mounted; do [ "$canmount" != off ] && [ "$mounted" != yes ] && zfs mount "$ds"; done`))

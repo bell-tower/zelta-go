@@ -48,7 +48,9 @@ func TestMain(m *testing.M) {
 			must(err)
 			must(os.WriteFile(zeltaBin, data, 0o755))
 		} else {
-			build := exec.Command("go", "build", "-o", zeltaBin, "./cmd/zelta")
+			// No VCS stamp: git refuses a checkout owned by another user
+			// (root in a CI VM), and the version comes from -ldflags anyway.
+			build := exec.Command("go", "build", "-buildvcs=false", "-o", zeltaBin, "./cmd/zelta")
 			build.Dir = root
 			build.Stdout, build.Stderr = os.Stdout, os.Stderr
 			must(build.Run())

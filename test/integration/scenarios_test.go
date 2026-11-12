@@ -220,18 +220,19 @@ func TestLockUnlockFailover(t *testing.T) {
 	src, tgt := tree(t, "failover")
 	sh(t, "zfs set mountpoint="+filepath.Join(mountDir, "fo-src")+" "+src+" && zfs set compression=lz4 "+src)
 	expectOK(t, zelta(t, nil, "backup", src, tgt))
-	r := zelta(t, nil, "failover", src, tgt)
-	expectOK(t, r)
+	// Without "zfs mount -R" (OpenZFS 2.2, as on Ubuntu 24.04), failover and
+	// unlock mount each dataset instead, and still succeed.
+	expectOK(t, zelta(t, nil, "failover", src, tgt))
 	prop := func(ds, p string) string { return strings.TrimSpace(sh(t, "zfs get -H -o value "+p+" "+ds)) }
 	if prop(src, "readonly") != "on" || prop(src, "mounted") != "no" {
 		t.Errorf("source not locked: readonly=%s mounted=%s", prop(src, "readonly"), prop(src, "mounted"))
 	}
-	if prop(tgt, "readonly") != "off" || prop(tgt, "compression") != "lz4" {
-		t.Errorf("target not promoted: readonly=%s compression=%s", prop(tgt, "readonly"), prop(tgt, "compression"))
+	if prop(tgt, "readonly") != "off" || prop(tgt, "mounted") != "yes" || prop(tgt, "compression") != "lz4" {
+		t.Errorf("target not promoted: readonly=%s mounted=%s compression=%s", prop(tgt, "readonly"), prop(tgt, "mounted"), prop(tgt, "compression"))
 	}
 	expectOK(t, zelta(t, nil, "unlock", src))
-	if prop(src, "readonly") != "off" {
-		t.Errorf("unlock did not clear readonly")
+	if prop(src, "readonly") != "off" || prop(src, "mounted") != "yes" {
+		t.Errorf("source not unlocked: readonly=%s mounted=%s", prop(src, "readonly"), prop(src, "mounted"))
 	}
 }
 

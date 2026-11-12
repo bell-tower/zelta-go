@@ -108,6 +108,10 @@ These changes make runs faster without changing their results.
 
 ### Other commands
 
+- `zelta unlock` and `zelta failover` succeed on a zfs without
+  `zfs mount -R` (OpenZFS 2.2, as on Ubuntu 24.04) by mounting each dataset.
+  Zelta 1.2 does the same mounts but reports "failed recursive mount during
+  unlock" and exits 1.
 - `zelta match -p` prints exact byte counts in human-readable tables, as
   documented.
 - `--include`/`--exclude` with intermediate backups skip filtered snapshots
