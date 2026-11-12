@@ -11,6 +11,7 @@ import (
 
 	"github.com/bell-tower/zelta-go/internal/app"
 	"github.com/bell-tower/zelta-go/internal/backup"
+	"github.com/bell-tower/zelta-go/internal/cache"
 	"github.com/bell-tower/zelta-go/internal/cli"
 	"github.com/bell-tower/zelta-go/internal/config"
 	"github.com/bell-tower/zelta-go/internal/execx"
@@ -33,6 +34,7 @@ func newApp() *cli.App {
 	failover.Backup = backup.Run
 	a := cli.New(engines(), runPolicy)
 	a.Multiplex = func(e execx.Executor) execx.Executor { return &execx.SSHMux{Inner: e} }
+	a.CacheDir = cache.DefaultDir
 	a.Columns = matchColumns
 	a.PolicyObjects = policy.Objects
 	return a

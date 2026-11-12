@@ -51,6 +51,12 @@ type App struct {
 	// (REMOTE_MULTIPLEX); nil disables it. The result is closed after the
 	// command when it implements io.Closer.
 	Multiplex func(execx.Executor) execx.Executor
+	// CacheDir returns the default cache directory; nil disables the cache
+	// unless CACHE_DIR is set.
+	CacheDir func() string
+
+	// invocation is the command line of the running verb, for replay.
+	invocation []string
 }
 
 // PolicyEngine runs "zelta policy".
@@ -123,6 +129,10 @@ func (a *App) execute(ctx context.Context, args []string) int {
 func (a *App) executeWith(ctx context.Context, args []string, internal bool) int {
 	status := 0
 	root := a.rootCommand(&status, internal)
+	a.invocation = nil
+	if !internal {
+		a.invocation = slices.Clone(args)
+	}
 	if len(args) > 0 {
 		if v, ok := findVerb(args[0]); ok {
 			args = append([]string{args[0]}, preprocess(args[1:], v.optionVerb())...)
@@ -180,6 +190,7 @@ func (a *App) rootCommand(status *int, internal bool) *cobra.Command {
 		root.AddCommand(cmd)
 	}
 	root.SetHelpCommand(a.helpCommand(status))
+	root.AddCommand(a.replayCommand(status))
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Show version information",
@@ -314,6 +325,7 @@ func (a *App) runVerb(ctx context.Context, v verb, p *parser, args []string, int
 	base := &app.Runtime{
 		Opts: opts, Exec: a.Exec, Stdin: a.Stdin, Stdout: a.Stdout, Stderr: a.Stderr,
 		Now: a.Now, Hostname: loader.Hostname, User: loader.User, TTY: a.TTY,
+		Cache: a.cacheStore(opts),
 	}
 	if a.Multiplex != nil && opts.Bool("REMOTE_MULTIPLEX") && !opts.Bool("DRYRUN") {
 		base.Exec = a.Multiplex(a.Exec)
@@ -358,7 +370,11 @@ func (a *App) runVerb(ctx context.Context, v verb, p *parser, args []string, int
 		rt.JSON = nil
 		return app.Finish(rt, &app.ExitError{Code: 1})
 	}
-	return app.Finish(rt, runErr)
+	code := app.Finish(rt, runErr)
+	if !opts.Bool("DRYRUN") {
+		a.remember(base.Cache, v, args, code)
+	}
+	return code
 }
 
 func prog(v verb) string {

@@ -35,6 +35,10 @@ These changes make runs faster without changing their results.
   of the summed stream times (JSON `replicationTime` is still the sum).
 - When a send option is dropped and retried (`--send-check`), failures of
   other datasets are no longer masked.
+- Zelta keeps a cache directory (`CACHE`, `CACHE_DIR`, `CACHE_TIMEOUT`,
+  `--no-cache`). It only holds hints; deleting it never changes a result.
+  `zelta replay PATTERN` repeats the last backup between endpoints matching
+  PATTERN, read from the cache.
 
 ## Command line
 

@@ -55,6 +55,7 @@ func rootHelp(w io.Writer) {
 	}
 	fmt.Fprintln(w, "\nOther commands:")
 	fmt.Fprintf(w, "  %-12s%s\n", "help", "Show the manual for zelta or a TOPIC")
+	fmt.Fprintf(w, "  %-12s%s\n", "replay", "Repeat a previous backup")
 	fmt.Fprintf(w, "  %-12s%s\n", "version", "Show version information")
 	fmt.Fprintf(w, "  %-12s%s\n", "completion", "Generate a bash, zsh, fish, or powershell completion script")
 	fmt.Fprintln(w)
