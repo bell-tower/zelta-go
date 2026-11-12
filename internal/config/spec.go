@@ -124,6 +124,7 @@ var Specs = []*Spec{
 	{Verbs: verbsAll, Flags: flags("--depth,-d"), Key: "DEPTH", Type: Set, Arg: "LEVELS", Desc: "limit the recursion depth", Group: GroupFilter},
 	{Verbs: verbsAll, Flags: flags("--exclude,-X"), Key: "EXCLUDE", Type: List, Arg: "PATTERN", Desc: "exclude source dataset or snapshot patterns", Group: GroupFilter},
 	{Verbs: verbsAll, Flags: flags("--include"), Key: "INCLUDE", Type: List, Arg: "PATTERN", Desc: "include only source dataset or snapshot patterns", Group: GroupFilter},
+	{Verbs: verbsAll, Flags: flags("--no-cache"), Key: "CACHE", Type: False, Desc: "ignore and do not update the cache", Group: GroupCommand},
 
 	// Backup and other send/receive verbs.
 	{Verbs: verbsBackup, Flags: flags("--json,-j"), Key: "LOG_MODE", Type: Set, Value: "json", Desc: "json output", Group: GroupOutput},
@@ -252,6 +253,7 @@ var EnvOnlyKeys = []string{
 	"REMOTE_COMMAND", "REMOTE_DEFAULT", "REMOTE_SEND", "REMOTE_RECV",
 	"CREATE_PARENT", "LIST_WRITTEN", "SEND_REPLICATE", "CLONE_DEFAULT",
 	"LOG_PREFIX", "SYSTIME", "JSON_PRETTY", "SNAP_MODE", "REMOTE_MULTIPLEX",
+	"CACHE_DIR", "CACHE_TIMEOUT",
 	"REPORT_MESSAGE_DEFAULT", "REPORT_MESSAGE_NONE", "REPORT_MESSAGE_ALL", "REPORT_MESSAGE_SOME", "REPORT_MESSAGE_OK",
 	"REPORT_COMMAND_DEFAULT", "REPORT_COMMAND_NONE", "REPORT_COMMAND_ALL", "REPORT_COMMAND_SOME", "REPORT_COMMAND_OK",
 }

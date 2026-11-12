@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bell-tower/zelta-go/internal/cache"
 	"github.com/bell-tower/zelta-go/internal/command"
 	"github.com/bell-tower/zelta-go/internal/config"
 	"github.com/bell-tower/zelta-go/internal/endpoint"
@@ -43,6 +44,8 @@ type Runtime struct {
 	// LogHandler, when set, receives log messages instead of the streams,
 	// including those of loggers Build creates for nested runs.
 	LogHandler func(logging.Level, string)
+	// Cache holds speed hints between runs; nil disables caching.
+	Cache *cache.Store
 }
 
 // Endpoint parses an endpoint string for this runtime.

@@ -26,6 +26,8 @@ var defaults = []struct{ key, val string }{
 	{"REMOTE_COMMAND", "ssh"},
 	{"REMOTE_MULTIPLEX", "1"},
 	{"PARALLEL", "1"},
+	{"CACHE", "1"},
+	{"CACHE_TIMEOUT", "1day"},
 }
 
 // SnapTimeFormat is the layout of default snapshot names.

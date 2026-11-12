@@ -199,6 +199,15 @@ The following options should be modified in the environment to ensure proper ins
 **REMOTE_MULTIPLEX**
 :   When the remote command is plain `ssh`, run every command for a host over one shared connection (OpenSSH connection multiplexing), avoiding a new connection and key exchange per command. Enabled by default (`1`); set to `0` to connect for every command. It is not used when the remote command already sets `ControlPath`, `ControlMaster`, or `-S`. At most 8 commands share a connection at once, below sshd's default `MaxSessions` of 10; further commands connect directly. With `PARALLEL` above 1, all streams to a host share one connection and one ssh encryption process, so for large transfers over fast links `REMOTE_MULTIPLEX=0` can give more throughput.
 
+**CACHE**
+:   Keep speed hints and recent commands in a cache directory. The cache never decides what Zelta does; deleting it only makes Zelta slower. Enabled by default (`1`); set to `0` or use `--no-cache` to neither read nor update it.
+
+**CACHE_DIR**
+:   The cache directory. Defaults to `zelta` in the user's cache directory (`~/.cache/zelta`, or `~/Library/Caches/zelta` on macOS).
+
+**CACHE_TIMEOUT**
+:   How long a cached hint is trusted before Zelta checks again. Defaults to `1day`.
+
 # CLONE OPTIONS
 
 **CLONE_DEFAULT**
