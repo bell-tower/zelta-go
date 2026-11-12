@@ -4,6 +4,7 @@ on:
   push:
     branches: [main, rewrite, "release/**"]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -68,6 +69,24 @@ jobs:
         run: sudo -E env "PATH=$PATH" ./test/run_shellspec.sh standard
       - name: Run suite (remote endpoints through a fake ssh)
         run: sudo -E env "PATH=$PATH" ./test/run_shellspec.sh remote
+      # The golden prune pools are release assets of the Awk repo.
+      - name: Restore golden fixtures
+        uses: actions/cache@v4
+        id: goldens
+        with:
+          path: test/spec/helpers/golden/0200_prune/*.img
+          key: goldens-test-fixtures-v1
+      - name: Download golden fixtures
+        if: steps.goldens.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p test/spec/helpers/golden/0200_prune
+          gh release download test-fixtures/v1 --repo bell-tower/zelta \
+            --pattern '*.img.gz' --dir test/spec/helpers/golden/0200_prune
+          gunzip test/spec/helpers/golden/0200_prune/*.gz
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Run prune scenarios (golden pools)
+        run: sudo -E env "PATH=$PATH" ./test/run_shellspec.sh --tag install,prune-scenario,cleanup:install
 
   freebsd:
     name: FreeBSD ${{ matrix.release }} (unit and integration)
