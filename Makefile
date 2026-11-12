@@ -15,7 +15,7 @@ MANDIR     ?= $(PREFIX)/man
 ETCDIR     ?= $(PREFIX)/etc/zelta
 SHAREDIR   ?= $(PREFIX)/share/zelta
 GO         ?= go
-VERSION    != (git describe --tags 2>/dev/null || echo 2.0.0-dev) | sed 's/^v//'
+VERSION    != (git describe --tags 2>/dev/null || echo 1.3.0-dev) | sed 's/^v//'
 LDFLAGS    = -s -w -X github.com/bell-tower/zelta-go/internal/version.Version=$(VERSION)
 GOFLAGS    ?= -trimpath
 STATICCHECK ?= honnef.co/go/tools/cmd/staticcheck@2026.2.2

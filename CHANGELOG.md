@@ -2,9 +2,10 @@
 
 All notable changes to zelta-go will be documented in this file. Changes to
 Zelta itself are tracked in the [Awk changelog](https://github.com/bell-tower/zelta/blob/main/CHANGELOG.md);
-zelta-go follows its `main` branch.
+zelta-go follows its `main` branch and is planned to release as Zelta 1.3,
+replacing the Awk implementation.
 
-## [Unreleased] - 2.0.0-dev
+## [Unreleased] - 1.3.0-dev
 
 ### Changed
 - **Rewrite**: zelta-go is now a drop-in replacement for Zelta (Awk): same commands, flags, `ZELTA_*` variables, `zelta.env`, `zelta.conf`, output, and exit codes. Intentional differences are listed in [doc/COMPATIBILITY.md](doc/COMPATIBILITY.md).

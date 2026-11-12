@@ -1,6 +1,6 @@
 ![Zelta Logo](https://zelta.space/index/zelta-banner.svg)
 # The Zelta Backup and Recovery Suite (Go)
-*Development line: 2.0.0-dev*
+*Development line: 1.3.0-dev, the planned Zelta 1.3 and successor to the Awk release*
 
 ---
 > **Experimental.** zelta-go is used in production, but it should be considered experimental until it reaches feature parity with [Zelta 1.2.0](https://github.com/bell-tower/zelta). Known differences are listed in [doc/COMPATIBILITY.md](doc/COMPATIBILITY.md).
