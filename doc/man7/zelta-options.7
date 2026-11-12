@@ -92,7 +92,9 @@ present, otherwise the system manual path.
 .SH LOGGING OPTIONS
 .TP
 \f[B]LOG_FILE\f[R]
-Divert all output into the indicated file.
+Append log output to the indicated file.
+In JSON mode, write the JSON output to this file while status messages
+remain separate on stderr.
 .TP
 \f[B]LOG_LEVEL\f[R]
 Specify a log level value 0\-4: errors (0), warnings (1), notices (2,
@@ -256,6 +258,9 @@ Specify a snapshot name.
 Use the form \f[CR]$(my_snapshot_program)\f[R] to use a dynamically
 generated snapshot.
 The default is \f[CR]$(date \-u +zelta_%Y\-%m\-%d_%H.%M.%S)\f[R].
+If the default name already exists (two runs within the same second),
+Zelta waits for the next second and uses the new time; a name you
+specify is never changed.
 .TP
 \f[B]SNAP_PREFIX\f[R]
 Prefix generated snapshot names.
@@ -289,6 +294,20 @@ Bare numbers are bytes; supported suffixes are \f[CR]K\f[R],
 \f[CR]M\f[R], \f[CR]G\f[R], \f[CR]T\f[R], \f[CR]P\f[R], and
 \f[CR]E\f[R].
 .TP
+\f[B]BOOKMARK_MODE\f[R]
+After a successful receive, create a ZFS bookmark on each confirmed
+source snapshot.
+\f[CR]0\f[R] (default) disables bookmarking; \f[CR]1\f[R] bookmarks the
+latest confirmed source snapshot per successfully received dataset.
+Command\-line: \f[CR]\-\-bookmark\f[R], \f[CR]\-\-no\-bookmark\f[R], or
+\f[CR]\-\-bookmark\-mode\f[R].
+.TP
+\f[B]BOOKMARK_PREFIX\f[R]
+Prefix for replication\-success bookmark names.
+Default is \f[CR]{targethost}_\f[R], producing names such as
+\f[CR]pool/ds#backuphost_snapname\f[R].
+Command\-line: \f[CR]\-\-bookmark\-prefix\f[R].
+.TP
 \f[B]SYNC_DIRECTION\f[R]
 If both endpoints are remote, use \f[CR]PULL\f[R] (the default) or
 \f[CR]PUSH\f[R] sync.
@@ -296,6 +315,35 @@ If set to \f[CR]0\f[R], traffic will stream through the local host.
 Note that this feature PUSH and PULL features require appropriate ssh
 configurations with keys properly installed and/or ssh agent forwarding
 enabled.
+.TP
+\f[B]PARALLEL\f[R]
+Sync up to this many datasets at a time.
+Defaults to \f[CR]1\f[R], which syncs one dataset after another in tree
+order.
+Higher values shorten runs on trees with many datasets, because each
+\f[CR]zfs receive\f[R] spends most of its time waiting for ZFS to
+commit, even when little data is sent; values around 4 to 8 work well,
+and higher values can slow a busy pool.
+A new dataset is always received after its parent.
+Summary totals are unchanged, but per\-dataset messages may appear in
+any order, and the summary reports elapsed time rather than the sum of
+each stream\(cqs time (JSON \f[CR]replicationTime\f[R] remains the
+sum).
+Command\-line: \f[CR]\-\-parallel\f[R].
+.TP
+\f[B]REMOTE_MULTIPLEX\f[R]
+When the remote command is plain \f[CR]ssh\f[R], run every command for a
+host over one shared connection (OpenSSH connection multiplexing),
+avoiding a new connection and key exchange per command.
+Enabled by default (\f[CR]1\f[R]); set to \f[CR]0\f[R] to connect for
+every command.
+It is not used when the remote command already sets
+\f[CR]ControlPath\f[R], \f[CR]ControlMaster\f[R], or \f[CR]\-S\f[R].
+At most 8 commands share a connection at once, below sshd\(cqs default
+\f[CR]MaxSessions\f[R] of 10; further commands connect directly.
+With \f[CR]PARALLEL\f[R] above 1, all streams to a host share one
+connection and one ssh encryption process, so for large transfers over
+fast links \f[CR]REMOTE_MULTIPLEX=0\f[R] can give more throughput.
 .SH CLONE OPTIONS
 .TP
 \f[B]CLONE_DEFAULT\f[R]

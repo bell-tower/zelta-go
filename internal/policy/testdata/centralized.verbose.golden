@@ -1,0 +1,2 @@
++ ZELTA_EXCLUDE="/backups,/swap,/tmp" ZELTA_SEND_INTR="0" ZELTA_SNAP_TIME="8h" zelta backup 'fw2.dal1:fw2-dal1-boot/jail/webproxy_bts' 'vault1.den0:data1/Backups/webproxy_bts'
++ ZELTA_EXCLUDE="/backups,/swap,/tmp" ZELTA_SEND_INTR="0" ZELTA_SNAP_TIME="8h" zelta backup 'fw2.dal1:fw2-dal1-boot/jail/webproxy_bts' 'vault1.nyc1:rust12/Backups/webproxy_bts'

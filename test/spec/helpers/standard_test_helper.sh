@@ -24,17 +24,7 @@ setup_env() {
     # used to construct sandbox dir name
     SANDBOX_ZELTA_TMP_PREFIX=zelta_sandbox
 
-    # Awk parity: default sandbox under /tmp. Override parent with
-    # SANDBOX_ZELTA_TMP_BASE when needed.
-    if [ -n "$SANDBOX_ZELTA_TMP_BASE" ]; then
-        _tmp_base="$SANDBOX_ZELTA_TMP_BASE"
-    else
-        _tmp_base="/tmp"
-    fi
-    mkdir -p "$_tmp_base"
-
-    export SANDBOX_ZELTA_TMP_DIR="${_tmp_base}/${SANDBOX_ZELTA_TMP_PREFIX}_${SANDBOX_ZELTA_TMP_SUFFIX}"
-    mkdir -p "$SANDBOX_ZELTA_TMP_DIR"
+    export SANDBOX_ZELTA_TMP_DIR="/tmp/${SANDBOX_ZELTA_TMP_PREFIX}_${SANDBOX_ZELTA_TMP_SUFFIX}"
     export ZELTA_BIN="$SANDBOX_ZELTA_TMP_DIR/bin"
     export ZELTA_SHARE="$SANDBOX_ZELTA_TMP_DIR/share"
     export ZELTA_ETC="$SANDBOX_ZELTA_TMP_DIR/etc"
@@ -100,14 +90,14 @@ tgt_exec() {
 ##########
 
 check_install() {
-    # Go binary embeds AWK share logic; do not require zelta-*.awk under ZELTA_SHARE.
     _installed=1
     if [ ! -x "$ZELTA_BIN/zelta" ]; then
         echo missing: "$ZELTA_BIN/zelta" >/dev/stderr
         _installed=0
     fi
-    if [ ! -x "$ZELTA_BIN/zprune" ]; then
-        echo missing: "$ZELTA_BIN/zprune" >/dev/stderr
+    # zelta-go: the share directory holds shell completions, not Awk scripts.
+    if [ ! -f "$ZELTA_SHARE/completions/zelta.bash" ]; then
+        echo missing: "$ZELTA_SHARE/completions/zelta.bash" >/dev/stderr
         _installed=0
     fi
     if [ ! -f "$ZELTA_DOC/man8/zelta.8" ]; then
@@ -124,12 +114,9 @@ check_install() {
 
 # Make sure the installer worked and clean up carefully
 cleanup_temp_install() {
-    find "$SANDBOX_ZELTA_TMP_DIR" -type f 2>/dev/null | wc -w
+    find "$SANDBOX_ZELTA_TMP_DIR" -type f | wc -w
 	if [ -d "$SANDBOX_ZELTA_TMP_DIR" ]; then
-		# Avoid literal "zelta.*" when the glob matches nothing (set -f / no nullglob).
-		if [ -d "$ZELTA_ETC" ]; then
-			find "$ZELTA_ETC" -maxdepth 1 -name 'zelta.*' -exec rm -f {} + 2>/dev/null || true
-		fi
+		rm "$ZELTA_ETC"/zelta.*
 		rm -fr "$SANDBOX_ZELTA_TMP_DIR"
     	[ ! -e "$SANDBOX_ZELTA_TMP_DIR" ] && return 0
 	fi
@@ -168,14 +155,9 @@ backup_check_json_cr_sanitized() {
 	if [ -d "$SANDBOX_ZELTA_TMP_DIR" ]; then
 		_tmp="$SANDBOX_ZELTA_TMP_DIR/zelta_json_cr_$$"
 	else
-		_tmp="/tmp/zelta_json_cr_$$"
+		_tmp="${TMPDIR:-/tmp}/zelta_json_cr_$$"
 	fi
-	# Prefer sandbox install binary; fall back to repo build (Go has no ZELTA_SHARE).
-	_zelta="$ZELTA_BIN/zelta"
-	if [ ! -x "$_zelta" ]; then
-		_zelta="$_repo_root/bin/zelta"
-	fi
-	"$_zelta" backup --dryrun --json "$(printf 'local\rhost'):pool/source" pool/target >"$_tmp" 2>/dev/null
+	env ZELTA_SHARE="$_repo_root/share/zelta" "$_repo_root/bin/zelta" backup --dryrun --json "$(printf 'local\rhost'):pool/source" pool/target >"$_tmp" 2>/dev/null
 	_lines=$(wc -l <"$_tmp" | tr -d ' ')
 	jq -re '.sourceHost == "localhost" and .sourceEndpoint == "localhost:pool/source" and (.errorMessages[0] | contains("localhost:pool/source")) and ([.. | select(. == null)] | length == 0)' "$_tmp" >/dev/null || {
 		rm -f "$_tmp"
@@ -230,15 +212,10 @@ skip_tgt_pool() {
     return 0
 }
 
-_pool_img_path() {
-	# File-backed pool images live under the sandbox tmp dir (/tmp/zelta_sandbox_…)
-	printf '%s/%s.img' "${SANDBOX_ZELTA_TMP_DIR:-/tmp}" "$1"
-}
-
 nuke_pool() {
 	_pool_name="$1"
 	_exec_func="$2"
-	_pool_file=$(_pool_img_path "$_pool_name")
+	_pool_file=/tmp/$_pool_name.img
 	$_exec_func zpool destroy -f "$_pool_name" >/dev/null 2>&1
 	$_exec_func rm -f "$_pool_file"
 	return 0
@@ -247,8 +224,7 @@ nuke_pool() {
 make_new_pool() {
 	_pool_name="$1"
 	_exec_func="$2"
-	_pool_file=$(_pool_img_path "$_pool_name")
-	$_exec_func mkdir -p "$(dirname "$_pool_file")"
+	_pool_file=/tmp/$_pool_name.img
 	$_exec_func truncate -s 64m "$_pool_file"
 	$_exec_func zpool create -f "$_pool_name" "$_pool_file"
 	return $?
@@ -308,14 +284,10 @@ tgt_ds_exists() {
 	return $?
 }
 
-_enc_key_path() {
-	printf '%s/zfs_test_enc_key_%s' "${SANDBOX_ZELTA_TMP_DIR:-.}" "${SANDBOX_ZELTA_TMP_SUFFIX}"
-}
-
 # Clean source dataset if it exists
 clean_src_ds() {
 	if src_ds_exists; then
-	    src_exec rm -f "$(_enc_key_path)"
+	    src_exec rm -f /tmp/zfs_test_enc_key_${SANDBOX_ZELTA_TMP_SUFFIX}
 		src_exec zfs destroy -r "$SANDBOX_ZELTA_SRC_DS"
 		return $?
 	fi
@@ -360,9 +332,8 @@ make_initial_tree() {
 	# If we get this far, it will be safe to attempt to clean it up
 	tmpfile_touch "divergent_tree_created"
 
-	# Create encryption key under sandbox tmp
-	_key=$(_enc_key_path)
-	src_exec dd if=/dev/urandom bs=32 count=1 of="$_key" >/dev/null 2>&1 || return 1
+	# Create encryption key
+	src_exec dd if=/dev/urandom bs=32 count=1 of="/tmp/zfs_test_enc_key_${SANDBOX_ZELTA_TMP_SUFFIX}" >/dev/null 2>&1 || return 1
 
 	# Create child datasets
 	src_exec zfs create -u "$SANDBOX_ZELTA_SRC_DS/sub1" || return 1
@@ -372,7 +343,7 @@ make_initial_tree() {
 	src_exec zfs create -u "$SANDBOX_ZELTA_SRC_DS/sub3/space\ name" || return 1
 	src_exec zfs create -u "$SANDBOX_ZELTA_SRC_DS/sub4" || return 1
 	src_exec zfs create -sV 8M "$SANDBOX_ZELTA_SRC_DS/sub4/zvol" || return 1
-	src_exec zfs create -u -o encryption=on -o keyformat=raw -o "keylocation=file://${_key}" "$SANDBOX_ZELTA_SRC_DS/sub4/encrypted" || return 1
+	src_exec zfs create -u -o encryption=on -o keyformat=raw -o "keylocation=file:///tmp/zfs_test_enc_key_${SANDBOX_ZELTA_TMP_SUFFIX}" "$SANDBOX_ZELTA_SRC_DS/sub4/encrypted" || return 1
 
 	return 0
 }
@@ -394,6 +365,25 @@ make_tree_divergence() {
 	tgt_exec zfs snapshot "$SANDBOX_ZELTA_TGT_DS/sub2@two" || return 1
 
 	return 0
+}
+
+# Confirm a blocked revert leaves every original dataset at its original path.
+reject_mixed_revert_tree() {
+	_before=$(src_exec zfs list -Hro name,guid "$SANDBOX_ZELTA_SRC_DS") || return 1
+	if zelta revert -qq "$SANDBOX_ZELTA_SRC_EP"@manual_test; then
+		return 1
+	fi
+	_after=$(src_exec zfs list -Hro name,guid "$SANDBOX_ZELTA_SRC_DS") || return 1
+	[ "$_before" = "$_after" ] || return 1
+	if src_exec zfs list "$SANDBOX_ZELTA_SRC_DS"_manual_test >/dev/null 2>&1; then
+		return 1
+	fi
+	return 0
+}
+
+# Explicitly preserve the newer subtree so the remaining tree can revert cleanly.
+preserve_new_revert_children() {
+	src_exec zfs rename "$SANDBOX_ZELTA_SRC_DS/sub5" "${SANDBOX_ZELTA_SRC_DS}_post_snapshot"
 }
 
 add_tree_delta() {

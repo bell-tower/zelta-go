@@ -1,147 +1,137 @@
 #!/bin/sh
 #
-# Zelta Installer
+# Zelta installer
 #
-#   PRE_RUN is executed before installation (default: make build).
-#   Override with PRE_RUN='' to skip, or PRE_RUN='make build doc' to also
-#   refresh man pages from the awk tree.
+# Installs the zelta binary (and the zprune link), manual pages, shell
+# completions, and example configuration. It honors the same variables as
+# the original Zelta installer:
+#
+#   ZELTA_BIN    binary directory      (root: /usr/local/bin, user: ~/bin)
+#   ZELTA_SHARE  data directory        (root: /usr/local/share/zelta, user: ~/.local/share/zelta)
+#   ZELTA_ETC    configuration         (root: /usr/local/etc/zelta, user: ~/.config/zelta)
+#   ZELTA_DOC    manual root           (root: /usr/local/man, user: $ZELTA_SHARE/doc)
+#
+# Existing zelta.env and zelta.conf files are never overwritten.
 
-: ${PRE_RUN="make build"}
-if [ -n "$PRE_RUN" ]; then
-	echo "Running: $PRE_RUN"
-	# Capture build noise; only surface it when we cannot fall back to bin/.
-	_pre_run_err="${TMPDIR:-/tmp}/zelta-install-prerun.$$"
-	if ! (eval "$PRE_RUN") >"$_pre_run_err" 2>&1; then
-		# ShellSpec / lab hosts may ship a prebuilt bin/ when Go is too old.
-		if [ -x bin/zelta ] && [ -x bin/zprune ]; then
-			echo "PRE_RUN failed; continuing with existing bin/"
-			rm -f "$_pre_run_err"
-		else
-			cat "$_pre_run_err" >&2
-			rm -f "$_pre_run_err"
-			exit 1
-		fi
-	else
-		rm -f "$_pre_run_err"
-	fi
+set -u
+
+cd "$(dirname "$0")" || exit 1
+
+if [ "$(id -u)" -eq 0 ]; then
+	: "${ZELTA_BIN:=/usr/local/bin}"
+	: "${ZELTA_SHARE:=/usr/local/share/zelta}"
+	: "${ZELTA_ETC:=/usr/local/etc/zelta}"
+	: "${ZELTA_DOC:=/usr/local/man}"
+elif [ -z "${ZELTA_BIN:-}" ] || [ -z "${ZELTA_SHARE:-}" ] || [ -z "${ZELTA_ETC:-}" ] || [ -z "${ZELTA_DOC:-}" ]; then
+	: "${ZELTA_BIN:=$HOME/bin}"
+	: "${ZELTA_SHARE:=$HOME/.local/share/zelta}"
+	: "${ZELTA_ETC:=$HOME/.config/zelta}"
+	: "${ZELTA_DOC:=$ZELTA_SHARE/doc}"
 fi
-
-# Path defaults. Explicit ZELTA_* (ShellSpec sandbox under /tmp/zelta_sandbox_*)
-# always win — including when install runs as root.
-if [ -z "$ZELTA_BIN" ] || [ -z "$ZELTA_SHARE" ] || [ -z "$ZELTA_ETC" ] || [ -z "$ZELTA_DOC" ]; then
-	if [ "$(id -u)" -eq 0 ]; then
-		: ${ZELTA_BIN:="/usr/local/bin"}
-		: ${ZELTA_SHARE:="/usr/local/share/zelta"}
-		: ${ZELTA_ETC:="/usr/local/etc/zelta"}
-		: ${ZELTA_DOC:="/usr/local/man"}
-	else
-		: ${ZELTA_BIN:="$HOME/bin"}
-		: ${ZELTA_SHARE:="$HOME/.local/share/zelta"}
-		: ${ZELTA_ETC:="$HOME/.config/zelta"}
-		: ${ZELTA_DOC:="$ZELTA_SHARE/doc"}
-	fi
-fi
-
-: ${ZELTA_CONFIG:="$ZELTA_ETC/zelta.conf"}
-: ${ZELTA_ENV:="$ZELTA_ETC/zelta.env"}
+: "${ZELTA_CONFIG:=$ZELTA_ETC/zelta.conf}"
+: "${ZELTA_ENV:=$ZELTA_ETC/zelta.env}"
 ZELTA="$ZELTA_BIN/zelta"
-ZPRUNE="$ZELTA_BIN/zprune"
+ZELTA_UPDATED=""
 
-# Helpers
-copy_file() {
-	if [ -z "$3" ]; then
-		ZELTA_MODE="644"
-	else
-		ZELTA_MODE="$3"
+# Build the binary unless a prebuilt one is supplied with ZELTA_BINARY.
+BINARY="${ZELTA_BINARY:-bin/zelta}"
+if [ -z "${ZELTA_BINARY:-}" ]; then
+	if command -v go >/dev/null 2>&1; then
+		echo "building: $BINARY"
+		mkdir -p bin
+		CGO_ENABLED=0 go build -trimpath -o "$BINARY" ./cmd/zelta || {
+			echo "Error: build failed" >&2
+			exit 1
+		}
+	elif [ ! -x "$BINARY" ]; then
+		echo "Error: Go is required to build zelta (or set ZELTA_BINARY)" >&2
+		exit 1
 	fi
-	if [ ! -f "$2" ] || [ "$1" -nt "$2" ]; then
+fi
+
+copy_file() {
+	_mode="${3:-644}"
+	if [ ! -f "$2" ] || [ "$1" -nt "$2" ] || ! cmp -s "$1" "$2"; then
 		echo "installing: $1 -> $2"
-		cp "$1" "$2"
-		chmod "$ZELTA_MODE" "$2"
+		rm -f "$2"
+		cp "$1" "$2" && chmod "$_mode" "$2" || exit 1
 		ZELTA_UPDATED=1
 	fi
 }
 
-# Create directories
-mkdir -p "$ZELTA_BIN" || exit 1
-mkdir -p "$ZELTA_SHARE" || exit 1
-mkdir -p "$ZELTA_ETC" || exit 1
+link_file() {
+	if [ "$(readlink "$2" 2>/dev/null)" != "$1" ]; then
+		echo "installing: $2 -> $1"
+		rm -f "$2"
+		ln -s "$1" "$2" || exit 1
+		ZELTA_UPDATED=1
+	fi
+}
 
-# Install binaries
-copy_file bin/zelta "$ZELTA" 755
-copy_file bin/zprune "$ZPRUNE" 755
+mkdir -p "$ZELTA_BIN" "$ZELTA_SHARE" "$ZELTA_ETC" || {
+	echo "Error: Failed to create directories" >&2
+	exit 1
+}
 
-# Install shared data files
-for f in share/zelta/zelta-*; do
-	[ -f "$f" ] || continue
-	copy_file "$f" "$ZELTA_SHARE/${f#share/zelta/}"
-done
+copy_file "$BINARY" "$ZELTA" 755
+link_file zelta "$ZELTA_BIN/zprune"
 
-# Install man pages (repo root doc/ or embedded cmd/zelta/doc/)
 if [ -n "$ZELTA_DOC" ]; then
-	mkdir -p "${ZELTA_DOC}/man7" 2>/dev/null
-	mkdir -p "${ZELTA_DOC}/man8" 2>/dev/null
-
-	_man7_src=""
-	_man8_src=""
-	if [ -d doc/man7 ]; then
-		_man7_src=doc/man7
-	elif [ -d cmd/zelta/doc/man7 ]; then
-		_man7_src=cmd/zelta/doc/man7
-	fi
-	if [ -d doc/man8 ]; then
-		_man8_src=doc/man8
-	elif [ -d cmd/zelta/doc/man8 ]; then
-		_man8_src=cmd/zelta/doc/man8
-	fi
-
-	if [ -n "$_man7_src" ]; then
-		for f in "$_man7_src"/*.7; do
-			[ -f "$f" ] || continue
-			copy_file "$f" "${ZELTA_DOC}/man7/${f##*/}"
+	for section in 7 8; do
+		mandir="$ZELTA_DOC/man$section"
+		mkdir -p "$mandir"
+		for file in doc/man$section/*.$section; do
+			copy_file "$file" "$mandir/${file##*/}"
 		done
+	done
+fi
+
+# Shell completions, generated by the installed binary.
+compdir="$ZELTA_SHARE/completions"
+mkdir -p "$compdir"
+tmp="${TMPDIR:-/tmp}/zelta-install.$$"
+for shell in bash zsh fish; do
+	case "$shell" in
+	bash) dest="$compdir/zelta.bash" ;;
+	zsh) dest="$compdir/_zelta" ;;
+	fish) dest="$compdir/zelta.fish" ;;
+	esac
+	if "$ZELTA" completion "$shell" >"$tmp" 2>/dev/null; then
+		copy_file "$tmp" "$dest"
 	fi
-	if [ -n "$_man8_src" ]; then
-		for f in "$_man8_src"/*.8; do
-			[ -f "$f" ] || continue
-			copy_file "$f" "${ZELTA_DOC}/man8/${f##*/}"
-		done
+done
+rm -f "$tmp"
+
+copy_file zelta.env "$ZELTA_ENV.example"
+[ -s "$ZELTA_ENV" ] || copy_file zelta.env "$ZELTA_ENV"
+copy_file zelta.conf "$ZELTA_CONFIG.example"
+[ -s "$ZELTA_CONFIG" ] || copy_file zelta.conf "$ZELTA_CONFIG"
+
+[ -n "$ZELTA_UPDATED" ] || echo "Zelta is up to date."
+
+_existing_zelta=$(command -v zelta 2>/dev/null || echo "")
+if [ -n "$_existing_zelta" ] && [ "$_existing_zelta" != "$ZELTA" ]; then
+	echo ""
+	echo "Warning: A different 'zelta' appears first in PATH."
+	echo "Installed: $ZELTA"
+	echo "Found:     $_existing_zelta"
+	echo "To use the newly installed version, ensure $ZELTA_BIN precedes '$(dirname "$_existing_zelta")' in PATH."
+fi
+
+if [ "$(id -u)" -ne 0 ] && [ -n "$ZELTA_UPDATED" ]; then
+	echo ""
+	echo "Zelta installed to user directories."
+	if [ "$_existing_zelta" != "$ZELTA" ]; then
+		echo "To use zelta, update PATH in your shell startup file:"
+		echo
+		echo "    export PATH=\"$ZELTA_BIN:\$PATH\""
 	fi
 fi
 
-# Install environment file (always .example; only as default if missing or empty)
-if [ -f zelta.env ]; then
-	copy_file zelta.env "$ZELTA_ENV.example"
-	[ ! -s "$ZELTA_ENV" ] && copy_file zelta.env "$ZELTA_ENV"
-fi
-
-# Install configuration file (always .example; only as default if missing or empty)
-if [ -f zelta.conf ]; then
-	copy_file zelta.conf "$ZELTA_CONFIG.example"
-	[ ! -s "$ZELTA_CONFIG" ] && copy_file zelta.conf "$ZELTA_CONFIG"
-fi
-
-# Up-to-date check
-[ -z "$ZELTA_UPDATED" ] && echo "Zelta is up to date."
-
-# PATH conflict warning
-if [ -n "$ZELTA_BIN" ]; then
-	_other_zelta="$(command -v zelta 2>/dev/null)"
-	if [ -n "$_other_zelta" ] && [ "$_other_zelta" != "$ZELTA" ]; then
-		echo "WARNING: found another zelta in PATH: $_other_zelta" >&2
-		echo "         Ensure $ZELTA_BIN is first in your PATH, or remove the other." >&2
-	fi
-fi
-
-# Non-root post-install info
-if [ "$(id -u)" -ne 0 ]; then
-	if ! echo "$PATH" | grep -q "$ZELTA_BIN"; then
-		echo ""
-		echo "Add $ZELTA_BIN to your PATH:"
-		echo "  export PATH=\"\$PATH:$ZELTA_BIN\""
-		echo ""
-	fi
-fi
-
-# Verify installation
-"$ZELTA" version
+echo ""
+echo "Shell completions are in $compdir:"
+echo "    bash: . $compdir/zelta.bash"
+echo "    zsh:  fpath=($compdir \$fpath); autoload -U compinit && compinit"
+echo "    fish: source $compdir/zelta.fish"
+echo ""
+echo "zelta version: $("$ZELTA" version)"

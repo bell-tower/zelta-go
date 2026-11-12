@@ -1,29 +1,19 @@
-# Build
+# Build output
 /bin/
+/build/
 /dist/
-*.exe
 *.test
-*.out
-!testdata/**/*.out
-/zelta
-/zprune
+coverage.out
+coverage.html
 
-# Go
-vendor/
+# Test debris
+/test/.shellspec-local/
+/test/runners/test_generation/config/zelta_test_policy.conf
+/test/spec/helpers/golden/**/*.img
 
-# OS / editor
+# Editors and OS
 .DS_Store
 *.swp
 *~
 .idea/
 .vscode/
-.helix/
-
-# Env / secrets
-.env
-.env.*
-*.pem
-
-# Test debris
-/tmp/
-coverage.out

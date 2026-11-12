@@ -85,6 +85,7 @@ Local:  pool/dataset
 Local:  pool/dataset\(atsnapshot
 Remote: user\(atexample.com:pool/dataset
 Remote: user\(atexample.com:pool/dataset\(atsnapshot
+IPv6:   user\(at[2001:db8::1]:pool/dataset
 .EE
 .SH OPTIONS
 .SS Endpoint Arguments (Required)
@@ -128,6 +129,14 @@ When both endpoints are remote, use \f[CR]PULL\f[R] (default) or
 \f[B]\-\-recv\-pipe\f[R] \f[I]COMMAND\f[R]
 Pipe \f[CR]zfs receive\f[R] output through the indicated command, such
 as \f[CR]dd status=progress\f[R].
+.TP
+\f[B]\-\-parallel\f[R] \f[I]N\f[R]
+Sync up to \f[I]N\f[R] datasets at a time (default 1).
+Large trees benefit most; values around 4 to 8 work well.
+New datasets are always received after their parents.
+Per\-dataset messages may appear in any order.
+See \f[B]PARALLEL\f[R] and \f[B]REMOTE_MULTIPLEX\f[R] in
+\f[B]zelta\-options(7)\f[R].
 .SS Dataset Options
 .TP
 \f[B]\-d, \-\-depth\f[R] \f[I]LEVELS\f[R]
@@ -153,6 +162,8 @@ If a snapshot is needed for replication, the operation will fail.
 .TP
 \f[B]\-\-snapshot, \-\-snapshot\-always\f[R]
 Force snapshot creation even if the source has no uncommitted changes.
+If the snapshot cannot be created, the operation stops with an error
+rather than syncing an older snapshot.
 .TP
 \f[B]\-\-snap\-name\f[R] \f[I]NAME\f[R]
 Specify snapshot name.
@@ -196,6 +207,20 @@ Example: \f[CR]\-\-snap\-size 128K\f[R].
 .PP
 \f[CR]\-\-snapshot\f[R] and \f[CR]\-\-no\-snapshot\f[R] ignore
 \f[CR]\-\-snap\-time\f[R] and \f[CR]\-\-snap\-size\f[R].
+.SS Bookmark Options
+.TP
+\f[B]\-\-bookmark\f[R]
+After a successful receive, create a ZFS bookmark on each confirmed
+source snapshot.
+Default is off.
+.TP
+\f[B]\-\-no\-bookmark\f[R]
+Do not create source bookmarks after replication (default).
+.TP
+\f[B]\-\-bookmark\-prefix\f[R] \f[I]PREFIX\f[R]
+Prefix for bookmark names.
+Default is \f[CR]{targethost}_\f[R], producing names such as
+\f[CR]pool/ds#backuphost_snapname\f[R].
 .SS Sync Options
 .TP
 \f[B]\-\-target\-origin\f[R], \f[B]\-\-origin\f[R] \f[I]TARGET_ORIGIN\f[R]
