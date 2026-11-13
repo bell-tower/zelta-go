@@ -126,7 +126,12 @@ func (j *Job) SourceEndpoint() string {
 }
 
 // Name identifies the job in messages.
-func (j *Job) Name() string { return "[" + j.Site + ": " + j.Target + "] " + j.SourceEndpoint() }
+func (j *Job) Name() string {
+	if j.Site == "" {
+		return "[" + j.Target + "] " + j.SourceEndpoint()
+	}
+	return "[" + j.Site + ": " + j.Target + "] " + j.SourceEndpoint()
+}
 
 // Prefix is the LOG_PREFIX for the job's messages.
 func (j *Job) Prefix() string { return j.Name() + ": " }

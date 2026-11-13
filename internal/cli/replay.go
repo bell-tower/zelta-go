@@ -150,8 +150,8 @@ func (a *App) replay(ctx context.Context, args []string) int {
 	if !ok {
 		return 1
 	}
-	argv := append([]string{choice.Args[0]}, extra...)
-	argv = append(argv, choice.Args[1:]...)
+	// Extra options go last so they override the recorded ones.
+	argv := append(slices.Clone(choice.Args), extra...)
 	fmt.Fprintf(a.Stderr, "replaying: zelta %s\n", strings.Join(argv, " "))
 	return a.execute(ctx, argv)
 }

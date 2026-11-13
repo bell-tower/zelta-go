@@ -39,7 +39,7 @@ func TestReplay(t *testing.T) {
 	if c.engine != "backup" || c.opts.Get("VERB") != "sync" || !slices.Equal(c.args, []string{"pool/other", "sink/other"}) || c.opts.Get("LOG_LEVEL") != "1" {
 		t.Errorf("replayed %s %v verb=%s level=%s", c.engine, c.args, c.opts.Get("VERB"), c.opts.Get("LOG_LEVEL"))
 	}
-	if !strings.Contains(h.err.String(), "replaying: zelta sync -q pool/other sink/other") {
+	if !strings.Contains(h.err.String(), "replaying: zelta sync pool/other sink/other -q") {
 		t.Errorf("replay notice: %q", h.err.String())
 	}
 
