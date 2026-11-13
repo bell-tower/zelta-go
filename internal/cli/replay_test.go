@@ -19,7 +19,7 @@ func TestReplay(t *testing.T) {
 	dir := t.TempDir()
 	h.app.CacheDir = func() string { return dir }
 
-	h.run("backup", "-v", "pool/vm/vm_balls", "backup:pool/vm/vm_balls")
+	h.run("-vv", "backup", "pool/vm/vm_balls", "backup:pool/vm/vm_balls")
 	h.run("backup", "pool/vm/vm_balls", "other_backup:tank/Backups/vm_balls")
 	h.run("sync", "pool/other", "sink/other")
 	h.run("backup", "-n", "pool/dry", "sink/dry")
@@ -57,7 +57,7 @@ func TestReplay(t *testing.T) {
 	if code := h.run("replay", "vm_balls"); code != 0 || len(h.calls) != 1 {
 		t.Fatalf("chosen replay: %d %q", code, h.err.String())
 	}
-	if !strings.Contains(tty.String(), "Choose your fate: ") || h.calls[0].args[1] != "backup:pool/vm/vm_balls" || h.calls[0].opts.Get("LOG_LEVEL") != "3" {
+	if !strings.Contains(tty.String(), "Choose your fate: ") || h.calls[0].args[1] != "backup:pool/vm/vm_balls" || h.calls[0].opts.Get("LOG_LEVEL") != "4" {
 		t.Errorf("chose %v; tty %q", h.calls[0].args, tty.String())
 	}
 

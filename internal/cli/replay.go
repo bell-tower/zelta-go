@@ -67,7 +67,12 @@ func (a *App) remember(store *cache.Store, v verb, operands []string, cli map[st
 	var list []replayEntry
 	store.Load(replayFile, &list)
 	list = slices.DeleteFunc(list, func(e replayEntry) bool { return e.Source == operands[0] && e.Target == operands[1] })
-	e := replayEntry{Source: operands[0], Target: operands[1], Args: slices.Clone(a.invocation), Options: maps.Clone(cli), Status: code, Last: a.now().Unix()}
+	// Options may precede the verb ("zelta -v backup"); store the verb first.
+	args := slices.Clone(a.invocation)
+	if i := slices.Index(args, v.name); i > 0 {
+		args = append(append([]string{v.name}, args[:i]...), args[i+1:]...)
+	}
+	e := replayEntry{Source: operands[0], Target: operands[1], Args: args, Options: maps.Clone(cli), Status: code, Last: a.now().Unix()}
 	list = append([]replayEntry{e}, list...)
 	if len(list) > replayMax {
 		list = list[:replayMax]
