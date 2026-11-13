@@ -34,6 +34,7 @@ func newApp() *cli.App {
 	a := cli.New(engines(), runPolicy)
 	a.Multiplex = func(e execx.Executor) execx.Executor { return &execx.SSHMux{Inner: e} }
 	a.Columns = matchColumns
+	a.Progress = statusBoard()
 	a.PolicyObjects = policy.Objects
 	return a
 }

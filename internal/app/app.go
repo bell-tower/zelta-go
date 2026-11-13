@@ -17,6 +17,7 @@ import (
 	"github.com/bell-tower/zelta-go/internal/execx"
 	"github.com/bell-tower/zelta-go/internal/jsonout"
 	"github.com/bell-tower/zelta-go/internal/logging"
+	"github.com/bell-tower/zelta-go/internal/progress"
 )
 
 // Runtime is the environment a command runs in.
@@ -43,6 +44,9 @@ type Runtime struct {
 	// LogHandler, when set, receives log messages instead of the streams,
 	// including those of loggers Build creates for nested runs.
 	LogHandler func(logging.Level, string)
+	// Progress tracks streams in flight for status requests; nil tracks
+	// nothing.
+	Progress *progress.Board
 }
 
 // Endpoint parses an endpoint string for this runtime.

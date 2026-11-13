@@ -21,6 +21,7 @@ import (
 	"github.com/bell-tower/zelta-go/internal/command"
 	"github.com/bell-tower/zelta-go/internal/config"
 	"github.com/bell-tower/zelta-go/internal/execx"
+	"github.com/bell-tower/zelta-go/internal/progress"
 	"github.com/bell-tower/zelta-go/internal/version"
 )
 
@@ -51,6 +52,9 @@ type App struct {
 	// (REMOTE_MULTIPLEX); nil disables it. The result is closed after the
 	// command when it implements io.Closer.
 	Multiplex func(execx.Executor) execx.Executor
+	// Progress tracks replication streams for status requests; nil
+	// disables tracking.
+	Progress *progress.Board
 }
 
 // PolicyEngine runs "zelta policy".
@@ -314,6 +318,7 @@ func (a *App) runVerb(ctx context.Context, v verb, p *parser, args []string, int
 	base := &app.Runtime{
 		Opts: opts, Exec: a.Exec, Stdin: a.Stdin, Stdout: a.Stdout, Stderr: a.Stderr,
 		Now: a.Now, Hostname: loader.Hostname, User: loader.User, TTY: a.TTY,
+		Progress: a.Progress,
 	}
 	if a.Multiplex != nil && opts.Bool("REMOTE_MULTIPLEX") && !opts.Bool("DRYRUN") {
 		base.Exec = a.Multiplex(a.Exec)

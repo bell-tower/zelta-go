@@ -36,6 +36,7 @@ type syncOutcome struct {
 	message   string
 	errMsg    string
 	syncError bool
+	progress  int // handle on rt.Progress
 }
 
 func (r *run) syncErrorMessage(line, suffix string) string {
@@ -67,6 +68,7 @@ func (r *run) parseSyncLine(o *syncOutcome, suffix, dsSnap, line string) {
 		o.size = field(1)
 		r.rt.Log.Infof("syncing: %s for %s", units.HumanBytes(units.Atof(o.size)), dsSnap)
 		r.sum.replicationSize += int64(units.Atof(o.size))
+		r.rt.Progress.Size(o.progress, int64(units.Atof(o.size)))
 	case field(0) == "received":
 		o.streams++
 		t := units.Atof(field(4))
@@ -92,7 +94,12 @@ func (r *run) parseSyncLine(o *syncOutcome, suffix, dsSnap, line string) {
 		r.rt.Log.Debugf("%s: %s", line, r.tgt.DS+suffix)
 		r.addFailedProp(field(2))
 	case strings.Contains(field(0), ":") && progressNumber.MatchString(field(1)):
-		r.rt.Log.Infof("%s", line)
+		r.rt.Progress.Sent(o.progress, f[len(f)-1], int64(units.Atof(field(1))))
+		if r.rt.Progress.IsLive() {
+			r.rt.Log.Debugf("%s", line)
+		} else {
+			r.rt.Log.Infof("%s", line)
+		}
 	case ignoreSendOutput.MatchString(line), ignoreResumeOutput.MatchString(line):
 	case zfs.Feedback(r.rt.Log, line) == logging.Error:
 		o.errMsg = line
@@ -149,7 +156,8 @@ func (r *run) syncLocked(suffix string) (retry bool) {
 		r.trackBookmark(suffix)
 		return false
 	}
-	o := &syncOutcome{message: "synced"}
+	o := &syncOutcome{message: "synced", progress: r.rt.Progress.Start(stream)}
+	defer r.rt.Progress.Done(o.progress)
 	r.rt.Log.Debugf("`%s`", pipe.String())
 	r.mu.Unlock()
 	res := r.rt.Exec.Pipe(r.ctx, pipe, func(l execx.Line) {
