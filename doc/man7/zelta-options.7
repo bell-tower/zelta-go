@@ -327,8 +327,7 @@ and higher values can slow a busy pool.
 A new dataset is always received after its parent.
 Summary totals are unchanged, but per\-dataset messages may appear in
 any order, and the summary reports elapsed time rather than the sum of
-each stream\(cqs time (JSON \f[CR]replicationTime\f[R] remains the
-sum).
+each stream\(cqs time (JSON \f[CR]replicationTime\f[R] remains the sum).
 Command\-line: \f[CR]\-\-parallel\f[R].
 .TP
 \f[B]REMOTE_MULTIPLEX\f[R]
@@ -344,6 +343,18 @@ At most 8 commands share a connection at once, below sshd\(cqs default
 With \f[CR]PARALLEL\f[R] above 1, all streams to a host share one
 connection and one ssh encryption process, so for large transfers over
 fast links \f[CR]REMOTE_MULTIPLEX=0\f[R] can give more throughput.
+.TP
+\f[B]SEND_PROGRESS\f[R]
+Have \f[CR]zfs send\f[R] report its progress every second
+(\f[CR]zfs send \-v\f[R]) so that a status request can show bytes sent
+for every stream in flight, local or remote, including parallel streams.
+Request a status with Ctrl+T (SIGINFO) on BSD and macOS, or with
+\f[CR]pkill \-USR1 \-x zelta\f[R] on any system.
+\f[CR]auto\f[R] (the default) enables it when stderr is a terminal;
+\f[CR]1\f[R] always; \f[CR]0\f[R] never, in which case a status request
+shows only the estimated size and elapsed time.
+Send zelta itself the signal, never its process group: OpenZFS releases
+before 2.2 are terminated by SIGUSR1.
 .SH CLONE OPTIONS
 .TP
 \f[B]CLONE_DEFAULT\f[R]

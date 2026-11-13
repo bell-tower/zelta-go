@@ -105,14 +105,14 @@ These changes make runs faster without changing their results.
 - The resume hint names the receiving dataset (`zfs receive -A <target>`).
 - Displayed `zfs snapshot` commands quote the snapshot name like every other
   name, and "0 snapshots bookmarked" prints the zero.
-- **Ctrl+T status (SIGINFO).** On BSD and macOS, SIGINFO prints each stream in
-  flight to stderr (`pool/ds@a%b: 1G of 4G sent (25%), 42s elapsed`)
-  regardless of log level. Byte counts come from `zfs send -P` progress lines
-  (OpenZFS 2.2+ answers SIGINFO itself). Remote senders never see the local
-  terminal's signal, so when stderr is a terminal a remote send runs as
-  `zfs send -Pv` and reports once a second; those lines are then logged at
-  debug instead of info. Zelta 1.2 logged a local sender's line at info and
-  showed nothing for remote senders.
+- **Status requests.** Ctrl+T (SIGINFO, BSD and macOS) or SIGUSR1 (any
+  system) prints each stream in flight to stderr, regardless of log level:
+  `pool/ds@a%b: 1G of 4G sent (25%), 42s elapsed`. With `SEND_PROGRESS`
+  (`auto` by default: on when stderr is a terminal) every real send runs as
+  `zfs send -Pv`, local or remote, and its once-a-second progress lines are
+  logged at debug instead of info. Scripted runs keep Zelta 1.2's
+  `zfs send -P`. Zelta 1.2 logged a local sender's own SIGINFO line at info
+  and showed nothing for remote senders.
 
 ### Other commands
 

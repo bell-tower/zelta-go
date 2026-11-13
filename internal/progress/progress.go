@@ -1,5 +1,6 @@
 // Package progress tracks replication streams in flight so a status
-// request (SIGINFO, Ctrl+T on BSD and macOS terminals) can describe them.
+// request (SIGINFO from Ctrl+T on BSD and macOS terminals, or SIGUSR1) can
+// describe them.
 // All methods are safe on a nil *Board, which tracks nothing.
 package progress
 
@@ -8,17 +9,19 @@ import (
 	"io"
 	"maps"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/bell-tower/zelta-go/internal/config"
 	"github.com/bell-tower/zelta-go/internal/units"
 )
 
 // Board holds the streams currently being sent.
 type Board struct {
-	// Live reports that status requests can arrive, so senders should
-	// report progress (zfs send -v) where the signal cannot reach them.
-	Live bool
+	// TTY reports that stderr is a terminal, which turns on sender
+	// progress reports (zfs send -v) when SEND_PROGRESS is auto.
+	TTY bool
 	// Now returns the current time; nil uses time.Now.
 	Now func() time.Time
 
@@ -43,8 +46,19 @@ func (b *Board) now() time.Time {
 	return time.Now()
 }
 
-// IsLive reports whether b is non-nil and live.
-func (b *Board) IsLive() bool { return b != nil && b.Live }
+// Enabled reports whether senders should report progress, given the
+// SEND_PROGRESS option: unset or "auto" follows TTY, otherwise its truth
+// value. A nil board is never enabled.
+func (b *Board) Enabled(sendProgress string) bool {
+	if b == nil {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(sendProgress)) {
+	case "", "auto":
+		return b.TTY
+	}
+	return config.Truthy(sendProgress)
+}
 
 // Start records a stream and returns its handle.
 func (b *Board) Start(name string) int {

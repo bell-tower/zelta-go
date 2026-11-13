@@ -158,15 +158,19 @@ func (r *run) sendArgs(suffix, mode string) []command.Arg {
 }
 
 // sendCommand returns "zfs send -P ...", reached through the source's remote
-// shell when remote is set and the source is remote. A remote send cannot see
-// the local terminal's SIGINFO, so when status requests are live it reports
-// progress every second instead (-v).
+// shell when remote is set and the source is remote. With SEND_PROGRESS on,
+// the send reports its progress every second (-v) for status requests.
 func (r *run) sendCommand(suffix string, remote bool) command.Cmd {
 	mode := "-P"
-	if r.rt.Progress.IsLive() && r.src.IsRemote() && !r.dryRun() {
+	if r.sendProgress() {
 		mode = "-Pv"
 	}
 	return r.zfsOn(r.src, remote, zfs.RemoteSend, r.sendArgs(suffix, mode)...)
+}
+
+// sendProgress reports whether sends report progress for status requests.
+func (r *run) sendProgress() bool {
+	return !r.dryRun() && r.rt.Progress.Enabled(r.opts.Get("SEND_PROGRESS"))
 }
 
 func (r *run) zfsOn(ep endpoint.Endpoint, remote bool, kind string, args ...command.Arg) command.Cmd {

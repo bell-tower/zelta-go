@@ -38,7 +38,22 @@ func TestNilBoard(t *testing.T) {
 	b.Sent(id, "x", 1)
 	b.Done(id)
 	b.Write(nil)
-	if b.IsLive() {
-		t.Fatal("nil board is live")
+}
+
+func TestEnabled(t *testing.T) {
+	for _, tt := range []struct {
+		tty  bool
+		opt  string
+		want bool
+	}{
+		{true, "", true}, {false, "", false}, {true, "AUTO", true}, {false, "auto", false},
+		{true, "0", false}, {true, "off", false}, {false, "1", true}, {false, "yes", true},
+	} {
+		if got := (&Board{TTY: tt.tty}).Enabled(tt.opt); got != tt.want {
+			t.Errorf("TTY=%v SEND_PROGRESS=%q: got %v", tt.tty, tt.opt, got)
+		}
+	}
+	if (*Board)(nil).Enabled("1") {
+		t.Error("nil board enabled")
 	}
 }

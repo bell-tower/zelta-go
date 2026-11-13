@@ -95,7 +95,7 @@ func (r *run) parseSyncLine(o *syncOutcome, suffix, dsSnap, line string) {
 		r.addFailedProp(field(2))
 	case strings.Contains(field(0), ":") && progressNumber.MatchString(field(1)):
 		r.rt.Progress.Sent(o.progress, f[len(f)-1], int64(units.Atof(field(1))))
-		if r.rt.Progress.IsLive() {
+		if r.sendProgress() {
 			r.rt.Log.Debugf("%s", line)
 		} else {
 			r.rt.Log.Infof("%s", line)

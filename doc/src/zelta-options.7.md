@@ -199,6 +199,9 @@ The following options should be modified in the environment to ensure proper ins
 **REMOTE_MULTIPLEX**
 :   When the remote command is plain `ssh`, run every command for a host over one shared connection (OpenSSH connection multiplexing), avoiding a new connection and key exchange per command. Enabled by default (`1`); set to `0` to connect for every command. It is not used when the remote command already sets `ControlPath`, `ControlMaster`, or `-S`. At most 8 commands share a connection at once, below sshd's default `MaxSessions` of 10; further commands connect directly. With `PARALLEL` above 1, all streams to a host share one connection and one ssh encryption process, so for large transfers over fast links `REMOTE_MULTIPLEX=0` can give more throughput.
 
+**SEND_PROGRESS**
+:   Have `zfs send` report its progress every second (`zfs send -v`) so that a status request can show bytes sent for every stream in flight, local or remote, including parallel streams. Request a status with Ctrl+T (SIGINFO) on BSD and macOS, or with `pkill -USR1 -x zelta` on any system. `auto` (the default) enables it when stderr is a terminal; `1` always; `0` never, in which case a status request shows only the estimated size and elapsed time. Send zelta itself the signal, never its process group: OpenZFS releases before 2.2 are terminated by SIGUSR1.
+
 # CLONE OPTIONS
 
 **CLONE_DEFAULT**
