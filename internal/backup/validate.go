@@ -61,6 +61,10 @@ func (r *run) validateSourceDataset() error {
 }
 
 func (r *run) validateTargetDataset() error {
+	if r.memory != nil {
+		r.recallTarget()
+		return nil
+	}
 	ok, err := r.loadProperties(tgt)
 	if err != nil {
 		return err

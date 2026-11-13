@@ -163,6 +163,15 @@ type run struct {
 	synced map[string]bool
 	// created is the snapshot this run created (or would create).
 	created string
+	// memory is the remembered target state used instead of reading the
+	// target (REMEMBER); noMemory disables it for a retry, and stale
+	// records that a receive refused it.
+	memory   *memory
+	noMemory bool
+	stale    bool
+	// snapshotTaken skips snapshotting when a retry follows a run that
+	// already took one.
+	snapshotTaken bool
 }
 
 // Run implements backup, sync, replicate, rotate, clone, and revert, selected
@@ -194,6 +203,7 @@ func (r *run) main() error {
 	}
 	r.loadEndpoints()
 	r.resetState()
+	r.recall()
 	if r.verb == "replicate" {
 		r.depth = 1
 	}
@@ -230,12 +240,16 @@ func (r *run) main() error {
 	if err != nil {
 		return err
 	}
+	if r.stale {
+		return errStale
+	}
 	if err := r.runBookmarks(); err != nil {
 		return err
 	}
 	r.sum.endTime = r.rt.Unix()
 	r.sum.finished = true
 	r.computeEligibility()
+	r.memorize()
 	r.printSummary()
 	return nil
 }

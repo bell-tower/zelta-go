@@ -154,6 +154,9 @@ _target_
 **-i, \--incremental**
 : Sync only the latest snapshot, skipping any intermediate snapshots. For full backups only the latest snapshot will be sent. For incremental backups, `zfs send -i` will be used.
 
+**\--remember**
+: Remember the snapshots synced to each target dataset and, on the next run, send from them without reading the target. Intended for frequent syncs such as twins. If the target changed, **zfs receive** refuses the stream and Zelta compares both sides as usual, so a diverged target is still left alone. Not used with **--dryrun**, bookmarks, filtered intermediate sends, or receive options that could force a receive. See **REMEMBER** in **zelta-options(7)**.
+
 **\--resume, \--no-resume**
 : Enable (default) or disable automatic resume of interrupted syncs.
 

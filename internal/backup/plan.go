@@ -57,7 +57,7 @@ func (r *run) matchRequest(target endpoint.Endpoint) match.Request {
 func (r *run) loadSnapshotDeltas() error {
 	r.rt.Log.Infof("checking replica deltas")
 	target := r.tgt
-	if !r.tree.targetExists {
+	if !r.tree.targetExists || r.memory != nil {
 		target = endpoint.Endpoint{}
 	}
 	res, err := match.Compare(r.ctx, r.matchRuntime(), r.matchRequest(target))
@@ -76,6 +76,9 @@ func (r *run) loadSnapshotDeltas() error {
 		sd := r.dataset(src, p.Suffix)
 		sd.next, sd.latest = p.SrcNext, p.SrcLast
 		r.dataset(tgt, p.Suffix).latest = p.TgtLast
+	}
+	if r.memory != nil {
+		return r.recallMatches()
 	}
 	return nil
 }

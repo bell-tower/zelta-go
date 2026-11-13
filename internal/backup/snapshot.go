@@ -119,7 +119,7 @@ func snapTimeCutoff(now int64, v string) (int64, error) {
 
 // shouldSnapshot returns the reason prefix for a snapshot, or "".
 func (r *run) shouldSnapshot() (string, error) {
-	if r.tree.snapshotAttempted {
+	if r.tree.snapshotAttempted || r.snapshotTaken {
 		return "", nil
 	}
 	verb := "snapshotting: "

@@ -167,6 +167,9 @@ The following options should be modified in the environment to ensure proper ins
 **RESUME**
 :   Enable (`1`, the default) or disable automatic resume of interrupted syncs.
 
+**REMEMBER**
+:   Remember the snapshots synced to each target dataset in the cache, and send from them next time without reading the target. A receive refused because the target changed makes Zelta forget them and compare both sides. Disabled by default (`0`). Command-line: `--remember`.
+
 # REPLICATION OPTIONS
 
 **SNAP_NAME**

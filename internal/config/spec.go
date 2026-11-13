@@ -136,6 +136,7 @@ var Specs = []*Spec{
 	{Verbs: verbsBackup, Flags: flags("--recv-override"), Key: "RECV_OVERRIDE", Type: Set, Arg: "OPTIONS", Desc: "override all zfs recv options", Group: GroupOverride},
 	{Verbs: verbsBackupNoFO, Flags: flags("--rotate"), Key: "VERB", Type: Set, Value: "rotate", Desc: "rotate a diverged target (see zelta rotate)", Group: GroupSync},
 	{Verbs: verbsBackupNoFO, Flags: flags("--replicate,-R"), Key: "VERB", Type: Set, Value: "replicate", Desc: "use zfs send --replicate", Group: GroupSync},
+	{Verbs: verbsBackup, Flags: flags("--remember"), Key: "REMEMBER", Type: True, Desc: "remember the last synced snapshots and skip reading the target next time", Group: GroupSync},
 	{Verbs: verbsBackup, Flags: flags("--resume"), Key: "RESUME", Type: True, Desc: "save partial transfers (default)", Group: GroupSync},
 	{Verbs: verbsBackup, Flags: flags("--no-resume"), Key: "RESUME", Type: False, Desc: "discard failed partial transfers", Group: GroupSync},
 	{Verbs: verbsSnapName, Flags: flags("--snap-name"), Key: "SNAP_NAME", Type: Set, Arg: "NAME", Desc: "specify a snapshot name; use '$(command)' for a dynamic name", Group: GroupSnapshot},

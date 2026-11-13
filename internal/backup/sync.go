@@ -47,6 +47,14 @@ func (r *run) syncErrorMessage(line, suffix string) string {
 }
 
 func (r *run) syncFailed(o *syncOutcome, msg string) {
+	if r.memory != nil {
+		// The receive refused the remembered state; compare again.
+		r.rt.Log.Infof("%s", msg)
+		r.stale = true
+		o.errMsg = msg
+		o.syncError = true
+		return
+	}
 	r.rt.Log.Errorf("%s", msg)
 	o.errMsg = msg
 	o.syncError = true
@@ -300,7 +308,8 @@ func (r *run) runBackup() {
 }
 
 func (r *run) announceSync() {
-	if r.tree.syncable == 0 {
+	// A retry after stale memory was already announced.
+	if r.tree.syncable == 0 || r.noMemory {
 		return
 	}
 	verb := "syncing "

@@ -43,6 +43,9 @@ These changes make runs faster without changing their results.
   `--config` ending in `.json`), which becomes the default when it exists.
   `--save PATTERN` turns a remembered backup into a job, `--rm PATTERN`
   removes one, and `--import FILE` converts a `zelta.conf`.
+- `--remember` (`REMEMBER`) skips reading the target on the next sync and
+  sends from the snapshots last synced, falling back to a full comparison
+  when the receive refuses the stream.
 
 ## Command line
 

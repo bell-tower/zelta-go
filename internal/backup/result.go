@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"errors"
 	"slices"
 
 	"github.com/bell-tower/zelta-go/internal/app"
@@ -47,8 +48,16 @@ type DatasetResult struct {
 // nil only when the run failed before planning.
 func Execute(ctx context.Context, rt *app.Runtime, args []string) (*Result, error) {
 	r := newRun(ctx, rt, args)
-	defer r.report()
+	defer func() { r.report() }()
 	err := r.main()
+	if errors.Is(err, errStale) {
+		rt.Log.Infof("%s; checking %s", errStale, r.tgt.ID)
+		rt.Cache.Delete(r.memoryKey())
+		created := r.created
+		r = newRun(ctx, rt, args)
+		r.noMemory, r.created, r.snapshotTaken = true, created, created != ""
+		err = r.main()
+	}
 	if err == nil && r.sum.errorCode != 0 {
 		err = &app.ExitError{Code: r.sum.errorCode}
 	}
