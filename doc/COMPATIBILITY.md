@@ -39,6 +39,10 @@ These changes make runs faster without changing their results.
   `--no-cache`). It only holds hints; deleting it never changes a result.
   `zelta replay PATTERN` repeats the last backup between endpoints matching
   PATTERN, read from the cache.
+- `zelta policy` also reads a JSON policy store (`policy.json`, or any
+  `--config` ending in `.json`), which becomes the default when it exists.
+  `--save PATTERN` turns a remembered backup into a job, `--rm PATTERN`
+  removes one, and `--import FILE` converts a `zelta.conf`.
 
 ## Command line
 

@@ -103,6 +103,9 @@ func (l *Loader) Paths() Paths {
 	p.Config = l.Env[EnvPrefix+"CONFIG"]
 	if p.Config == "" {
 		p.Config = filepath.Join(p.Etc, "zelta.conf")
+		if _, err := os.Stat(filepath.Join(p.Etc, "policy.json")); err == nil {
+			p.Config = filepath.Join(p.Etc, "policy.json")
+		}
 	}
 	p.Doc = l.Env[EnvPrefix+"DOC"]
 	if p.Doc == "" && home != "" && l.DirExists(filepath.Join(home, ".local/share/zelta/doc")) {

@@ -52,11 +52,7 @@ var hiddenDisplayKeys = []string{"LOG_PREFIX", "LOG_MODE", "LOG_LEVEL", "LOG_COM
 func Run(ctx context.Context, rt *app.Runtime, args []string, deps Deps) error {
 	p := newParser(rt.Opts, rt.Log, args)
 	cfg := rt.Opts.Get("CONFIG")
-	lines, err := loadLines(cfg, 0, map[string]bool{})
-	if err != nil {
-		return err
-	}
-	if err := p.parse(lines); err != nil {
+	if err := p.load(cfg); err != nil {
 		return err
 	}
 	if len(p.jobs) == 0 {
@@ -321,13 +317,11 @@ func (r *runner) runExternal(ctx context.Context, j *Job) bool {
 // Objects returns the site, host, dataset, and target names in the policy
 // file at path, for shell completion.
 func Objects(path string) []string {
-	lines, err := loadLines(path, 0, map[string]bool{})
-	if err != nil {
-		return nil
-	}
 	p := newParser(nil, nil, nil)
 	p.strict = false
-	_ = p.parse(lines)
+	if p.load(path) != nil && len(p.all) == 0 {
+		return nil
+	}
 	seen := map[string]bool{}
 	add := func(s string) {
 		if s != "" {

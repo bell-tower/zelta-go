@@ -27,6 +27,15 @@ In the **zelta policy** configuration file, you may override **zelta backup**'s 
 **-C**, **\--config** _FILE_
 :    Read policy configuration from _FILE_ instead of the default location.
 
+**\--save** _PATTERN_
+:    Save the last **zelta backup** or **zelta sync** whose endpoints contain _PATTERN_ (see **zelta replay**) as a job, with the options it was run with. Saving the same source and target again replaces the job's options; the changes are shown. Output options such as **-v** and **-n** are not saved. Jobs are saved in a policy store (**policy.json**): _FILE_ when **--config** names one, otherwise **policy.json** in the Zelta configuration directory.
+
+**\--rm** _PATTERN_
+:    Remove the saved job whose endpoints contain _PATTERN_.
+
+**\--import** _FILE_
+:    Copy the jobs of a **zelta.conf** _FILE_ into the policy store, with inherited options written out in each job.
+
 **\--backup-root**
 :    The relative target path for the target job. For example 'bkhost:tank/Backups' would place backups below that dataset (if not overridden).
 
@@ -112,6 +121,9 @@ For detailed documentation of the **zelta policy** configuration see `zelta.conf
 
 **/usr/local/etc/zelta/zelta.conf**
 :    The default configuration file location.
+
+**policy.json**
+:    The policy store, in the same directory. When it exists, it is the default policy instead of **zelta.conf**.
 
 # ENVIRONMENT
 For detailed documentation of the **zelta** environment variables see `zelta help options`.

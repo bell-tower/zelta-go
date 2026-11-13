@@ -351,7 +351,9 @@ func (a *App) runVerb(ctx context.Context, v verb, p *parser, args []string, int
 	reportEndpoints(rt, args)
 
 	var runErr error
-	if v.name == "policy" {
+	if v.name == "policy" && policyEditing(opts) {
+		runErr = a.policyEdit(rt, loader)
+	} else if v.name == "policy" {
 		if a.Policy == nil {
 			runErr = app.Fail("zelta policy: not available")
 		} else {
@@ -372,7 +374,7 @@ func (a *App) runVerb(ctx context.Context, v verb, p *parser, args []string, int
 	}
 	code := app.Finish(rt, runErr)
 	if !opts.Bool("DRYRUN") {
-		a.remember(base.Cache, v, args, code)
+		a.remember(base.Cache, v, args, cli, code)
 	}
 	return code
 }

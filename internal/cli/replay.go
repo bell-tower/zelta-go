@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -31,8 +32,10 @@ type replayEntry struct {
 	Source string   `json:"source"`
 	Target string   `json:"target"`
 	Args   []string `json:"args"`
-	Last   int64    `json:"last"`
-	Status int      `json:"status"`
+	// Options are the option values set on the command line.
+	Options map[string]string `json:"options,omitempty"`
+	Last    int64             `json:"last"`
+	Status  int               `json:"status"`
 }
 
 func (e replayEntry) label() string { return e.Source + " -> " + e.Target }
@@ -57,14 +60,14 @@ func (a *App) cacheStore(opts *config.Options) *cache.Store {
 }
 
 // remember records a finished replayable command.
-func (a *App) remember(store *cache.Store, v verb, operands []string, code int) {
+func (a *App) remember(store *cache.Store, v verb, operands []string, cli map[string]string, code int) {
 	if store == nil || len(operands) != 2 || len(a.invocation) == 0 || !slices.Contains(replayVerbs, v.name) {
 		return
 	}
 	var list []replayEntry
 	store.Load(replayFile, &list)
 	list = slices.DeleteFunc(list, func(e replayEntry) bool { return e.Source == operands[0] && e.Target == operands[1] })
-	e := replayEntry{Source: operands[0], Target: operands[1], Args: slices.Clone(a.invocation), Status: code, Last: a.now().Unix()}
+	e := replayEntry{Source: operands[0], Target: operands[1], Args: slices.Clone(a.invocation), Options: maps.Clone(cli), Status: code, Last: a.now().Unix()}
 	list = append([]replayEntry{e}, list...)
 	if len(list) > replayMax {
 		list = list[:replayMax]
@@ -138,12 +141,9 @@ func (a *App) replay(ctx context.Context, args []string) int {
 		fmt.Fprintf(a.Stderr, "error: no backup matches '%s'\n", pattern)
 		return 1
 	}
-	choice := found[0]
-	if len(found) > 1 {
-		var ok bool
-		if choice, ok = a.choose(found); !ok {
-			return 1
-		}
+	choice, ok := a.pickReplay(found)
+	if !ok {
+		return 1
 	}
 	argv := append([]string{choice.Args[0]}, extra...)
 	argv = append(argv, choice.Args[1:]...)
@@ -151,8 +151,24 @@ func (a *App) replay(ctx context.Context, args []string) int {
 	return a.execute(ctx, argv)
 }
 
-// choose lists ambiguous matches and reads a choice from the terminal.
-func (a *App) choose(found []replayEntry) (replayEntry, bool) {
+func (a *App) pickReplay(found []replayEntry) (replayEntry, bool) {
+	labels := make([]string, len(found))
+	for i, e := range found {
+		labels[i] = e.label()
+	}
+	i, ok := a.choose(labels)
+	if !ok {
+		return replayEntry{}, false
+	}
+	return found[i], true
+}
+
+// choose returns the only label, or lists ambiguous labels and reads a
+// choice from the terminal.
+func (a *App) choose(labels []string) (int, bool) {
+	if len(labels) == 1 {
+		return 0, true
+	}
 	var tty io.ReadWriteCloser
 	if a.TTY != nil {
 		tty, _ = a.TTY()
@@ -162,19 +178,19 @@ func (a *App) choose(found []replayEntry) (replayEntry, bool) {
 		defer tty.Close()
 		out = tty
 	}
-	for i, e := range found {
-		fmt.Fprintf(out, "%d. %s\n", i+1, e.label())
+	for i, l := range labels {
+		fmt.Fprintf(out, "%d. %s\n", i+1, l)
 	}
 	if tty == nil {
 		fmt.Fprintln(a.Stderr, "error: pattern is ambiguous")
-		return replayEntry{}, false
+		return 0, false
 	}
 	fmt.Fprint(tty, "Choose your fate: ")
 	line, _ := bufio.NewReader(tty).ReadString('\n')
 	n, err := strconv.Atoi(strings.TrimSpace(line))
-	if err != nil || n < 1 || n > len(found) {
+	if err != nil || n < 1 || n > len(labels) {
 		fmt.Fprintln(a.Stderr, "error: no backup chosen")
-		return replayEntry{}, false
+		return 0, false
 	}
-	return found[n-1], true
+	return n - 1, true
 }

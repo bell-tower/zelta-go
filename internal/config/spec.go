@@ -217,6 +217,9 @@ var Specs = []*Spec{
 	// zelta policy.
 	{Verbs: []string{"policy"}, Flags: flags("-H"), Key: "NO_HEADER", Type: True, Desc: "scripting mode: no header, space-delimited dry-run table", Group: GroupPolicy},
 	{Verbs: []string{"policy"}, Flags: flags("--config,-C"), Key: "CONFIG", Type: Set, Arg: "FILE", Desc: "read the policy configuration from FILE", Group: GroupPolicy, Complete: "file"},
+	{Verbs: []string{"policy"}, Flags: flags("--save"), Key: "POLICY_SAVE", Type: Set, Arg: "PATTERN", Desc: "save the last backup matching PATTERN (see zelta replay) as a job", Group: GroupPolicy},
+	{Verbs: []string{"policy"}, Flags: flags("--rm"), Key: "POLICY_RM", Type: Set, Arg: "PATTERN", Desc: "remove the saved job matching PATTERN", Group: GroupPolicy},
+	{Verbs: []string{"policy"}, Flags: flags("--import"), Key: "POLICY_IMPORT", Type: Set, Arg: "FILE", Desc: "import the jobs of a zelta.conf FILE", Group: GroupPolicy, Complete: "file"},
 	{Verbs: []string{"policy"}, Flags: flags("--retry"), Key: "RETRY", Type: Set, Optional: "1", Arg: "N", Desc: "retry failed syncs N times (default 1)", Group: GroupPolicy},
 	{Verbs: []string{"policy"}, Flags: flags("--no-retry,--noretry"), Key: "RETRY", Type: False, Desc: "do not retry failed syncs", Group: GroupPolicy},
 	{Verbs: []string{"policy"}, Flags: flags("--jobs"), Key: "JOBS", Type: Set, Arg: "N", Desc: "run policy jobs for up to N sites concurrently", Group: GroupPolicy},

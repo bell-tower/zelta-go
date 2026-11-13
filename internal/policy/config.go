@@ -118,7 +118,12 @@ type Job struct {
 }
 
 // SourceEndpoint returns the source endpoint passed to zelta backup.
-func (j *Job) SourceEndpoint() string { return j.SourceRemote + ":" + j.Source }
+func (j *Job) SourceEndpoint() string {
+	if j.SourceRemote == "" {
+		return j.Source
+	}
+	return j.SourceRemote + ":" + j.Source
+}
 
 // Name identifies the job in messages.
 func (j *Job) Name() string { return "[" + j.Site + ": " + j.Target + "] " + j.SourceEndpoint() }
