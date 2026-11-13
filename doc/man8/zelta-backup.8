@@ -249,6 +249,17 @@ Sync only the latest snapshot, skipping any intermediate snapshots.
 For full backups only the latest snapshot will be sent.
 For incremental backups, \f[CR]zfs send \-i\f[R] will be used.
 .TP
+\f[B]\-\-remember\f[R]
+Remember the snapshots synced to each target dataset and, on the next
+run, send from them without reading the target.
+Intended for frequent syncs such as twins.
+If the target changed, \f[B]zfs receive\f[R] refuses the stream and
+Zelta compares both sides as usual, so a diverged target is still left
+alone.
+Not used with \f[B]\(endryrun\f[R], bookmarks, filtered intermediate
+sends, or receive options that could force a receive.
+See \f[B]REMEMBER\f[R] in \f[B]zelta\-options(7)\f[R].
+.TP
 \f[B]\-\-resume, \-\-no\-resume\f[R]
 Enable (default) or disable automatic resume of interrupted syncs.
 .TP

@@ -50,6 +50,24 @@ Only meaningful with \f[B]\(endryrun\f[R].
 Read policy configuration from \f[I]FILE\f[R] instead of the default
 location.
 .TP
+\f[B]\-\-save\f[R] \f[I]PATTERN\f[R]
+Save the last \f[B]zelta backup\f[R] or \f[B]zelta sync\f[R] whose
+endpoints contain \f[I]PATTERN\f[R] (see \f[B]zelta replay\f[R]) as a
+job, with the options it was run with.
+Saving the same source and target again replaces the job\(cqs options;
+the changes are shown.
+Output options such as \f[B]\-v\f[R] and \f[B]\-n\f[R] are not saved.
+Jobs are saved in a policy store (\f[B]policy.json\f[R]): \f[I]FILE\f[R]
+when \f[B]\(enconfig\f[R] names one, otherwise \f[B]policy.json\f[R] in
+the Zelta configuration directory.
+.TP
+\f[B]\-\-rm\f[R] \f[I]PATTERN\f[R]
+Remove the saved job whose endpoints contain \f[I]PATTERN\f[R].
+.TP
+\f[B]\-\-import\f[R] \f[I]FILE\f[R]
+Copy the jobs of a \f[B]zelta.conf\f[R] \f[I]FILE\f[R] into the policy
+store, with inherited options written out in each job.
+.TP
 \f[B]\-\-backup\-root\f[R]
 The relative target path for the target job.
 For example `bkhost:tank/Backups' would place backups below that dataset
@@ -174,6 +192,11 @@ see \f[CR]zelta.conf.example\f[R].
 .TP
 \f[B]/usr/local/etc/zelta/zelta.conf\f[R]
 The default configuration file location.
+.TP
+\f[B]policy.json\f[R]
+The policy store, in the same directory.
+When it exists, it is the default policy instead of
+\f[B]zelta.conf\f[R].
 .SH ENVIRONMENT
 For detailed documentation of the \f[B]zelta\f[R] environment variables
 see \f[CR]zelta help options\f[R].

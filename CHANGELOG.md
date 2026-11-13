@@ -15,6 +15,10 @@ replacing the Awk implementation.
 ### Added
 - **Backup**: `--parallel N` replicates up to N datasets at once; one multiplexed ssh connection per host.
 - **CLI**: Per-command `--help`, embedded manual pages for `zelta help`, and shell completion for flags, datasets, snapshots, ssh hosts, and policy sites.
+- **Cache**: A per-user cache directory (`CACHE`, `CACHE_DIR`, `CACHE_TIMEOUT`, `--no-cache`) holds hints only; deleting it never changes a result.
+- **Replay**: `zelta replay PATTERN` repeats the last backup between endpoints matching PATTERN, with a chooser when several match.
+- **Policy**: A JSON policy store (`policy.json`) with `zelta policy --save PATTERN`, `--rm PATTERN`, and `--import FILE` (from `zelta.conf`).
+- **Backup**: `--remember` skips reading the target on the next sync and sends from the remembered snapshots; a refused receive falls back to a full comparison.
 
 ### Fixed
 - **Upstream**: Includes Zelta fixes #83 and #84.
