@@ -20,3 +20,4 @@ replacing the Awk implementation.
 - **Upstream**: Includes Zelta fixes #83 and #84.
 - **Snapshot**: `zelta snapshot` fails when the snapshot cannot be created.
 - **Failover**: `zelta unlock` and `zelta failover` succeed on OpenZFS 2.2, which lacks `zfs mount -R`.
+- **Prune**: `--prune-size` selects exactly what `zfs destroy -nvp` frees, and any positive size selects at least one snapshot. It no longer destroys far more than asked when older snapshots are kept (clone origins, grid, `--prune-name`) or on clones.
