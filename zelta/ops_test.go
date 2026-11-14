@@ -154,6 +154,14 @@ func TestPrune(t *testing.T) {
 	if _, err = c.PlanPrune(ctx, "apool/src", &PruneOptions{GuardMode: "sometimes"}); err == nil {
 		t.Error("bad guard mode accepted")
 	}
+	// Excluding @s1 keeps it, so the reclaim estimate needs written@s1.
+	f.OnFunc(func(s string) bool { return strings.HasPrefix(s, "zfs get -Hpo name,value written@s1 ") }, func(s string) execx.Result {
+		var out []string
+		for _, n := range strings.Fields(s)[4:] {
+			out = append(out, strings.Trim(n, "'")+"\t0")
+		}
+		return execx.Out(out...)
+	})
 	if _, err = c.PlanPrune(ctx, "apool/src", &PruneOptions{Reclaim: 15, Filter: Filter{Exclude: []string{"@s1"}}}); err != nil {
 		t.Errorf("reclaim: %v", err)
 	}

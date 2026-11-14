@@ -219,8 +219,8 @@ type PruneOptions struct {
 	KeepFor time.Duration
 	// Grid is a GFS retention grid such as "30x1 day, 52x1 week, 1 year".
 	Grid string
-	// Reclaim selects the oldest eligible snapshots until about this many
-	// bytes would be freed.
+	// Reclaim selects the oldest eligible snapshots until destroying them
+	// would free at least this many bytes.
 	Reclaim int64
 	// Name limits pruning to snapshots matching a glob, or one of
 	// "zfsnap", "truenas", or "sanoid".

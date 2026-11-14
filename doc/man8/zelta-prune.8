@@ -21,8 +21,8 @@ retention options.
 Scope filters first narrow the dataset tree or snapshot names.
 Clone and replication checks protect snapshots within that scope.
 Retention options protect snapshots by count, age, or retention grid.
-\f[CR]\-\-prune\-size\f[R] can further limit candidates to an estimated
-reclaim target.
+\f[CR]\-\-prune\-size\f[R] can further limit candidates to a reclaim
+target.
 .PP
 All selected rules stack.
 A snapshot is a prune candidate only if it remains in scope and no
@@ -173,8 +173,13 @@ interval.
 Keep the newest \f[I]N\f[R] snapshots.
 .TP
 \f[CR]\-\-prune\-size\f[R] \f[I]SIZE\f[R]
-Select the oldest remaining snapshots until their estimated reclaim
-reaches at least \f[I]SIZE\f[R].
+Select the oldest remaining snapshots until destroying them would free
+at least \f[I]SIZE\f[R], as \f[B]zfs destroy \-nvp\f[R] reports it.
+Any positive \f[I]SIZE\f[R] selects at least one snapshot, so
+\f[CR]\-\-prune\-size=1\f[R] selects the oldest candidates that free any
+space.
+If the remaining snapshots free less than \f[I]SIZE\f[R], all of them
+are selected.
 Suffixes such as \f[CR]M\f[R], \f[CR]G\f[R], and \f[CR]T\f[R] are
 supported.
 .PP
@@ -182,9 +187,6 @@ Like all other options, each dataset is evaluated separately.
 On a dataset tree, every dataset is evaluated against the full
 \f[I]SIZE\f[R].
 Use \f[CR]\-\-depth=1\f[R] or another filter to limit one dataset.
-The estimate assumes sequential oldest\-first pruning; use the
-\f[B]zprune(8)\f[R] preview for a more accurate estimate of reclaimed
-space.
 .TP
 \f[CR]\-\-prune\-time\f[R] \f[I]TIME\f[R]
 Keep snapshots newer than \f[I]TIME\f[R] relative to the current time.
@@ -251,8 +253,7 @@ from the last 30 days.
 Diamonds may extend farther into history when the time window protects
 more than the count window.
 .PP
-Select the oldest snapshots until their estimated reclaim reaches 150
-GiB.
+Select the oldest snapshots until destroying them would free 150 GiB.
 Limiting depth makes the reclaim apply only to \f[CR]tank/data\f[R]:
 .IP
 .EX

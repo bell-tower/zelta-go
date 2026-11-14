@@ -146,6 +146,13 @@ These changes make runs faster without changing their results.
 - `zelta prune` only offers snapshots of datasets present in the source
   listing; an absolute `--exclude` can no longer leak candidates through the
   match endpoint.
+- `--prune-size` stops selecting once the snapshots would really free the
+  requested size, matching `zfs destroy -nvp`. Zelta 1.2 subtracted the last
+  selected snapshot's `referenced` from the `written` it summed, which never
+  counted anything for the oldest snapshot alone and read far too low when
+  older snapshots were kept (clone origins, grid, `--prune-name`), so it
+  destroyed much more than asked. A run of candidates after a kept snapshot
+  costs one `zfs get written@<kept>`.
 - `--prune-guard` also accepts `no`, `false`, and `off` for `none`, in any case.
 - zprune's per-dataset summary keeps the full names of datasets containing
   spaces.

@@ -14,7 +14,7 @@
 
 Only _endpoint_ is evaluated for prune candidates. An optional match endpoint is never destroyed; it is used only for match validation and **--prune-guard** protection.
 
-A pruning strategy combines scope filters, snapshot protections, and retention options. Scope filters first narrow the dataset tree or snapshot names. Clone and replication checks protect snapshots within that scope. Retention options protect snapshots by count, age, or retention grid. `--prune-size` can further limit candidates to an estimated reclaim target.
+A pruning strategy combines scope filters, snapshot protections, and retention options. Scope filters first narrow the dataset tree or snapshot names. Clone and replication checks protect snapshots within that scope. Retention options protect snapshots by count, age, or retention grid. `--prune-size` can further limit candidates to a reclaim target.
 
 All selected rules stack. A snapshot is a prune candidate only if it remains in scope and no protection or retention rule keeps it. For example, the default strategy is:
 
@@ -100,9 +100,9 @@ Grid ages are measured backward from the latest common snapshot between _endpoin
 : Keep the newest _N_ snapshots.
 
 `--prune-size` _SIZE_
-: Select the oldest remaining snapshots until their estimated reclaim reaches at least _SIZE_. Suffixes such as `M`, `G`, and `T` are supported.
+: Select the oldest remaining snapshots until destroying them would free at least _SIZE_, as **zfs destroy -nvp** reports it. Any positive _SIZE_ selects at least one snapshot, so `--prune-size=1` selects the oldest candidates that free any space. If the remaining snapshots free less than _SIZE_, all of them are selected. Suffixes such as `M`, `G`, and `T` are supported.
 
-Like all other options, each dataset is evaluated separately. On a dataset tree, every dataset is evaluated against the full _SIZE_. Use `--depth=1` or another filter to limit one dataset. The estimate assumes sequential oldest-first pruning; use the **zprune(8)** preview for a more accurate estimate of reclaimed space.
+Like all other options, each dataset is evaluated separately. On a dataset tree, every dataset is evaluated against the full _SIZE_. Use `--depth=1` or another filter to limit one dataset.
 
 `--prune-time` _TIME_
 : Keep snapshots newer than _TIME_ relative to the current time.
@@ -158,7 +158,7 @@ zelta prune --visual --match-endpoint=backup:tank/data tank/data
 
 When a common snapshot exists, the default protects that latest match and everything newer. Among older snapshots, it also protects the newest 30 and all snapshots from the last 30 days. Diamonds may extend farther into history when the time window protects more than the count window.
 
-Select the oldest snapshots until their estimated reclaim reaches 150 GiB. Limiting depth makes the reclaim apply only to `tank/data`:
+Select the oldest snapshots until destroying them would free 150 GiB. Limiting depth makes the reclaim apply only to `tank/data`:
 
 ```sh
 zelta prune --visual --prune-size=150G --depth=1 tank/data

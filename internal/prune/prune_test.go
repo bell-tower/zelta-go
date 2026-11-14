@@ -286,24 +286,101 @@ func TestPruneGuards(t *testing.T) {
 	}
 }
 
+// sizeFixture models block lifetimes (oldest snapshot first): A (10 bytes)
+// lives in s0–s1, B (20) in s1–s3, C (5) in s2 only; the live dataset holds
+// none of them. Destroying s0 frees 0, s0–s1 frees A (10), s0–s2 frees A+C.
+func sizeFixture() map[string][]row {
+	now := app.TestNow.Unix()
+	r := func(name string, age, written, referenced int64) row {
+		return row{name: name, guid: fmt.Sprint(100 + age), creation: now - age*86400, written: written, referenced: referenced}
+	}
+	return map[string][]row{"p/ds": {
+		r("p/ds", 0, 0, 0),
+		r("p/ds@s3", 1, 0, 20),
+		r("p/ds@s2", 2, 5, 25),
+		r("p/ds@s1", 3, 20, 30),
+		r("p/ds@s0", 4, 10, 10),
+	}}
+}
+
 func TestPruneSizeSelection(t *testing.T) {
-	lists := map[string][]row{"p/ds": dailies("p/ds", 6, 100)}
-	// Each snapshot writes 100 bytes and references 50: selecting oldest
-	// first, two snapshots reach an estimate of 200-50 >= 120.
-	tr, err := runPrune(t, map[string]string{"PRUNE_SIZE": "120", "NO_RANGES": "1"}, lists, "p/ds")
-	if err != nil {
-		t.Fatal(err)
+	lists := sizeFixture()
+	for _, c := range []struct{ size, want string }{
+		{"1", "p/ds@s0\np/ds@s1\n"}, // s0 alone frees nothing
+		{"10", "p/ds@s0\np/ds@s1\n"},
+		{"11", "p/ds@s0\np/ds@s1\np/ds@s2\n"},
+		{"15", "p/ds@s0\np/ds@s1\np/ds@s2\n"},
+	} {
+		tr, err := runPrune(t, map[string]string{"PRUNE_SIZE": c.size, "NO_RANGES": "1"}, lists, "p/ds")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tr.Out.String() != c.want {
+			t.Errorf("size %s output = %q, want %q", c.size, tr.Out.String(), c.want)
+		}
+		if len(tr.Fake.Calls) != 1 {
+			t.Errorf("size %s: runs from the oldest snapshot need no zfs get: %v", c.size, tr.Fake.Calls)
+		}
 	}
-	if tr.Out.String() != "p/ds@d00\np/ds@d01\n" {
-		t.Errorf("size output = %q", tr.Out.String())
-	}
-	tr, _ = runPrune(t, map[string]string{"PRUNE_SIZE": "1G"}, lists, "p/ds")
+	lists = map[string][]row{"p/ds": dailies("p/ds", 6, 100)}
+	tr, _ := runPrune(t, map[string]string{"PRUNE_SIZE": "1G"}, lists, "p/ds")
 	if tr.Out.String() != "p/ds@d00%d05\n" {
 		t.Errorf("unreachable size selects everything eligible: %q", tr.Out.String())
 	}
 	tr, _ = runPrune(t, map[string]string{"PRUNE_SIZE": "0"}, lists, "p/ds")
 	if tr.Out.String() != "p/ds@d00%d05\n" {
 		t.Errorf("zero size = %q", tr.Out.String())
+	}
+}
+
+// TestPruneSizeAfterKept covers a run that starts after a kept snapshot.
+// Blocks (oldest first): O (90) lives from s0 on, P (10) in s0–s1, Q (6) in
+// s1 only, S (4) in s1–s2, T (7) from s2 on. s0 is a clone origin, so P stays
+// held: destroying s1 frees Q (6), s1–s2 frees Q+S (10). The old estimate,
+// Σ written − referenced, never got above zero here and selected both.
+func TestPruneSizeAfterKept(t *testing.T) {
+	now := app.TestNow.Unix()
+	lists := map[string][]row{"p/ds": {
+		{name: "p/ds", guid: "1", creation: now, written: 0, referenced: 97},
+		{name: "p/ds@s2", guid: "12", creation: now - 86400, written: 7, referenced: 101},
+		{name: "p/ds@s1", guid: "11", creation: now - 2*86400, written: 10, referenced: 110},
+		{name: "p/ds@s0", guid: "10", creation: now - 3*86400, written: 100, referenced: 100, clones: "p/clone"},
+	}}
+	since := map[string]string{"p/ds@s2": "11", "p/ds": "7"}
+	getRe := regexp.MustCompile(`^zfs get -Hpo name,value written@s0 (.*)$`)
+	for _, c := range []struct{ size, want, get string }{
+		{"1", "p/ds@s1\n", "zfs get -Hpo name,value written@s0 'p/ds@s2' 'p/ds'"},
+		{"6", "p/ds@s1\n", ""},
+		{"7", "p/ds@s1\np/ds@s2\n", ""},
+		{"1G", "p/ds@s1\np/ds@s2\n", ""},
+	} {
+		tr := app.NewTest("prune", map[string]string{"PRUNE_SIZE": c.size, "NO_RANGES": "1"})
+		fakeZFS(tr, lists)
+		var gets []string
+		tr.Fake.OnFunc(getRe.MatchString, func(s string) execx.Result {
+			gets = append(gets, s)
+			var out []string
+			for n := range strings.FieldsSeq(getRe.FindStringSubmatch(s)[1]) {
+				n = strings.Trim(n, "'")
+				out = append(out, n+"\t"+since[n])
+			}
+			return execx.Out(out...)
+		})
+		if err := Run(context.Background(), tr.Runtime, []string{"p/ds"}); err != nil {
+			t.Fatal(err)
+		}
+		if tr.Out.String() != c.want {
+			t.Errorf("size %s output = %q, want %q", c.size, tr.Out.String(), c.want)
+		}
+		if len(gets) != 1 || (c.get != "" && gets[0] != c.get) {
+			t.Errorf("size %s: want one batched zfs get, got %q", c.size, gets)
+		}
+	}
+	tr := app.NewTest("prune", map[string]string{"PRUNE_SIZE": "1"})
+	fakeZFS(tr, lists)
+	tr.Fake.OnFunc(getRe.MatchString, func(string) execx.Result { return execx.Fail(1) })
+	if err := Run(context.Background(), tr.Runtime, []string{"p/ds"}); err == nil || tr.Out.String() != "" {
+		t.Errorf("failed zfs get must not select: err=%v out=%q", err, tr.Out.String())
 	}
 }
 

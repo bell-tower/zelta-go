@@ -16,6 +16,7 @@ import (
 	"github.com/bell-tower/zelta-go/internal/endpoint"
 	"github.com/bell-tower/zelta-go/internal/match"
 	"github.com/bell-tower/zelta-go/internal/units"
+	"github.com/bell-tower/zelta-go/internal/zfs"
 )
 
 // Guard modes for --prune-guard.
@@ -214,6 +215,8 @@ type Dataset struct {
 	src  *match.Dataset
 	// prune and kept are newest first.
 	prune, kept []entry
+	// eligible holds --prune-size candidates, newest first.
+	eligible []*match.Row
 }
 
 // Plan is the result of prune candidate selection.
@@ -298,6 +301,9 @@ func Build(ctx context.Context, rt *app.Runtime, args []string, dryRun bool) (*P
 				d.sendRange(set.sendRange)
 			} else {
 				d.analyze(set, p, res.Target.Dataset(p.Suffix), now)
+				if err := d.selectSize(ctx, rt, src, set.sizeBytes); err != nil {
+					return nil, err
+				}
 			}
 		}
 		plan.Datasets = append(plan.Datasets, d)
@@ -335,7 +341,6 @@ func (d *Dataset) analyze(set *settings, p *match.Pair, tgt *match.Dataset, now 
 	}
 	minAge := now - set.timeSecs
 	buckets := map[[2]int64]bool{}
-	var eligible []*match.Row
 	seen := int64(0)
 	for s := matchIdx + 1; s <= len(snaps); s++ {
 		r := snaps[s-1]
@@ -358,25 +363,105 @@ func (d *Dataset) analyze(set *settings, p *match.Pair, tgt *match.Dataset, now 
 			set.timeSet && r.Creation >= minAge:
 			keep()
 		case set.sizeBytes > 0:
-			eligible = append(eligible, r)
+			d.eligible = append(d.eligible, r)
 		default:
 			d.prune = append(d.prune, entry{r.Savepoint, r.SnapIdx})
 		}
 	}
-	// Select the oldest eligible snapshots until the estimated reclaim
-	// reaches the target size.
+}
+
+// selectSize selects the oldest eligible snapshots until destroying them
+// would free at least size bytes, or every eligible snapshot is selected.
+//
+// Destroying a run of snapshots s[a..b] frees the blocks born in the run
+// that are gone by s[b+1], the next snapshot or the live dataset:
+//
+//	freed = Σ written(s[a..b+1]) − written@s[a−1] of s[b+1]
+//
+// When s[a] is the oldest snapshot the last term is referenced(s[b+1]).
+// Otherwise one "zfs get written@s[a−1]" per run supplies it; snapshot
+// properties alone can't say how old the data that died in the run was.
+// Runs are separated by kept snapshots, so their frees add up.
+func (d *Dataset) selectSize(ctx context.Context, rt *app.Runtime, ep endpoint.Endpoint, size int64) error {
+	if len(d.eligible) == 0 {
+		return nil
+	}
+	eligible := make(map[*match.Row]bool, len(d.eligible))
+	for _, r := range d.eligible {
+		eligible[r] = true
+	}
+	// chain is every snapshot oldest first, then the live dataset.
+	var chain []*match.Row
+	for _, r := range slices.Backward(d.src.Snaps) {
+		if r.Kind == match.KindSnapshot {
+			chain = append(chain, r)
+		}
+	}
+	chain = append(chain, d.src.Row)
 	var selected []*match.Row
-	var written int64
-	for _, r := range slices.Backward(eligible) {
+	var done, run, sum int64 // finished runs, current run, Σ written of the current run
+	var base map[string]int64
+	start := -1
+	for i, r := range chain[:len(chain)-1] {
+		if !eligible[r] {
+			done, run, start = done+run, 0, -1
+			continue
+		}
+		if start < 0 {
+			start, sum, base = i, 0, nil
+			if i > 0 {
+				var err error
+				if base, err = writtenSince(ctx, rt, ep, chain[i-1], chain[i+1:], eligible); err != nil {
+					return err
+				}
+			}
+		}
 		selected = append(selected, r)
-		written += r.Written
-		if written-r.Referenced >= set.sizeBytes {
+		next := chain[i+1]
+		sum += r.Written
+		if start == 0 {
+			run = sum + next.Written - next.Referenced
+		} else {
+			w, ok := base[next.Name]
+			if !ok {
+				return app.Fail("cannot read written%s for %s", chain[start-1].Savepoint, next.Name)
+			}
+			run = sum + next.Written - w
+		}
+		if done+run >= size {
 			break
 		}
 	}
 	for _, s := range slices.Backward(selected) {
 		d.prune = append(d.prune, entry{s.Savepoint, s.SnapIdx})
 	}
+	return nil
+}
+
+// writtenSince reads "written@from" for each row in later up to and
+// including the first one that isn't eligible, the furthest a run starting
+// right after from can reach.
+func writtenSince(ctx context.Context, rt *app.Runtime, ep endpoint.Endpoint, from *match.Row, later []*match.Row, eligible map[*match.Row]bool) (map[string]int64, error) {
+	args := command.Words("get", "-Hpo", "name,value", "written"+from.Savepoint)
+	for _, r := range later {
+		args = append(args, command.Name(r.Name))
+		if !eligible[r] {
+			break
+		}
+	}
+	res := rt.Run(ctx, zfs.Command(rt, ep, zfs.RemoteDefault, args...))
+	if !res.OK() {
+		return nil, app.Fail("cannot read written%s for %s", from.Savepoint, strings.TrimSuffix(from.Name, from.Savepoint))
+	}
+	out := map[string]int64{}
+	for _, l := range res.Stdout() {
+		if f := strings.Split(l, "\t"); len(f) == 2 {
+			if n, err := strconv.ParseInt(f[1], 10, 64); err == nil {
+				out[f[0]] = n
+			}
+		}
+	}
+	return out, nil
 }
 
 // sendRange lists the selected snapshots newer than the named snapshot.
