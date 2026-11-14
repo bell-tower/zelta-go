@@ -152,7 +152,8 @@ These changes make runs faster without changing their results.
   counted anything for the oldest snapshot alone and read far too low when
   older snapshots were kept (clone origins, grid, `--prune-name`), so it
   destroyed much more than asked. A run of candidates after a kept snapshot
-  costs one `zfs get written@<kept>`.
+  costs one `zfs get written@<kept>`; on a clone, a run from its oldest
+  snapshot also reads `origin` and uses `written@<origin>`.
 - `--prune-guard` also accepts `no`, `false`, and `off` for `none`, in any case.
 - zprune's per-dataset summary keeps the full names of datasets containing
   spaces.

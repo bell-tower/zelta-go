@@ -322,13 +322,12 @@ func TestPruneSizeSelection(t *testing.T) {
 			t.Errorf("size %s: runs from the oldest snapshot need no zfs get: %v", c.size, tr.Fake.Calls)
 		}
 	}
-	lists = map[string][]row{"p/ds": dailies("p/ds", 6, 100)}
 	tr, _ := runPrune(t, map[string]string{"PRUNE_SIZE": "1G"}, lists, "p/ds")
-	if tr.Out.String() != "p/ds@d00%d05\n" {
+	if tr.Out.String() != "p/ds@s0%s3\n" {
 		t.Errorf("unreachable size selects everything eligible: %q", tr.Out.String())
 	}
 	tr, _ = runPrune(t, map[string]string{"PRUNE_SIZE": "0"}, lists, "p/ds")
-	if tr.Out.String() != "p/ds@d00%d05\n" {
+	if tr.Out.String() != "p/ds@s0%s3\n" {
 		t.Errorf("zero size = %q", tr.Out.String())
 	}
 }
@@ -381,6 +380,28 @@ func TestPruneSizeAfterKept(t *testing.T) {
 	tr.Fake.OnFunc(getRe.MatchString, func(string) execx.Result { return execx.Fail(1) })
 	if err := Run(context.Background(), tr.Runtime, []string{"p/ds"}); err == nil || tr.Out.String() != "" {
 		t.Errorf("failed zfs get must not select: err=%v out=%q", err, tr.Out.String())
+	}
+}
+
+// TestPruneSizeClone covers a clone, whose oldest snapshot also references
+// its origin's data (O, 30 bytes, alive throughout). Blocks: A (5) in s0
+// only, B (95) from s0 on, C (1) from s1 on. Destroying s0 frees A.
+func TestPruneSizeClone(t *testing.T) {
+	now := app.TestNow.Unix()
+	lists := map[string][]row{"p/ds": {
+		{name: "p/ds", guid: "1", creation: now, written: 0, referenced: 126},
+		{name: "p/ds@s1", guid: "11", creation: now - 86400, written: 1, referenced: 126},
+		{name: "p/ds@s0", guid: "10", creation: now - 2*86400, written: 100, referenced: 130},
+	}}
+	tr := app.NewTest("prune", map[string]string{"PRUNE_SIZE": "1", "NO_RANGES": "1"})
+	fakeZFS(tr, lists)
+	tr.Fake.On("zfs get -Hpo value origin 'p/ds'", execx.Out("p/base@o"))
+	tr.Fake.On("zfs get -Hpo name,value written@p/base@o 'p/ds@s1' 'p/ds'", execx.Out("p/ds\t96", "p/ds@s1\t96"))
+	if err := Run(context.Background(), tr.Runtime, []string{"p/ds"}); err != nil {
+		t.Fatal(err)
+	}
+	if tr.Out.String() != "p/ds@s0\n" {
+		t.Errorf("clone output = %q", tr.Out.String())
 	}
 }
 

@@ -378,8 +378,9 @@ func (d *Dataset) analyze(set *settings, p *match.Pair, tgt *match.Dataset, now 
 //
 //	freed = Σ written(s[a..b+1]) − written@s[a−1] of s[b+1]
 //
-// When s[a] is the oldest snapshot the last term is referenced(s[b+1]).
-// Otherwise one "zfs get written@s[a−1]" per run supplies it; snapshot
+// When s[a] is the oldest snapshot the last term is referenced(s[b+1]),
+// unless the dataset is a clone, where s[a−1] is its origin. Otherwise one
+// "zfs get written@s[a−1]" per run supplies it; snapshot
 // properties alone can't say how old the data that died in the run was.
 // Runs are separated by kept snapshots, so their frees add up.
 func (d *Dataset) selectSize(ctx context.Context, rt *app.Runtime, ep endpoint.Endpoint, size int64) error {
@@ -401,6 +402,7 @@ func (d *Dataset) selectSize(ctx context.Context, rt *app.Runtime, ep endpoint.E
 	var selected []*match.Row
 	var done, run, sum int64 // finished runs, current run, Σ written of the current run
 	var base map[string]int64
+	var from string // snapshot the current run's written@ is relative to
 	start := -1
 	for i, r := range chain[:len(chain)-1] {
 		if !eligible[r] {
@@ -408,10 +410,20 @@ func (d *Dataset) selectSize(ctx context.Context, rt *app.Runtime, ep endpoint.E
 			continue
 		}
 		if start < 0 {
-			start, sum, base = i, 0, nil
-			if i > 0 {
+			start, sum, from = i, 0, ""
+			switch {
+			case i > 0:
+				from = strings.TrimPrefix(chain[i-1].Savepoint, "@")
+			case r.Written != r.Referenced:
+				// A clone's oldest snapshot still shares its origin's data.
 				var err error
-				if base, err = writtenSince(ctx, rt, ep, chain[i-1], chain[i+1:], eligible); err != nil {
+				if from, err = origin(ctx, rt, ep, d.src.Name); err != nil {
+					return err
+				}
+			}
+			if from != "" {
+				var err error
+				if base, err = writtenSince(ctx, rt, ep, from, chain[i+1:], eligible); err != nil {
 					return err
 				}
 			}
@@ -419,12 +431,12 @@ func (d *Dataset) selectSize(ctx context.Context, rt *app.Runtime, ep endpoint.E
 		selected = append(selected, r)
 		next := chain[i+1]
 		sum += r.Written
-		if start == 0 {
+		if from == "" {
 			run = sum + next.Written - next.Referenced
 		} else {
 			w, ok := base[next.Name]
 			if !ok {
-				return app.Fail("cannot read written%s for %s", chain[start-1].Savepoint, next.Name)
+				return app.Fail("cannot read written@%s for %s", from, next.Name)
 			}
 			run = sum + next.Written - w
 		}
@@ -438,11 +450,21 @@ func (d *Dataset) selectSize(ctx context.Context, rt *app.Runtime, ep endpoint.E
 	return nil
 }
 
+// origin returns the full name of a clone's origin snapshot.
+func origin(ctx context.Context, rt *app.Runtime, ep endpoint.Endpoint, ds string) (string, error) {
+	res := rt.Run(ctx, zfs.Command(rt, ep, zfs.RemoteDefault, append(command.Words("get", "-Hpo", "value", "origin"), command.Name(ds))...))
+	if out := res.Stdout(); res.OK() && len(out) == 1 && strings.Contains(out[0], "@") {
+		return out[0], nil
+	}
+	return "", app.Fail("cannot read origin for %s", ds)
+}
+
 // writtenSince reads "written@from" for each row in later up to and
 // including the first one that isn't eligible, the furthest a run starting
-// right after from can reach.
-func writtenSince(ctx context.Context, rt *app.Runtime, ep endpoint.Endpoint, from *match.Row, later []*match.Row, eligible map[*match.Row]bool) (map[string]int64, error) {
-	args := command.Words("get", "-Hpo", "name,value", "written"+from.Savepoint)
+// right after from can reach. From is a short snapshot name or, for a
+// clone, its origin's full name.
+func writtenSince(ctx context.Context, rt *app.Runtime, ep endpoint.Endpoint, from string, later []*match.Row, eligible map[*match.Row]bool) (map[string]int64, error) {
+	args := command.Words("get", "-Hpo", "name,value", "written@"+from)
 	for _, r := range later {
 		args = append(args, command.Name(r.Name))
 		if !eligible[r] {
@@ -451,8 +473,9 @@ func writtenSince(ctx context.Context, rt *app.Runtime, ep endpoint.Endpoint, fr
 	}
 	res := rt.Run(ctx, zfs.Command(rt, ep, zfs.RemoteDefault, args...))
 	if !res.OK() {
-		return nil, app.Fail("cannot read written%s for %s", from.Savepoint, strings.TrimSuffix(from.Name, from.Savepoint))
+		return nil, app.Fail("cannot read written@%s for %s", from, later[0].Name)
 	}
+	// zfs get doesn't print in argument order.
 	out := map[string]int64{}
 	for _, l := range res.Stdout() {
 		if f := strings.Split(l, "\t"); len(f) == 2 {
