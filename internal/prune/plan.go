@@ -4,6 +4,7 @@
 package prune
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"maps"
@@ -44,6 +45,7 @@ type settings struct {
 	timeSecs  int64
 	timeSet   bool
 	grid      []gridTerm
+	gridUnion bool
 	sizeBytes int64
 	name      *regexp.Regexp
 	sendRange string
@@ -126,18 +128,40 @@ func parseSettings(o interface {
 		}
 		s.sizeBytes = b
 	}
+	switch strings.ToLower(o.Get("PRUNE_GRID_TYPE")) {
+	case "", "band", "zrepl":
+	case "union":
+		s.gridUnion = true
+	default:
+		return nil, app.Usage("invalid --prune-grid-type: %s", o.Get("PRUNE_GRID_TYPE"))
+	}
 	if grid != "" {
 		if s.grid, err = parseGrid(grid); err != nil {
 			return nil, err
+		}
+		if !s.gridUnion {
+			s.grid = bands(s.grid)
 		}
 	}
 	return s, nil
 }
 
+// bands truncates a sorted grid after its first term without a count, since
+// that band covers all remaining history.
+func bands(grid []gridTerm) []gridTerm {
+	for i, t := range grid {
+		if t.count == -1 {
+			return grid[:i+1]
+		}
+	}
+	return grid
+}
+
 var gridSpaceX = regexp.MustCompile(`[ \t]*x[ \t]*`)
 var gridSep = regexp.MustCompile(`[,|]+`)
 
-// parseGrid parses terms such as "30x1 day, 52x1 week, 1 year".
+// parseGrid parses terms such as "30x1 day, 52x1 week, 1 year", sorted by
+// interval, shortest first.
 func parseGrid(grid string) ([]gridTerm, error) {
 	var terms []gridTerm
 	for _, term := range gridSep.Split(gridSpaceX.ReplaceAllString(grid, "x"), -1) {
@@ -164,7 +188,28 @@ func parseGrid(grid string) ([]gridTerm, error) {
 		gt.interval = secs
 		terms = append(terms, gt)
 	}
+	slices.SortStableFunc(terms, func(a, b gridTerm) int { return cmp.Compare(a.interval, b.interval) })
 	return terms, nil
+}
+
+// unionKeeps is gridKeeps for --prune-grid-type=union: every term is
+// measured back from anchor, and a snapshot is kept when it is the newest
+// in a bucket of any term.
+func unionKeeps(grid []gridTerm, buckets map[[2]int64]bool, creation, anchor int64) bool {
+	age := anchor - creation
+	if age < 0 {
+		return false
+	}
+	kept := false
+	for g, t := range grid {
+		if t.count != -1 && age >= t.count*t.interval {
+			continue
+		}
+		if claim(buckets, int64(g), age/t.interval) {
+			kept = true
+		}
+	}
+	return kept
 }
 
 // gridKeeps reports whether the grid protects a snapshot created at
@@ -342,6 +387,10 @@ func (d *Dataset) analyze(set *settings, p *match.Pair, tgt *match.Dataset, now 
 	}
 	minAge := now - set.timeSecs
 	buckets := map[[2]int64]bool{}
+	keeps := gridKeeps
+	if set.gridUnion {
+		keeps = unionKeeps
+	}
 	seen := int64(0)
 	for s := matchIdx + 1; s <= len(snaps); s++ {
 		r := snaps[s-1]
@@ -359,7 +408,7 @@ func (d *Dataset) analyze(set *settings, p *match.Pair, tgt *match.Dataset, now 
 			keep()
 		case set.guard == guardUnsynced && (tgt.ByGUID(r.GUID) == nil || !tgt.HasSnapshotNamed(r.Savepoint)):
 			keep()
-		case len(set.grid) > 0 && (s == 1 || s == len(snaps) || gridKeeps(set.grid, buckets, r.Creation, anchor)),
+		case len(set.grid) > 0 && (s == 1 || s == len(snaps) || keeps(set.grid, buckets, r.Creation, anchor)),
 			set.keepSet && set.keep > 0 && seen <= set.keep,
 			set.timeSet && r.Creation >= minAge:
 			keep()

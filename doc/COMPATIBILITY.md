@@ -163,6 +163,13 @@ These changes make runs faster without changing their results.
   costs one `zfs get written@<kept>`; on a clone, a run from its oldest
   snapshot also reads `origin` and uses `written@<origin>`.
 - `--prune-guard` also accepts `no`, `false`, and `off` for `none`, in any case.
+- `--prune-grid` terms are ordered by interval, shortest first, and a term
+  without a count ends the grid. Zelta 1.2 used the written order, so
+  `1 year, 1 week, 1 day` kept only yearly snapshots; it now keeps dailies.
+  Grids already written shortest first behave as before.
+- `--prune-grid-type=band|zrepl|union` is new. `band` (alias `zrepl`) is the
+  1.x default; `union` measures every term from the anchor and keeps what
+  any term keeps.
 - zprune's per-dataset summary keeps the full names of datasets containing
   spaces.
 - `SYSTIME` drives the clock of every command (backup timestamps, report

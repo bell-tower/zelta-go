@@ -16,10 +16,12 @@ replacing the Awk implementation.
 - **Backup**: `--parallel N` replicates up to N datasets at once; one multiplexed ssh connection per host.
 - **CLI**: Per-command `--help`, embedded manual pages for `zelta help`, and shell completion for flags, datasets, snapshots, ssh hosts, and policy sites.
 - **Backup**: Ctrl+T (SIGINFO, BSD and macOS) or SIGUSR1 (any system) prints bytes sent for every stream in flight, local or remote. `ZELTA_SEND_PROGRESS` (`auto`, `1`, `0`) controls the `zfs send -v` progress reports behind it.
+- **Prune**: `--prune-grid-type=union` (and `PruneOptions.GridType`) measures every grid term from the anchor and keeps a snapshot that any term keeps. The default, `band` (alias `zrepl`), keeps the consecutive bands of Zelta 1.2; union is planned as the default for Zelta 2.
 - **API**: `PruneOptions.Approved` makes `Prune` destroy only snapshots from a reviewed plan that are still candidates; the rest are reported in `PrunePlan.Skipped`. Snapshots are matched by GUID, so planner UIs can re-run `PlanPrune` freely and then destroy exactly what they showed.
 
 ### Fixed
 - **Upstream**: Includes Zelta fixes #83 and #84.
+- **Prune**: `--prune-grid` terms are ordered by interval, so a grid written longest first (`1 year, 1 week, 1 day`) no longer keeps only the longest interval.
 - **Snapshot**: `zelta snapshot` fails when the snapshot cannot be created.
 - **Failover**: `zelta unlock` and `zelta failover` succeed on OpenZFS 2.2, which lacks `zfs mount -R`.
 - **Prune**: `--prune-size` selects exactly what `zfs destroy -nvp` frees, and any positive size selects at least one snapshot. It no longer destroys far more than asked when older snapshots are kept (clone origins, grid, `--prune-name`) or on clones.

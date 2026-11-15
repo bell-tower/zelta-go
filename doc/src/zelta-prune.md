@@ -92,9 +92,12 @@ Retention options apply within the scope selected by `--depth`, `--include`, `--
 `--prune-grid` _GRID_
 : Keep snapshots in one or more aging intervals written as [_COUNT_`x`]_INTERVAL_. For example, `30x1day, 52x1week, 1year` keeps one snapshot per day for 30 days, then one per week for 52 weeks, then one per year for all older history.
 
-Grid terms are evaluated from left to right. A term without _COUNT_ applies to all remaining history. Separate terms with commas or vertical bars. Whitespace is allowed.
+Grid terms are ordered by interval, shortest first, whatever order they are written in. A term without _COUNT_ applies to all remaining history, and any longer terms after it are ignored: `1year, 1week, 1day` keeps one snapshot per day. Separate terms with commas or vertical bars. Whitespace is allowed.
 
 Grid ages are measured backward from the latest common snapshot between _endpoint_ and the match endpoint when one exists, or from the latest snapshot or bookmark on _endpoint_ otherwise. **zelta prune** protects the newest snapshot found in each interval.
+
+`--prune-grid-type` _TYPE_
+: How grid terms combine. `band` (the default; `zrepl` is an alias) places each term after the previous one, as described above. `union` measures every term back from the same starting point and protects a snapshot that any term keeps, so `30x1day, 52x1week` keeps daily snapshots for 30 days and weekly snapshots for 52 weeks, not 30 days plus 52 weeks. Term order never matters.
 
 `--prune-num` _N_
 : Keep the newest _N_ snapshots.

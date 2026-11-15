@@ -204,6 +204,21 @@ const (
 	GuardNone GuardMode = "none"
 )
 
+// GridType is how the terms of a prune grid combine.
+type GridType string
+
+// Prune grid types.
+const (
+	// GridDefault uses the configured PRUNE_GRID_TYPE (band unless set).
+	GridDefault GridType = ""
+	// GridBand places terms in consecutive age bands, shortest interval
+	// first, as zrepl does. A term without a count ends the grid.
+	GridBand GridType = "band"
+	// GridUnion measures every term back from the anchor and keeps a
+	// snapshot that any term keeps.
+	GridUnion GridType = "union"
+)
+
 // PruneOptions configure PlanPrune and Prune. With no retention option
 // (Keep, KeepFor, Grid, Reclaim) the newest 30 snapshots and those from
 // the last 30 days are kept.
@@ -218,7 +233,8 @@ type PruneOptions struct {
 	// KeepFor keeps snapshots newer than this.
 	KeepFor time.Duration
 	// Grid is a GFS retention grid such as "30x1 day, 52x1 week, 1 year".
-	Grid string
+	Grid     string
+	GridType GridType
 	// Reclaim selects the oldest eligible snapshots until destroying them
 	// would free at least this many bytes.
 	Reclaim int64
@@ -253,6 +269,9 @@ func (o *PruneOptions) settings() map[string]string {
 	}
 	if o.Grid != "" {
 		s["PRUNE_GRID"] = o.Grid
+	}
+	if o.GridType != GridDefault {
+		s["PRUNE_GRID_TYPE"] = string(o.GridType)
 	}
 	if o.Reclaim > 0 {
 		s["PRUNE_SIZE"] = strconv.FormatInt(o.Reclaim, 10)

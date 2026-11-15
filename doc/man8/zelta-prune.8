@@ -158,8 +158,11 @@ For example, \f[CR]30x1day, 52x1week, 1year\f[R] keeps one snapshot per
 day for 30 days, then one per week for 52 weeks, then one per year for
 all older history.
 .PP
-Grid terms are evaluated from left to right.
-A term without \f[I]COUNT\f[R] applies to all remaining history.
+Grid terms are ordered by interval, shortest first, whatever order they
+are written in.
+A term without \f[I]COUNT\f[R] applies to all remaining history, and any
+longer terms after it are ignored: \f[CR]1year, 1week, 1day\f[R] keeps
+one snapshot per day.
 Separate terms with commas or vertical bars.
 Whitespace is allowed.
 .PP
@@ -168,6 +171,16 @@ Grid ages are measured backward from the latest common snapshot between
 latest snapshot or bookmark on \f[I]endpoint\f[R] otherwise.
 \f[B]zelta prune\f[R] protects the newest snapshot found in each
 interval.
+.TP
+\f[CR]\-\-prune\-grid\-type\f[R] \f[I]TYPE\f[R]
+How grid terms combine.
+\f[CR]band\f[R] (the default; \f[CR]zrepl\f[R] is an alias) places each
+term after the previous one, as described above.
+\f[CR]union\f[R] measures every term back from the same starting point
+and protects a snapshot that any term keeps, so
+\f[CR]30x1day, 52x1week\f[R] keeps daily snapshots for 30 days and
+weekly snapshots for 52 weeks, not 30 days plus 52 weeks.
+Term order never matters.
 .TP
 \f[CR]\-\-prune\-num\f[R] \f[I]N\f[R]
 Keep the newest \f[I]N\f[R] snapshots.

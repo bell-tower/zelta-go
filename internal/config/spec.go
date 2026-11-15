@@ -104,6 +104,7 @@ var (
 	syncDirections    = []string{"PULL", "PUSH", "0"}
 	pruneGuards       = []string{"latest", "unsynced", "none"}
 	pruneNames        = []string{"zfsnap", "truenas", "sanoid"}
+	pruneGridTypes    = []string{"band", "zrepl", "union"}
 	passThroughFlags  = "-b,--backup,-c,--compressed,-D,--dedup,-e,--embed,--holds,-L,--largeblock,-p,--parsable,--proctitle,--props,--raw,--skipmissing,-V,-w"
 	passThroughRecvFl = "-M,-u"
 )
@@ -203,6 +204,7 @@ var Specs = []*Spec{
 	{Verbs: []string{"prune"}, Flags: flags("--prune-time"), Key: "PRUNE_TIME", Type: Set, Arg: "DURATION", Desc: "keep snapshots newer than DURATION", Group: GroupPrune},
 	{Verbs: []string{"prune"}, Flags: flags("--prune-num"), Key: "PRUNE_NUM", Type: Set, Arg: "N", Desc: "keep the newest N snapshots older than the match", Group: GroupPrune},
 	{Verbs: []string{"prune"}, Flags: flags("--prune-grid"), Key: "PRUNE_GRID", Type: Set, Arg: "GRID", Desc: "GFS grid retention such as '30x1 day, 52x1 week, 1 year'", Group: GroupPrune},
+	{Verbs: []string{"prune"}, Flags: flags("--prune-grid-type"), Key: "PRUNE_GRID_TYPE", Type: Set, Arg: "TYPE", Desc: "grid terms as consecutive bands (band, zrepl) or overlapping from the anchor (union)", Group: GroupPrune, Values: pruneGridTypes},
 	{Verbs: []string{"prune"}, Flags: flags("--match-endpoint,--guard-endpoint,--prune-guard-endpoint"), Key: "MATCH_ENDPOINT", Type: Set, Arg: "GUARD", Desc: "endpoint used for match validation and prune-guard", Group: GroupPrune, Complete: "endpoint"},
 	{Verbs: []string{"prune"}, Flags: flags("--prune-guard"), Key: "PRUNE_GUARD", Type: Set, Arg: "MODE", Desc: "prune sync safety: latest, unsynced, or none", Group: GroupPrune, Values: pruneGuards},
 	{Verbs: []string{"prune"}, Flags: flags("--no-prune-guard"), Key: "PRUNE_GUARD", Type: Set, Value: "none", Desc: "disable match-endpoint safety checks", Group: GroupPrune},

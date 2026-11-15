@@ -224,6 +224,62 @@ func TestGridKeeps(t *testing.T) {
 	}
 }
 
+// TestGridOrder: band grids are sorted by interval and end at the first
+// term without a count, so term order never changes what is kept.
+func TestGridOrder(t *testing.T) {
+	day, week := int64(86400), int64(604800)
+	cases := []struct {
+		grid, kind string
+		want       []gridTerm
+	}{
+		{"1 year, 52x1 week, 30x1 day", "", []gridTerm{{30, day}, {52, week}, {-1, 31557600}}},
+		{"1 year, 1 week, 1 day", "zrepl", []gridTerm{{-1, day}}},
+		{"1 week, 12x1 month", "band", []gridTerm{{-1, week}}},
+		{"7x1d, 1w, 30x1d", "", []gridTerm{{7, day}, {30, day}, {-1, week}}},
+		{"1 year, 1 week, 1 day", "union", []gridTerm{{-1, day}, {-1, week}, {-1, 31557600}}},
+	}
+	for _, c := range cases {
+		s, err := parseSettings(app.NewTest("prune", map[string]string{"PRUNE_GRID": c.grid, "PRUNE_GRID_TYPE": c.kind}).Opts)
+		if err != nil || !slices.Equal(s.grid, c.want) || s.gridUnion != (c.kind == "union") {
+			t.Errorf("%q %s: grid = %+v %v", c.grid, c.kind, s.grid, err)
+		}
+	}
+}
+
+// TestUnionKeeps: union terms all start at the anchor, so weeklies stop at
+// 52 weeks where bands would run on to 30 days + 52 weeks, and each term
+// claims its own newest snapshot.
+func TestUnionKeeps(t *testing.T) {
+	day := int64(86400)
+	grid, _ := parseGrid("52x1w, 30x1d")
+	keeps := func(f func([]gridTerm, map[[2]int64]bool, int64, int64) bool, age int64) bool {
+		return f(grid, map[[2]int64]bool{}, 1000*day-age, 1000*day)
+	}
+	if !keeps(unionKeeps, 0) || !keeps(unionKeeps, 300*day) || keeps(unionKeeps, 370*day) || !keeps(gridKeeps, 370*day) {
+		t.Errorf("union reach differs from bands as expected")
+	}
+	b := map[[2]int64]bool{}
+	for _, c := range []struct {
+		age  int64
+		want bool
+	}{
+		{0, true},          // day 0 and week 0
+		{day, true},        // day bucket 1
+		{8 * day, true},    // day bucket 8 and week 1
+		{8*day + 1, false}, // both buckets taken
+		{29 * day, true},   // day bucket 29
+		{31 * day, false},  // week 4 already claimed by day 29
+		{36 * day, true},   // week 5
+		{-1, false},        // newer than the anchor
+		{363 * day, true},  // week 51, the last
+		{364 * day, false}, // beyond 52 weeks
+	} {
+		if got := unionKeeps(grid, b, 1000*day-c.age, 1000*day); got != c.want {
+			t.Errorf("age %d days: %v want %v", c.age/day, got, c.want)
+		}
+	}
+}
+
 // dailies builds n daily snapshots ending at app.TestNow, newest first.
 func dailies(ds string, n int, written int64) []row {
 	now := app.TestNow.Unix()
@@ -520,6 +576,7 @@ func TestPruneErrors(t *testing.T) {
 		{map[string]string{"PRUNE_TIME": "2 fortnights"}, []string{"p/ds"}, "invalid duration '2 fortnights'", false},
 		{map[string]string{"PRUNE_SIZE": "lots"}, []string{"p/ds"}, "invalid --prune-size: lots", true},
 		{map[string]string{"PRUNE_GRID": "ax1d"}, []string{"p/ds"}, "invalid --prune-grid term: ax1d", true},
+		{map[string]string{"PRUNE_GRID": "1d", "PRUNE_GRID_TYPE": "sieve"}, []string{"p/ds"}, "invalid --prune-grid-type: sieve", true},
 		{map[string]string{"DEPTH": "x"}, []string{"p/ds"}, "depth of 'x' invalid; must be positive", false},
 		{nil, nil, "no datasets defined", true},
 		{nil, []string{"host:"}, "invalid endpoint 'host:'", false},
