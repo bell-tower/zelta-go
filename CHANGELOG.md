@@ -23,6 +23,7 @@ replacing the Awk implementation.
 - **Snapshot**: `zelta snapshot` fails when the snapshot cannot be created.
 - **Failover**: `zelta unlock` and `zelta failover` succeed on OpenZFS 2.2, which lacks `zfs mount -R`.
 - **Prune**: `--prune-size` selects exactly what `zfs destroy -nvp` frees, and any positive size selects at least one snapshot. It no longer destroys far more than asked when older snapshots are kept (clone origins, grid, `--prune-name`) or on clones.
+- **Prune**: `--prune-size` reads `written@` only where the listing's `used` and `written` can't decide the selection, a few snapshots at a time, instead of every snapshot after a kept one. Same selection; on a 187-snapshot clone over ssh, planning dropped from about 6s to under 2s.
 
 ### Known Issues
 - **Parallel order**: With `--parallel`, datasets whose targets exist take free slots in arbitrary order, not tree order, so a small top dataset can wait behind long-running children.
