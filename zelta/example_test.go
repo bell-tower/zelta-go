@@ -60,6 +60,26 @@ func ExampleClient_PlanPrune() {
 	}
 }
 
+func ExampleClient_Prune() {
+	// A planner re-runs PlanPrune as the user edits the policy, shows the
+	// result, and destroys only what the user approved.
+	c, _ := zelta.New()
+	ctx := context.Background()
+	opts := &zelta.PruneOptions{Guard: "vault:pool/backups/home", Keep: 30}
+	seen, err := c.PlanPrune(ctx, "tank/home", opts)
+	if err != nil {
+		log.Fatal(err)
+	}
+	opts.Approved = seen
+	plan, err := c.Prune(ctx, "tank/home", opts)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, s := range plan.Skipped {
+		fmt.Println("no longer a candidate, kept:", s)
+	}
+}
+
 func ExampleWithEnvironment() {
 	// Behave like the zelta command on this host: read ZELTA_* variables
 	// and zelta.env, then override one option.

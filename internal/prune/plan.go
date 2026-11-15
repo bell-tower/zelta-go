@@ -6,6 +6,7 @@ package prune
 import (
 	"context"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -373,16 +374,21 @@ func (d *Dataset) analyze(set *settings, p *match.Pair, tgt *match.Dataset, now 
 // selectSize selects the oldest eligible snapshots until destroying them
 // would free at least size bytes, or every eligible snapshot is selected.
 //
-// Destroying a run of snapshots s[a..b] frees the blocks born in the run
+// Eligible snapshots form runs separated by kept snapshots, so the runs'
+// frees add up. Destroying a run s[a..b] frees the blocks born in the run
 // that are gone by s[b+1], the next snapshot or the live dataset:
 //
 //	freed = Σ written(s[a..b+1]) − written@s[a−1] of s[b+1]
 //
 // When s[a] is the oldest snapshot the last term is referenced(s[b+1]),
-// unless the dataset is a clone, where s[a−1] is its origin. Otherwise one
-// "zfs get written@s[a−1]" per run supplies it; snapshot
-// properties alone can't say how old the data that died in the run was.
-// Runs are separated by kept snapshots, so their frees add up.
+// unless the dataset is a clone, where s[a−1] is its origin. Otherwise it
+// takes a "zfs get written@s[a−1]": snapshot properties alone can't say how
+// much of the run's data s[b+1] still holds. The listing does bound it,
+//
+//	Σ used(s[a..b]) ≤ freed ≤ Σ written(s[a..b])
+//
+// and a single snapshot frees exactly its used, so written@ is read only
+// for the run lengths the bounds can't decide, a few at a time.
 func (d *Dataset) selectSize(ctx context.Context, rt *app.Runtime, ep endpoint.Endpoint, size int64) error {
 	if len(d.eligible) == 0 {
 		return nil
@@ -400,54 +406,119 @@ func (d *Dataset) selectSize(ctx context.Context, rt *app.Runtime, ep endpoint.E
 	}
 	chain = append(chain, d.src.Row)
 	var selected []*match.Row
-	var done, run, sum int64 // finished runs, current run, Σ written of the current run
-	var base map[string]int64
-	var from string // snapshot the current run's written@ is relative to
-	start := -1
-	for i, r := range chain[:len(chain)-1] {
-		if !eligible[r] {
-			done, run, start = done+run, 0, -1
+	var done int64
+	for a := 0; a < len(chain)-1 && done < size; a++ {
+		if !eligible[chain[a]] {
 			continue
 		}
-		if start < 0 {
-			start, sum, from = i, 0, ""
-			switch {
-			case i > 0:
-				from = strings.TrimPrefix(chain[i-1].Savepoint, "@")
-			case r.Written != r.Referenced:
-				// A clone's oldest snapshot still shares its origin's data.
-				var err error
-				if from, err = origin(ctx, rt, ep, d.src.Name); err != nil {
-					return err
-				}
-			}
-			if from != "" {
-				var err error
-				if base, err = writtenSince(ctx, rt, ep, from, chain[i+1:], eligible); err != nil {
-					return err
-				}
-			}
+		e := a
+		for eligible[chain[e+1]] {
+			e++
 		}
-		selected = append(selected, r)
-		next := chain[i+1]
-		sum += r.Written
-		if from == "" {
-			run = sum + next.Written - next.Referenced
-		} else {
-			w, ok := base[next.Name]
-			if !ok {
-				return app.Fail("cannot read written@%s for %s", from, next.Name)
-			}
-			run = sum + next.Written - w
+		r := &sizeRun{ctx: ctx, rt: rt, ep: ep, ds: d.src.Name, chain: chain, a: a, e: e}
+		n, freed, err := r.choose(size - done)
+		if err != nil {
+			return err
 		}
-		if done+run >= size {
-			break
-		}
+		selected = append(selected, chain[a:a+n]...)
+		done += freed
+		a = e
 	}
 	for _, s := range slices.Backward(selected) {
 		d.prune = append(d.prune, entry{s.Savepoint, s.SnapIdx})
 	}
 	return nil
+}
+
+// sizeRun measures a run chain[a..e] of eligible snapshots.
+type sizeRun struct {
+	ctx   context.Context
+	rt    *app.Runtime
+	ep    endpoint.Endpoint
+	ds    string
+	chain []*match.Row
+	a, e  int
+
+	from    string // snapshot written@ is relative to; "" for none
+	fromSet bool
+	base    map[string]int64 // written@from by name
+	batch   int
+}
+
+// choose returns how many of the run's oldest snapshots to destroy to free
+// need bytes, and at least how much they free (exactly, if not enough).
+func (r *sizeRun) choose(need int64) (int, int64, error) {
+	var written, used int64
+	for b := r.a; b <= r.e; b++ {
+		written += r.chain[b].Written
+		used += r.chain[b].Used
+		n := b - r.a + 1
+		if b < r.e && written < need {
+			continue
+		}
+		if used >= need {
+			return n, used, nil
+		}
+		freed, err := r.freed(b)
+		if err != nil || freed >= need || b == r.e {
+			return n, freed, err
+		}
+	}
+	return 0, 0, nil
+}
+
+// freed returns what destroying chain[a..b] frees.
+func (r *sizeRun) freed(b int) (int64, error) {
+	if b == r.a {
+		return r.chain[b].Used, nil
+	}
+	var sum int64
+	for _, s := range r.chain[r.a : b+1] {
+		sum += s.Written
+	}
+	next := r.chain[b+1]
+	base, err := r.since(b + 1)
+	return sum + next.Written - base, err
+}
+
+// since returns written@from of chain[j], reading it with the following
+// rows up to the end of the run, in batches that double.
+func (r *sizeRun) since(j int) (int64, error) {
+	if !r.fromSet {
+		r.fromSet = true
+		switch {
+		case r.a > 0:
+			r.from = strings.TrimPrefix(r.chain[r.a-1].Savepoint, "@")
+		case r.chain[r.a].Written != r.chain[r.a].Referenced:
+			// A clone's oldest snapshot still shares its origin's data.
+			var err error
+			if r.from, err = origin(r.ctx, r.rt, r.ep, r.ds); err != nil {
+				return 0, err
+			}
+		}
+	}
+	row := r.chain[j]
+	if r.from == "" {
+		return row.Referenced, nil
+	}
+	if w, ok := r.base[row.Name]; ok {
+		return w, nil
+	}
+	r.batch = max(4, 2*r.batch)
+	rows := r.chain[j:min(j+r.batch, r.e+2)]
+	got, err := writtenSince(r.ctx, r.rt, r.ep, r.from, rows)
+	if err != nil {
+		return 0, err
+	}
+	if r.base == nil {
+		r.base = map[string]int64{}
+	}
+	maps.Copy(r.base, got)
+	w, ok := r.base[row.Name]
+	if !ok {
+		return 0, app.Fail("cannot read written@%s for %s", r.from, row.Name)
+	}
+	return w, nil
 }
 
 // origin returns the full name of a clone's origin snapshot.
@@ -459,21 +530,16 @@ func origin(ctx context.Context, rt *app.Runtime, ep endpoint.Endpoint, ds strin
 	return "", app.Fail("cannot read origin for %s", ds)
 }
 
-// writtenSince reads "written@from" for each row in later up to and
-// including the first one that isn't eligible, the furthest a run starting
-// right after from can reach. From is a short snapshot name or, for a
-// clone, its origin's full name.
-func writtenSince(ctx context.Context, rt *app.Runtime, ep endpoint.Endpoint, from string, later []*match.Row, eligible map[*match.Row]bool) (map[string]int64, error) {
+// writtenSince reads "written@from" for rows. From is a short snapshot
+// name or, for a clone, its origin's full name.
+func writtenSince(ctx context.Context, rt *app.Runtime, ep endpoint.Endpoint, from string, rows []*match.Row) (map[string]int64, error) {
 	args := command.Words("get", "-Hpo", "name,value", "written@"+from)
-	for _, r := range later {
+	for _, r := range rows {
 		args = append(args, command.Name(r.Name))
-		if !eligible[r] {
-			break
-		}
 	}
 	res := rt.Run(ctx, zfs.Command(rt, ep, zfs.RemoteDefault, args...))
 	if !res.OK() {
-		return nil, app.Fail("cannot read written@%s for %s", from, later[0].Name)
+		return nil, app.Fail("cannot read written@%s for %s", from, rows[0].Name)
 	}
 	// zfs get doesn't print in argument order.
 	out := map[string]int64{}
@@ -538,6 +604,54 @@ func savepoints(list []entry) []string {
 		out = append(out, l.savepoint)
 	}
 	return out
+}
+
+// guids maps each of the dataset's snapshots ("@name") to its GUID.
+func (d *Dataset) guids() map[string]string {
+	out := map[string]string{}
+	if d.src != nil {
+		for _, r := range d.src.Snaps {
+			if r.Kind == match.KindSnapshot {
+				out[r.Savepoint] = r.GUID
+			}
+		}
+	}
+	return out
+}
+
+// SelectedGUIDs maps each selected snapshot ("pool/ds@name") to its GUID.
+func (p *Plan) SelectedGUIDs() map[string]string {
+	out := map[string]string{}
+	for _, d := range p.Datasets {
+		g := d.guids()
+		for _, e := range d.prune {
+			out[d.Name+e.savepoint] = g[e.savepoint]
+		}
+	}
+	return out
+}
+
+// Restrict keeps only the selected snapshots that are approved: approved
+// maps "pool/ds@name" to the GUID the approver saw, so a snapshot that was
+// replaced under the same name is not approved. Ranges are rebuilt from
+// this plan's listing, so an unapproved snapshot inside an approved range
+// splits it. Restrict returns the approved snapshots it doesn't select,
+// sorted.
+func (p *Plan) Restrict(approved map[string]string) []string {
+	left := maps.Clone(approved)
+	for _, d := range p.Datasets {
+		g := d.guids()
+		var keep []entry
+		for _, e := range d.prune {
+			name := d.Name + e.savepoint
+			if guid, ok := approved[name]; ok && guid != "" && guid == g[e.savepoint] {
+				keep = append(keep, e)
+				delete(left, name)
+			}
+		}
+		d.prune = keep
+	}
+	return slices.Sorted(maps.Keys(left))
 }
 
 // Candidates returns the snapshots or ranges to destroy, one per line, in

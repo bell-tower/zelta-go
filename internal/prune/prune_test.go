@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -17,6 +18,7 @@ type row struct {
 	name                          string
 	guid                          string
 	written, creation, referenced int64
+	used                          int64
 	clones                        string
 }
 
@@ -44,6 +46,8 @@ func fakeZFS(tr *app.TestRuntime, lists map[string][]row) {
 					cells = append(cells, fmt.Sprint(r.written))
 				case "creation":
 					cells = append(cells, fmt.Sprint(r.creation))
+				case "used":
+					cells = append(cells, fmt.Sprint(r.used))
 				case "referenced":
 					cells = append(cells, fmt.Sprint(r.referenced))
 				case "clones":
@@ -297,7 +301,7 @@ func sizeFixture() map[string][]row {
 	return map[string][]row{"p/ds": {
 		r("p/ds", 0, 0, 0),
 		r("p/ds@s3", 1, 0, 20),
-		r("p/ds@s2", 2, 5, 25),
+		{name: "p/ds@s2", guid: "102", creation: now - 2*86400, written: 5, referenced: 25, used: 5},
 		r("p/ds@s1", 3, 20, 30),
 		r("p/ds@s0", 4, 10, 10),
 	}}
@@ -342,16 +346,16 @@ func TestPruneSizeAfterKept(t *testing.T) {
 	lists := map[string][]row{"p/ds": {
 		{name: "p/ds", guid: "1", creation: now, written: 0, referenced: 97},
 		{name: "p/ds@s2", guid: "12", creation: now - 86400, written: 7, referenced: 101},
-		{name: "p/ds@s1", guid: "11", creation: now - 2*86400, written: 10, referenced: 110},
+		{name: "p/ds@s1", guid: "11", creation: now - 2*86400, written: 10, referenced: 110, used: 6},
 		{name: "p/ds@s0", guid: "10", creation: now - 3*86400, written: 100, referenced: 100, clones: "p/clone"},
 	}}
 	since := map[string]string{"p/ds@s2": "11", "p/ds": "7"}
 	getRe := regexp.MustCompile(`^zfs get -Hpo name,value written@s0 (.*)$`)
 	for _, c := range []struct{ size, want, get string }{
-		{"1", "p/ds@s1\n", "zfs get -Hpo name,value written@s0 'p/ds@s2' 'p/ds'"},
+		{"1", "p/ds@s1\n", ""}, // s1 alone frees its used
 		{"6", "p/ds@s1\n", ""},
-		{"7", "p/ds@s1\np/ds@s2\n", ""},
-		{"1G", "p/ds@s1\np/ds@s2\n", ""},
+		{"7", "p/ds@s1\np/ds@s2\n", "zfs get -Hpo name,value written@s0 'p/ds'"},
+		{"1G", "p/ds@s1\np/ds@s2\n", "zfs get -Hpo name,value written@s0 'p/ds'"},
 	} {
 		tr := app.NewTest("prune", map[string]string{"PRUNE_SIZE": c.size, "NO_RANGES": "1"})
 		fakeZFS(tr, lists)
@@ -371,15 +375,62 @@ func TestPruneSizeAfterKept(t *testing.T) {
 		if tr.Out.String() != c.want {
 			t.Errorf("size %s output = %q, want %q", c.size, tr.Out.String(), c.want)
 		}
-		if len(gets) != 1 || (c.get != "" && gets[0] != c.get) {
-			t.Errorf("size %s: want one batched zfs get, got %q", c.size, gets)
+		if want := []string{c.get}; c.get == "" && len(gets) != 0 || c.get != "" && !slices.Equal(gets, want) {
+			t.Errorf("size %s: zfs get = %q, want %q", c.size, gets, c.get)
 		}
 	}
-	tr := app.NewTest("prune", map[string]string{"PRUNE_SIZE": "1"})
+	tr := app.NewTest("prune", map[string]string{"PRUNE_SIZE": "7"})
 	fakeZFS(tr, lists)
 	tr.Fake.OnFunc(getRe.MatchString, func(string) execx.Result { return execx.Fail(1) })
 	if err := Run(context.Background(), tr.Runtime, []string{"p/ds"}); err == nil || tr.Out.String() != "" {
 		t.Errorf("failed zfs get must not select: err=%v out=%q", err, tr.Out.String())
+	}
+}
+
+// TestPruneSizeLongRun covers a long run after a kept snapshot where every
+// block lives in two snapshots, so used is 0 and only written@ can tell.
+// Destroying s1..sb frees 10(b−1) bytes; reading the 40 written@ values
+// it doesn't need would cost a deadlist walk each.
+func TestPruneSizeLongRun(t *testing.T) {
+	now := app.TestNow.Unix()
+	rows := []row{{name: "p/ds", guid: "1", creation: now}}
+	since := map[string]string{"p/ds": "10", "p/ds@s1": "10"}
+	for i := 40; i >= 1; i-- {
+		name := fmt.Sprintf("p/ds@s%d", i)
+		rows = append(rows, row{name: name, guid: fmt.Sprint(100 + i), creation: now - int64(41-i)*3600, written: 10, referenced: 120})
+		if i > 1 {
+			since[name] = "20"
+		}
+	}
+	rows = append(rows, row{name: "p/ds@s0", guid: "100", creation: now - 41*3600, written: 100, referenced: 100, clones: "p/clone"})
+	getRe := regexp.MustCompile(`^zfs get -Hpo name,value written@s0 (.*)$`)
+	for _, c := range []struct {
+		size  string
+		last  int // newest selected snapshot
+		reads int // written@ values read
+	}{
+		{"25", 4, 4},
+		{"1G", 40, 1}, // Σ written never reaches it: only the run's total
+	} {
+		tr := app.NewTest("prune", map[string]string{"PRUNE_SIZE": c.size, "NO_RANGES": "1"})
+		fakeZFS(tr, map[string][]row{"p/ds": rows})
+		reads := 0
+		tr.Fake.OnFunc(getRe.MatchString, func(s string) execx.Result {
+			var out []string
+			for n := range strings.FieldsSeq(getRe.FindStringSubmatch(s)[1]) {
+				n = strings.Trim(n, "'")
+				out = append(out, n+"\t"+since[n])
+				reads++
+			}
+			return execx.Out(out...)
+		})
+		if err := Run(context.Background(), tr.Runtime, []string{"p/ds"}); err != nil {
+			t.Fatal(err)
+		}
+		lines := strings.Split(strings.TrimSpace(tr.Out.String()), "\n")
+		if len(lines) != c.last || lines[len(lines)-1] != fmt.Sprintf("p/ds@s%d", c.last) || reads != c.reads {
+			t.Errorf("size %s: selected %d (last %q), read %d written@ values, want %d and %d", c.size, len(lines), lines[len(lines)-1], reads, c.last, c.reads)
+		}
 	}
 }
 
@@ -391,17 +442,25 @@ func TestPruneSizeClone(t *testing.T) {
 	lists := map[string][]row{"p/ds": {
 		{name: "p/ds", guid: "1", creation: now, written: 0, referenced: 126},
 		{name: "p/ds@s1", guid: "11", creation: now - 86400, written: 1, referenced: 126},
-		{name: "p/ds@s0", guid: "10", creation: now - 2*86400, written: 100, referenced: 130},
+		{name: "p/ds@s0", guid: "10", creation: now - 2*86400, written: 100, referenced: 130, used: 5},
 	}}
-	tr := app.NewTest("prune", map[string]string{"PRUNE_SIZE": "1", "NO_RANGES": "1"})
-	fakeZFS(tr, lists)
-	tr.Fake.On("zfs get -Hpo value origin 'p/ds'", execx.Out("p/base@o"))
-	tr.Fake.On("zfs get -Hpo name,value written@p/base@o 'p/ds@s1' 'p/ds'", execx.Out("p/ds\t96", "p/ds@s1\t96"))
-	if err := Run(context.Background(), tr.Runtime, []string{"p/ds"}); err != nil {
-		t.Fatal(err)
-	}
-	if tr.Out.String() != "p/ds@s0\n" {
-		t.Errorf("clone output = %q", tr.Out.String())
+	for _, c := range []struct {
+		size, want string
+		calls      int
+	}{
+		{"1", "p/ds@s0\n", 1},          // s0 alone frees its used: no zfs get
+		{"6", "p/ds@s0\np/ds@s1\n", 3}, // s0–s1 needs written@ of the origin
+	} {
+		tr := app.NewTest("prune", map[string]string{"PRUNE_SIZE": c.size, "NO_RANGES": "1"})
+		fakeZFS(tr, lists)
+		tr.Fake.On("zfs get -Hpo value origin 'p/ds'", execx.Out("p/base@o"))
+		tr.Fake.On("zfs get -Hpo name,value written@p/base@o 'p/ds'", execx.Out("p/ds\t96"))
+		if err := Run(context.Background(), tr.Runtime, []string{"p/ds"}); err != nil {
+			t.Fatal(err)
+		}
+		if tr.Out.String() != c.want || len(tr.Fake.Calls) != c.calls {
+			t.Errorf("clone size %s output = %q, calls %q", c.size, tr.Out.String(), tr.Fake.Calls)
+		}
 	}
 }
 

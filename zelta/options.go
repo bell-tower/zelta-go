@@ -225,6 +225,12 @@ type PruneOptions struct {
 	// Name limits pruning to snapshots matching a glob, or one of
 	// "zfsnap", "truenas", or "sanoid".
 	Name string
+	// Approved, if set, is a plan the user reviewed, from an earlier
+	// PlanPrune. The fresh plan then selects only snapshots that are in both
+	// plans, so Prune never destroys a snapshot the user didn't see; the
+	// approved snapshots it drops are listed in PrunePlan.Skipped. Remove
+	// entries from Approved.Datasets[].Destroy to approve fewer snapshots.
+	Approved *PrunePlan
 	// DryRun, for Prune, logs the destroy commands without running them.
 	DryRun   bool
 	Settings map[string]string
