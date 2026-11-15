@@ -3,11 +3,11 @@
 *Development line: 1.3.0-dev, the planned Zelta 1.3 and successor to the Awk release*
 
 ---
-> **Experimental.** zelta-go is used in production, but it should be considered experimental until it reaches feature parity with [Zelta 1.2.0](https://github.com/bell-tower/zelta). Known differences are listed in [doc/COMPATIBILITY.md](doc/COMPATIBILITY.md).
+> **Alpha.** zelta-go is pre-beta. Commands, output, and the Go API can still change without notice. For production backups, use [Zelta 1.2 (Awk)](https://github.com/bell-tower/zelta), the current stable release. When zelta-go reaches beta, it moves into the main Zelta repository as Zelta 1.3. Known differences from 1.2 are listed in [doc/COMPATIBILITY.md](doc/COMPATIBILITY.md).
 >
 > - **What's New:** Check [CHANGELOG.md](CHANGELOG.md) for the latest changes
 > - **Found a Bug?** Please [open an issue](https://github.com/bell-tower/zelta-go/issues)
-> - **Stable Release:** [Zelta 1.2.0 (Awk)](https://github.com/bell-tower/zelta)
+> - **Stable Release:** [Zelta 1.2 (Awk)](https://github.com/bell-tower/zelta)
 >
 >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  ![CI](https://github.com/bell-tower/zelta-go/actions/workflows/ci.yml/badge.svg)
 ---
