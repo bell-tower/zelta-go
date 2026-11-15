@@ -16,6 +16,7 @@ replacing the Awk implementation.
 - **Backup**: `--parallel N` replicates up to N datasets at once; one multiplexed ssh connection per host.
 - **CLI**: Per-command `--help`, embedded manual pages for `zelta help`, and shell completion for flags, datasets, snapshots, ssh hosts, and policy sites.
 - **Backup**: Ctrl+T (SIGINFO, BSD and macOS) or SIGUSR1 (any system) prints bytes sent for every stream in flight, local or remote. `ZELTA_SEND_PROGRESS` (`auto`, `1`, `0`) controls the `zfs send -v` progress reports behind it.
+- **API**: `PruneOptions.Approved` makes `Prune` destroy only snapshots from a reviewed plan that are still candidates; the rest are reported in `PrunePlan.Skipped`. Snapshots are matched by GUID, so planner UIs can re-run `PlanPrune` freely and then destroy exactly what they showed.
 
 ### Fixed
 - **Upstream**: Includes Zelta fixes #83 and #84.

@@ -167,6 +167,39 @@ func TestPrune(t *testing.T) {
 	}
 }
 
+func TestPruneApproved(t *testing.T) {
+	ctx := context.Background()
+	trees := pruneTrees()
+	f := fakeZFS(trees)
+	f.On("zfs destroy 'apool/src@s1%s3'", execx.Out())
+	c, rec := newClient(t, f)
+	opts := &PruneOptions{Guard: "bpool/tgt", Keep: 1}
+	seen, err := c.PlanPrune(ctx, "apool/src", opts)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, rec)
+	}
+
+	// The guard catches up, so a fresh plan also selects @s4; the user
+	// never saw that, so only @s1..@s3 are destroyed.
+	trees["bpool/tgt"] = append([]snap{{"@s6", "106", 0, trees["apool/src"][0].creation}}, trees["bpool/tgt"]...)
+	plan, err := c.Prune(ctx, "apool/src", &PruneOptions{Guard: "bpool/tgt", Keep: 1, Approved: seen})
+	if err != nil || len(plan.Skipped) != 0 || !reflect.DeepEqual(mutations(f), []string{"zfs destroy 'apool/src@s1%s3'"}) {
+		t.Errorf("shifted window: %v %+v %q\n%s", err, plan, mutations(f), rec)
+	}
+
+	// The user unchecks @s2 and @s1 is replaced under the same name: only
+	// @s3 is destroyed, and the replaced @s1 is reported.
+	f = fakeZFS(trees)
+	f.On("zfs destroy 'apool/src@s3'", execx.Out())
+	c, _ = newClient(t, f)
+	seen.Datasets[0].Destroy = []string{"@s1", "@s3", "@bogus"}
+	trees["apool/src"][5].guid = "999"
+	plan, err = c.Prune(ctx, "apool/src", &PruneOptions{Guard: "bpool/tgt", Keep: 1, Approved: seen})
+	if err != nil || !reflect.DeepEqual(plan.Skipped, []string{"apool/src@s1"}) || !reflect.DeepEqual(mutations(f), []string{"zfs destroy 'apool/src@s3'"}) {
+		t.Errorf("trimmed: %v %+v %q", err, plan, mutations(f))
+	}
+}
+
 func TestLockFailoverPropsync(t *testing.T) {
 	ctx := context.Background()
 	f := execx.NewFake()

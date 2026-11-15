@@ -6,6 +6,7 @@ package prune
 import (
 	"context"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -538,6 +539,54 @@ func savepoints(list []entry) []string {
 		out = append(out, l.savepoint)
 	}
 	return out
+}
+
+// guids maps each of the dataset's snapshots ("@name") to its GUID.
+func (d *Dataset) guids() map[string]string {
+	out := map[string]string{}
+	if d.src != nil {
+		for _, r := range d.src.Snaps {
+			if r.Kind == match.KindSnapshot {
+				out[r.Savepoint] = r.GUID
+			}
+		}
+	}
+	return out
+}
+
+// SelectedGUIDs maps each selected snapshot ("pool/ds@name") to its GUID.
+func (p *Plan) SelectedGUIDs() map[string]string {
+	out := map[string]string{}
+	for _, d := range p.Datasets {
+		g := d.guids()
+		for _, e := range d.prune {
+			out[d.Name+e.savepoint] = g[e.savepoint]
+		}
+	}
+	return out
+}
+
+// Restrict keeps only the selected snapshots that are approved: approved
+// maps "pool/ds@name" to the GUID the approver saw, so a snapshot that was
+// replaced under the same name is not approved. Ranges are rebuilt from
+// this plan's listing, so an unapproved snapshot inside an approved range
+// splits it. Restrict returns the approved snapshots it doesn't select,
+// sorted.
+func (p *Plan) Restrict(approved map[string]string) []string {
+	left := maps.Clone(approved)
+	for _, d := range p.Datasets {
+		g := d.guids()
+		var keep []entry
+		for _, e := range d.prune {
+			name := d.Name + e.savepoint
+			if guid, ok := approved[name]; ok && guid != "" && guid == g[e.savepoint] {
+				keep = append(keep, e)
+				delete(left, name)
+			}
+		}
+		d.prune = keep
+	}
+	return slices.Sorted(maps.Keys(left))
 }
 
 // Candidates returns the snapshots or ranges to destroy, one per line, in
