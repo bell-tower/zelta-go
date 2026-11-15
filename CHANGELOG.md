@@ -15,9 +15,14 @@ replacing the Awk implementation.
 ### Added
 - **Backup**: `--parallel N` replicates up to N datasets at once; one multiplexed ssh connection per host.
 - **CLI**: Per-command `--help`, embedded manual pages for `zelta help`, and shell completion for flags, datasets, snapshots, ssh hosts, and policy sites.
+- **Backup**: Ctrl+T (SIGINFO, BSD and macOS) or SIGUSR1 (any system) prints bytes sent for every stream in flight, local or remote. `ZELTA_SEND_PROGRESS` (`auto`, `1`, `0`) controls the `zfs send -v` progress reports behind it.
 
 ### Fixed
 - **Upstream**: Includes Zelta fixes #83 and #84.
 - **Snapshot**: `zelta snapshot` fails when the snapshot cannot be created.
 - **Failover**: `zelta unlock` and `zelta failover` succeed on OpenZFS 2.2, which lacks `zfs mount -R`.
 - **Prune**: `--prune-size` selects exactly what `zfs destroy -nvp` frees, and any positive size selects at least one snapshot. It no longer destroys far more than asked when older snapshots are kept (clone origins, grid, `--prune-name`) or on clones.
+
+### Known Issues
+- **Parallel order**: With `--parallel`, datasets whose targets exist take free slots in arbitrary order, not tree order, so a small top dataset can wait behind long-running children.
+- **Interrupted sync message**: Interrupting a sync (SIGINT) reports `sync command failed before receiving stream` even when data was received and a resume token was saved; the next run resumes normally.
