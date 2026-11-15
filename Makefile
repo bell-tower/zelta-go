@@ -7,7 +7,8 @@
 #   make integration  end-to-end tests on temporary file-backed pools (root)
 #   make shellspec  the Zelta ShellSpec compatibility suite, local and
 #                   through fake remote hosts (root)
-#   make install    install to PREFIX (DESTDIR supported)
+#   make install    install to PREFIX (DESTDIR supported); non-root
+#                   without PREFIX or DESTDIR uses the install.sh user layout
 
 PREFIX     ?= /usr/local
 BINDIR     ?= $(PREFIX)/bin
@@ -21,7 +22,7 @@ GOFLAGS    ?= -trimpath
 STATICCHECK ?= honnef.co/go/tools/cmd/staticcheck@2026.2.2
 GOPLS      ?= golang.org/x/tools/gopls@v0.23.0
 
-.PHONY: all build test cover lint vet fmt integration shellspec install uninstall clean completions
+.PHONY: all build test cover lint vet fmt integration shellspec install uninstall install-prefix uninstall-prefix clean completions
 
 all: build
 
@@ -65,7 +66,23 @@ completions: build
 	bin/zelta completion zsh > build/completions/_zelta
 	bin/zelta completion fish > build/completions/zelta.fish
 
+# Non-root installs without PREFIX or DESTDIR use install.sh's user layout
+# (~/bin, ~/.local/share/zelta, ~/.config/zelta), matching Zelta Awk.
 install: build completions
+	@if [ -z "$(DESTDIR)" ] && [ "$(PREFIX)" = /usr/local ] && [ "$$(id -u)" -ne 0 ]; then \
+		ZELTA_BINARY=bin/zelta ./install.sh; \
+	else \
+		$(MAKE) install-prefix; \
+	fi
+
+uninstall:
+	@if [ -z "$(DESTDIR)" ] && [ "$(PREFIX)" = /usr/local ] && [ "$$(id -u)" -ne 0 ]; then \
+		./uninstall.sh home env; \
+	else \
+		$(MAKE) uninstall-prefix; \
+	fi
+
+install-prefix:
 	install -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(MANDIR)/man7 $(DESTDIR)$(MANDIR)/man8 $(DESTDIR)$(ETCDIR) $(DESTDIR)$(SHAREDIR)/completions
 	install -m 755 bin/zelta $(DESTDIR)$(BINDIR)/zelta
 	ln -sf zelta $(DESTDIR)$(BINDIR)/zprune
@@ -75,7 +92,7 @@ install: build completions
 	install -m 644 zelta.env $(DESTDIR)$(ETCDIR)/zelta.env.example
 	install -m 644 zelta.conf $(DESTDIR)$(ETCDIR)/zelta.conf.example
 
-uninstall:
+uninstall-prefix:
 	rm -f $(DESTDIR)$(BINDIR)/zelta $(DESTDIR)$(BINDIR)/zprune
 	rm -f $(DESTDIR)$(MANDIR)/man7/zelta*.7 $(DESTDIR)$(MANDIR)/man8/zelta*.8 $(DESTDIR)$(MANDIR)/man8/zprune.8
 	rm -rf $(DESTDIR)$(SHAREDIR)
