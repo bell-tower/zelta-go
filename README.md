@@ -16,9 +16,9 @@
 
 **Zelta** provides bulletproof backups that meet strict compliance requirements while remaining straightforward to deploy and operate. It transforms complex backup and recovery operations into safe, auditable commands—protecting your data without requiring specialized expertise.
 
-Zelta orchestrates backup operations across any modern Unix system. It has been battle-tested in production for over six years, managing tens of millions of snapshots across thousands of systems—with zero package dependencies.
+Zelta orchestrates backup operations across any modern Unix system. Its Awk implementation has been battle-tested in production for over six years, managing tens of millions of snapshots across thousands of systems. zelta-go keeps that footprint: one static binary with no runtime dependencies.
 
-zelta-go is a drop-in replacement for the original Awk implementation. It accepts the same commands, flags, `ZELTA_*` environment variables, `zelta.env`, and `zelta.conf`, prints the same output, and returns the same exit codes.
+zelta-go is a drop-in replacement for the original Awk implementation. It accepts the same commands, flags, `ZELTA_*` environment variables, `zelta.env`, and `zelta.conf`, prints the same output, and returns the same exit codes, except for the intentional differences listed in [doc/COMPATIBILITY.md](doc/COMPATIBILITY.md).
 
 > **Zelta requires ZFS.** If ZFS isn't yet part of your workflow, it's easier than ever to improve your infrastructure with ZFS and Zelta. See [Getting Started with ZFS](https://zelta.space/conf/zfs) to begin.
 
@@ -30,7 +30,7 @@ zelta-go is a drop-in replacement for the original Awk implementation. It accept
 Zelta preserves every version of your data without destructive overwrites. When source and backup diverge, Zelta keeps both versions intact. Your team is already telling auditors you do this—Zelta makes it practical and verifiable.
 
 ### Safe Defaults, No Surprises
-Backups are created read-only. Dangerous operations are rejected, not just discouraged. Zelta has no destructive features and never requires force flags to function correctly.
+Backups are created read-only. Dangerous operations are rejected, not just discouraged. Core commands never destroy data and never require force flags to function correctly. Snapshot destruction lives in the separate `zprune` command, and `zfs recv -F` is only passed through when you ask for it explicitly.
 
 ### Zero Footprint on Endpoints
 Zelta runs entirely from a management host using SSH. Your backup sources and targets need only standard system tools—no agents, no daemons, no additional attack surface.
