@@ -16,9 +16,9 @@
 
 **Zelta** provides bulletproof backups that meet strict compliance requirements while remaining straightforward to deploy and operate. It transforms complex backup and recovery operations into safe, auditable commands—protecting your data without requiring specialized expertise.
 
-Zelta orchestrates backup operations across any modern Unix system. Its Awk implementation has been battle-tested in production for over six years, managing tens of millions of snapshots across thousands of systems. zelta-go keeps that footprint: one static binary with no runtime dependencies.
+Zelta orchestrates backup operations across any modern Unix system. It has been battle-tested in production for over six years, managing tens of millions of snapshots across thousands of systems—with zero runtime dependencies.
 
-zelta-go is a drop-in replacement for the original Awk implementation. It accepts the same commands, flags, `ZELTA_*` environment variables, `zelta.env`, and `zelta.conf`, prints the same output, and returns the same exit codes, except for the intentional differences listed in [doc/COMPATIBILITY.md](doc/COMPATIBILITY.md).
+zelta-go is a drop-in replacement for the original Awk implementation. It accepts the same commands, flags, `ZELTA_*` environment variables, `zelta.env`, and `zelta.conf`, prints the same output, and returns the same exit codes.
 
 > **Zelta requires ZFS.** If ZFS isn't yet part of your workflow, it's easier than ever to improve your infrastructure with ZFS and Zelta. See [Getting Started with ZFS](https://zelta.space/conf/zfs) to begin.
 
