@@ -16,8 +16,8 @@ MANDIR     ?= $(PREFIX)/man
 ETCDIR     ?= $(PREFIX)/etc/zelta
 SHAREDIR   ?= $(PREFIX)/share/zelta
 GO         ?= go
-VERSION    != (git describe --tags 2>/dev/null || echo 1.3.0-dev) | sed 's/^v//'
-LDFLAGS    = -s -w -X github.com/bell-tower/zelta-go/internal/version.Version=$(VERSION)
+VERSION    ?=
+LDFLAGS    = -s -w
 GOFLAGS    ?= -trimpath
 STATICCHECK ?= honnef.co/go/tools/cmd/staticcheck@2026.2.2
 GOPLS      ?= golang.org/x/tools/gopls@v0.23.0
@@ -28,7 +28,9 @@ all: build
 
 build:
 	@mkdir -p bin
-	CGO_ENABLED=0 $(GO) build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o bin/zelta ./cmd/zelta
+	@v='$(VERSION)'; [ -n "$$v" ] || v=$$(git describe --tags 2>/dev/null || echo 1.3.0-dev); v=$${v#v}; \
+	echo "building zelta $$v"; \
+	CGO_ENABLED=0 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS) -X github.com/bell-tower/zelta-go/internal/version.Version=$$v" -o bin/zelta ./cmd/zelta
 	@ln -sf zelta bin/zprune
 
 test:
