@@ -211,8 +211,9 @@ func fit(text string, width int) string {
 }
 
 // bars draws one line per dataset, all at the same snapshots per cell,
-// starting from the first dataset. It also returns the snapshots per cell.
-func bars(s style, rs []row, first, width, height int) ([]string, float64) {
+// starting from the first dataset, with the selected one's name
+// highlighted. It also returns the snapshots per cell.
+func bars(s style, rs []row, first, sel, width, height int) ([]string, float64) {
 	nameW := 0
 	maxN := 0
 	for _, r := range rs {
@@ -232,7 +233,11 @@ func bars(s style, rs []row, first, width, height int) ([]string, float64) {
 	for i := first; i < len(rs) && len(out) < height; i++ {
 		r := rs[i]
 		var l line
-		l.add(s, "", fit(r.name, nameW))
+		code := ""
+		if i == sel {
+			code = "7"
+		}
+		l.add(s, code, fit(r.name, nameW))
 		l.pad(nameW)
 		l.add(s, "", fmt.Sprintf(" %*d", d, r.doomed))
 		l.add(s, "2", fmt.Sprintf(" / %-*d ", d, len(r.v)))

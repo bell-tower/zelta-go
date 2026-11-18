@@ -92,6 +92,10 @@ type app struct {
 	endpoint, guard string
 	fields          []field
 	focus, scroll   int
+	// sel is the selected dataset row, or -1 while editing fields; zoom
+	// shows it alone. page is how many rows the last view showed.
+	sel, page int
+	zoom      bool
 
 	gen, planGen int
 	busy         bool
@@ -127,7 +131,7 @@ func (a *app) print() int {
 		return 1
 	}
 	st := style{color: false}
-	lines, per := bars(st, p.rows, 0, 80, len(p.rows))
+	lines, per := bars(st, p.rows, 0, -1, 80, len(p.rows))
 	if per > 1.05 {
 		fmt.Printf("# each cell is about %.3g snapshots\n", per)
 	}
@@ -165,6 +169,7 @@ func (a *app) interactive() int {
 		debounce.Reset(300 * time.Millisecond)
 	}
 
+	a.sel = -1
 	print := false
 loop:
 	for {
@@ -180,7 +185,9 @@ loop:
 				a.err, a.planGen = r.err, r.gen
 				if r.err == nil {
 					a.rows, a.empty = r.rows, r.empty
-					a.scroll = min(a.scroll, max(0, len(a.rows)-1))
+					if a.sel >= len(a.rows) || len(a.rows) < 2 {
+						a.sel, a.zoom = -1, false
+					}
 				}
 			} else {
 				start()
@@ -219,15 +226,26 @@ const (
 )
 
 func (a *app) key(k string) action {
-	f := &a.fields[a.focus]
 	switch k {
-	case kInterrupt, kEsc:
+	case kInterrupt:
 		return actQuit
 	case kEnter:
 		return actPrint
+	}
+	if a.sel >= 0 {
+		return a.datasetKey(k)
+	}
+	f := &a.fields[a.focus]
+	switch k {
+	case kEsc:
+		return actQuit
 	case kUp, kBackTab:
 		a.focus = (a.focus + len(a.fields) - 1) % len(a.fields)
 	case kDown, kTab:
+		if a.focus == len(a.fields)-1 && len(a.rows) > 1 {
+			a.sel = a.scroll
+			return actNone
+		}
 		a.focus = (a.focus + 1) % len(a.fields)
 	case kLeft, kRight:
 		if len(f.presets) == 0 {
@@ -241,9 +259,9 @@ func (a *app) key(k string) action {
 		f.val = f.presets[(i+step)%len(f.presets)]
 		return actReplan
 	case kPgUp:
-		a.scroll = max(0, a.scroll-10)
+		a.scroll = max(0, a.scroll-a.page)
 	case kPgDn:
-		a.scroll = min(max(0, len(a.rows)-1), a.scroll+10)
+		a.scroll += a.page
 	case kBack:
 		if f.cycleOnly || f.val == "" {
 			return actNone
@@ -263,6 +281,37 @@ func (a *app) key(k string) action {
 		}
 		f.val += k
 		return actReplan
+	}
+	return actNone
+}
+
+// datasetKey moves through the dataset rows below the fields.
+func (a *app) datasetKey(k string) action {
+	switch k {
+	case kEsc, kLeft:
+		if !a.zoom {
+			if k == kEsc {
+				return actQuit
+			}
+			return actNone
+		}
+		a.zoom = false
+	case kRight, " ":
+		a.zoom = true
+	case kTab, kBackTab:
+		a.sel, a.zoom = -1, false
+	case kUp:
+		if a.sel == 0 {
+			a.sel, a.zoom = -1, false
+		} else {
+			a.sel--
+		}
+	case kDown:
+		a.sel = min(a.sel+1, len(a.rows)-1)
+	case kPgUp:
+		a.sel = max(0, a.sel-a.page)
+	case kPgDn:
+		a.sel = min(len(a.rows)-1, a.sel+a.page)
 	}
 	return actNone
 }

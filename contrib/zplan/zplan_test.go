@@ -123,3 +123,28 @@ func TestSize(t *testing.T) {
 		}
 	}
 }
+
+func TestDatasetKeys(t *testing.T) {
+	a := &app{fields: newFields(""), rows: make([]row, 3), sel: -1, page: 2}
+	a.focus = len(a.fields) - 1
+	a.key(kDown)
+	if a.sel != 0 {
+		t.Fatalf("down from the last field: sel %d", a.sel)
+	}
+	a.key(kRight)
+	a.key(kDown)
+	if !a.zoom || a.sel != 1 {
+		t.Errorf("zoomed down: zoom %v sel %d", a.zoom, a.sel)
+	}
+	if a.key(kEsc) != actNone || a.zoom {
+		t.Errorf("esc should unzoom first")
+	}
+	a.key(kUp)
+	a.key(kUp)
+	if a.sel != -1 || a.focus != len(a.fields)-1 {
+		t.Errorf("up past the first dataset: sel %d focus %d", a.sel, a.focus)
+	}
+	if a.key("7") != actReplan || a.fields[a.focus].val != "7" {
+		t.Errorf("typing edits the field again")
+	}
+}

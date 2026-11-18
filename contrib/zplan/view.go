@@ -49,14 +49,22 @@ func (a *app) view(w, h int) []string {
 		viz = []string{st.sgr("2", "no snapshots")}
 	case len(a.rows) == 1:
 		viz, per = block(st, a.rows[0], w, vizH)
+	case a.zoom:
+		viz, per = block(st, a.rows[a.sel], w, vizH)
 	default:
 		n := vizH
-		if len(a.rows)-a.scroll > n {
+		if len(a.rows) > n {
 			n--
 		}
-		viz, per = bars(st, a.rows, a.scroll, w, n)
+		a.page = max(1, n)
+		if a.sel >= 0 {
+			a.scroll = min(a.scroll, a.sel)
+			a.scroll = max(a.scroll, a.sel-a.page+1)
+		}
+		a.scroll = max(0, min(a.scroll, len(a.rows)-a.page))
+		viz, per = bars(st, a.rows, a.scroll, a.sel, w, n)
 		if rest := len(a.rows) - a.scroll - len(viz); rest > 0 {
-			viz = append(viz, st.sgr("2", fmt.Sprintf("… %d more datasets (PgDn)", rest)))
+			viz = append(viz, st.sgr("2", fmt.Sprintf("… %d more datasets", rest)))
 		}
 	}
 	out = append(out, a.summary(w, per))
@@ -69,13 +77,20 @@ func (a *app) view(w, h int) []string {
 	for _, c := range cmd {
 		out = append(out, st.sgr("2", c))
 	}
-	out = append(out, st.sgr("2", fit("↑↓ field  ←→ preset  type to edit  ^U clear  PgUp/PgDn scroll  Enter print & quit  Esc quit", w)))
+	help := "↑↓ field  ←→ preset  type to edit  ^U clear  Enter print & quit  Esc quit"
+	switch {
+	case a.zoom:
+		help = "↑↓ dataset  ← back  Tab fields  Enter print & quit  Esc back"
+	case a.sel >= 0:
+		help = "↑↓ PgUp PgDn dataset  → zoom  Tab fields  Enter print & quit  Esc quit"
+	}
+	out = append(out, st.sgr("2", fit(help, w)))
 	return out
 }
 
 func (a *app) fieldLine(i int, f field, w int) string {
 	st := a.st
-	focused := i == a.focus
+	focused := i == a.focus && a.sel < 0
 	l := line{max: w}
 	mark := "  "
 	if focused {
@@ -126,9 +141,13 @@ func (a *app) summary(w int, per float64) string {
 		l.add(st, "31", fit(a.err.Error(), w))
 		return l.String()
 	}
+	rs, where := a.rows, ""
+	if a.zoom {
+		rs, where = a.rows[a.sel:a.sel+1], a.rows[a.sel].name
+	}
 	total, n := 0, 0
 	var reclaim int64
-	for _, r := range a.rows {
+	for _, r := range rs {
 		total += len(r.v)
 		n += r.doomed
 		reclaim += r.reclaim
@@ -138,8 +157,13 @@ func (a *app) summary(w int, per float64) string {
 		ds = "dataset"
 	}
 	l.add(st, "1", fmt.Sprintf("destroy %d", n))
-	l.add(st, "", fmt.Sprintf(" of %d snapshots in %d %s", total, len(a.rows), ds))
-	if a.empty > 0 {
+	if where != "" {
+		l.add(st, "", fmt.Sprintf(" of %d snapshots in ", total))
+		l.add(st, "1", where)
+	} else {
+		l.add(st, "", fmt.Sprintf(" of %d snapshots in %d %s", total, len(a.rows), ds))
+	}
+	if a.empty > 0 && where == "" {
 		l.add(st, "2", fmt.Sprintf(" (+%d without)", a.empty))
 	}
 	if n > 0 {
