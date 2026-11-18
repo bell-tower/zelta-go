@@ -1,6 +1,7 @@
 # zelta-go Makefile
 #
 #   make            build bin/zelta and bin/zprune
+#   make zplan      build bin/zplan, the contrib prune planner (not installed)
 #   make test       unit tests with the race detector
 #   make cover      unit tests with a coverage report (coverage.html)
 #   make lint       gofmt, go vet, staticcheck, and gopls diagnostics
@@ -22,7 +23,7 @@ GOFLAGS    ?= -trimpath
 STATICCHECK ?= honnef.co/go/tools/cmd/staticcheck@2026.2.2
 GOPLS      ?= golang.org/x/tools/gopls@v0.23.0
 
-.PHONY: all build test cover lint vet fmt integration shellspec install uninstall install-prefix uninstall-prefix clean completions
+.PHONY: all build zplan test cover lint vet fmt integration shellspec install uninstall install-prefix uninstall-prefix clean completions
 
 all: build
 
@@ -33,6 +34,10 @@ build:
 	for c in zelta zprune; do \
 		CGO_ENABLED=0 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS) -X zelta.space/internal/version.Version=$$v" -o bin/$$c ./cmd/$$c || exit 1; \
 	done
+
+zplan:
+	@mkdir -p bin
+	cd contrib/zplan && CGO_ENABLED=0 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o ../../bin/zplan .
 
 test:
 	$(GO) test -race ./...

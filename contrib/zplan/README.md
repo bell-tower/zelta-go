@@ -44,6 +44,8 @@ terminal, zplan prints the plan once, in shades, and the command.
 | ↑ ↓ Tab | Move between fields |
 | ← → | Cycle the field's presets |
 | typing, Backspace, ^U | Edit; ^U clears |
-| PgUp PgDn | Scroll datasets |
+| ↓ past the last field | Select datasets; ↑ past the first goes back |
+| → Space, ← | Zoom into the selected dataset, and back out |
+| PgUp PgDn | Page through datasets |
 | Enter | Quit and print the `zprune` command |
-| Esc ^C | Quit |
+| Esc | Zoom out, then quit; ^C quits |

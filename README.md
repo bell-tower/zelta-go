@@ -133,6 +133,8 @@ Replays local ZFS properties from one dataset tree to another while preserving t
 
 - `zelta snapshot`: Creates recursive snapshots on a local or remote endpoint.
 
+Extras that don't install with Zelta, such as the interactive prune planner `zplan`, live in [`contrib`](contrib).
+
 Compatibility aliases such as `zelta sync`, `zpull`, `zmatch`, and `zp` are supported for existing operators. New documentation uses explicit `zelta backup` commands.
 
 ### Large Trees
