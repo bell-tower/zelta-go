@@ -346,12 +346,25 @@ func TestLegacyNames(t *testing.T) {
 	if code := h.runAs("zprune", "--help"); code != 0 || !strings.Contains(h.out.String(), "usage: zprune [OPTIONS] ENDPOINT") || !strings.Contains(h.out.String(), "--match-endpoint") {
 		t.Errorf("zprune --help: %q", h.out.String())
 	}
-	if code := h.run("zprune", "-qq", "pool/a"); code != 0 || h.last(t).opts.Get("LOG_LEVEL") != "0" {
-		t.Errorf("zelta zprune")
-	}
 	h.runAs("zp", "SITE")
 	if c := h.last(t); c.engine != "policy" {
 		t.Errorf("zp ran %s", c.engine)
+	}
+}
+
+// TestZeltaRefusesZprune checks that the zelta binary, which has no zprune
+// engine, never runs zprune: not as a verb and not through a stale link.
+func TestZeltaRefusesZprune(t *testing.T) {
+	h := newHarness(t)
+	delete(h.app.Engines, "zprune")
+	if code := h.run("zprune", "--force", "--no-prune-guard", "pool/a"); code != 1 || len(h.calls) != 0 || !strings.Contains(h.err.String(), "unrecognized command: 'zprune'\ndid you mean 'zprune'?") {
+		t.Errorf("zelta zprune: code=%d calls=%d %q", code, len(h.calls), h.err.String())
+	}
+	if code := h.runAs("zprune", "--force", "--no-prune-guard", "pool/a"); code != 1 || len(h.calls) != 0 || !strings.Contains(h.err.String(), "zprune is now a separate command") {
+		t.Errorf("zprune link to zelta: code=%d calls=%d %q", code, len(h.calls), h.err.String())
+	}
+	if h.run("--help"); strings.Contains(h.out.String(), "zprune") {
+		t.Errorf("zelta --help lists zprune: %q", h.out.String())
 	}
 }
 

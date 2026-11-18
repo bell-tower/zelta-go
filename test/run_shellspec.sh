@@ -36,7 +36,7 @@ done
 if [ -n "${ZELTA_BINARY:-}" ]; then
 	mkdir -p bin
 	cp "$ZELTA_BINARY" bin/zelta
-	ln -sf zelta bin/zprune
+	cp "$(dirname "$ZELTA_BINARY")/zprune" bin/zprune
 	export ZELTA_BINARY
 else
 	make -s build

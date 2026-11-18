@@ -42,20 +42,26 @@ func TestMain(m *testing.M) {
 		_, file, _, _ := runtime.Caller(0)
 		root := filepath.Join(filepath.Dir(file), "..", "..")
 		must(os.MkdirAll(filepath.Dir(zeltaBin), 0o755))
-		if bin := os.Getenv("ZELTA_TEST_BINARY"); bin != "" {
-			// Test a prebuilt binary (another implementation, a release build).
-			data, err := os.ReadFile(bin)
-			must(err)
-			must(os.WriteFile(zeltaBin, data, 0o755))
-		} else {
+		for _, name := range []string{"zelta", "zprune"} {
+			out := filepath.Join(workDir, "bin", name)
+			if bin := os.Getenv("ZELTA_TEST_BINARY"); bin != "" {
+				// Test prebuilt binaries (another implementation, a release
+				// build), with zprune next to zelta.
+				if name == "zprune" {
+					bin = filepath.Join(filepath.Dir(bin), "zprune")
+				}
+				data, err := os.ReadFile(bin)
+				must(err)
+				must(os.WriteFile(out, data, 0o755))
+				continue
+			}
 			// No VCS stamp: git refuses a checkout owned by another user
 			// (root in a CI VM), and the version comes from -ldflags anyway.
-			build := exec.Command("go", "build", "-buildvcs=false", "-o", zeltaBin, "./cmd/zelta")
+			build := exec.Command("go", "build", "-buildvcs=false", "-o", out, "./cmd/"+name)
 			build.Dir = root
 			build.Stdout, build.Stderr = os.Stdout, os.Stderr
 			must(build.Run())
 		}
-		must(os.Symlink("zelta", filepath.Join(workDir, "bin", "zprune")))
 		fakeSSH = filepath.Join(workDir, "bin", "fakessh")
 		must(os.WriteFile(fakeSSH, []byte(fakeSSHScript), 0o755))
 

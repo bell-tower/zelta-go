@@ -87,7 +87,7 @@ var verbs = []verb{
 		long: "Replay local ZFS properties from one dataset tree onto another, inheriting target-only local properties."},
 	{name: "prune", group: groupRetain, usage: "ENDPOINT [GUARD]", short: "Plan snapshot pruning", maxOps: 2, operand: opEndpoint,
 		long: "Report snapshots that are candidates for pruning without destroying anything. Use zprune to destroy them."},
-	{name: "zprune", group: groupRetain, usage: "ENDPOINT", short: "Destroy snapshots selected by zelta prune", opVerb: "prune", maxOps: 1, operand: opEndpoint,
+	{name: "zprune", group: groupRetain, usage: "ENDPOINT", short: "Destroy snapshots selected by zelta prune", opVerb: "prune", maxOps: 1, operand: opEndpoint, hidden: true,
 		long: "Preview, confirm, and destroy the snapshots selected by 'zelta prune'. Requires --match-endpoint or --no-prune-guard."},
 	{name: "report", group: groupRetain, usage: "[ENDPOINT ...]", short: "Report datasets with stale snapshots", operand: opEndpoint, hidden: true,
 		long: "Report backup datasets whose newest snapshot is more than a day old (zeport)."},

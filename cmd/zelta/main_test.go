@@ -16,10 +16,13 @@ func TestWiring(t *testing.T) {
 	if failover.Backup == nil {
 		t.Fatalf("failover.Backup is not wired")
 	}
-	for _, name := range []string{"match", "backup", "snapshot", "clone", "revert", "rotate", "rebase", "lock", "unlock", "failover", "propsync", "prune", "zprune", "report"} {
+	for _, name := range []string{"match", "backup", "snapshot", "clone", "revert", "rotate", "rebase", "lock", "unlock", "failover", "propsync", "prune", "report"} {
 		if a.Engines[name] == nil {
 			t.Errorf("engine %q not wired", name)
 		}
+	}
+	if a.Engines["zprune"] != nil {
+		t.Errorf("zelta must not wire the zprune engine")
 	}
 	if a.Policy == nil || a.PolicyObjects == nil || a.Columns == nil {
 		t.Fatalf("policy or completion sources not wired")

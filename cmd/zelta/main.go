@@ -1,6 +1,6 @@
-// Command zelta is the Zelta command line. It also runs as zprune and the
-// historical command names (zmatch, zpull, zsync, ...) when invoked through
-// a link with that name.
+// Command zelta is the Zelta command line. It also runs as the historical
+// command names (zmatch, zpull, zsync, ...) when invoked through a link with
+// that name. Snapshot destruction lives in the separate zprune binary.
 package main
 
 import (
@@ -53,7 +53,6 @@ func engines() map[string]cli.Engine {
 		"failover": failover.Failover,
 		"propsync": failover.Propsync,
 		"prune":    prune.Run,
-		"zprune":   prune.Zprune,
 		"report":   report.Run,
 	}
 }

@@ -1,6 +1,6 @@
 # zelta-go Makefile
 #
-#   make            build bin/zelta and the bin/zprune link
+#   make            build bin/zelta and bin/zprune
 #   make test       unit tests with the race detector
 #   make cover      unit tests with a coverage report (coverage.html)
 #   make lint       gofmt, go vet, staticcheck, and gopls diagnostics
@@ -30,8 +30,9 @@ build:
 	@mkdir -p bin
 	@v='$(VERSION)'; [ -n "$$v" ] || v=$$(git describe --tags 2>/dev/null || echo 1.3.0-dev); v=$${v#v}; \
 	echo "building zelta $$v"; \
-	CGO_ENABLED=0 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS) -X zelta.space/internal/version.Version=$$v" -o bin/zelta ./cmd/zelta
-	@ln -sf zelta bin/zprune
+	for c in zelta zprune; do \
+		CGO_ENABLED=0 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS) -X zelta.space/internal/version.Version=$$v" -o bin/$$c ./cmd/$$c || exit 1; \
+	done
 
 test:
 	$(GO) test -race ./...
@@ -87,7 +88,8 @@ uninstall:
 install-prefix:
 	install -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(MANDIR)/man7 $(DESTDIR)$(MANDIR)/man8 $(DESTDIR)$(ETCDIR) $(DESTDIR)$(SHAREDIR)/completions
 	install -m 755 bin/zelta $(DESTDIR)$(BINDIR)/zelta
-	ln -sf zelta $(DESTDIR)$(BINDIR)/zprune
+	rm -f $(DESTDIR)$(BINDIR)/zprune
+	install -m 755 bin/zprune $(DESTDIR)$(BINDIR)/zprune
 	install -m 644 doc/man7/*.7 $(DESTDIR)$(MANDIR)/man7/
 	install -m 644 doc/man8/*.8 $(DESTDIR)$(MANDIR)/man8/
 	install -m 644 build/completions/* $(DESTDIR)$(SHAREDIR)/completions/

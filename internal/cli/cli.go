@@ -81,6 +81,10 @@ func (a *App) Main(ctx context.Context, argv []string) int {
 	if name, ok := legacyNames[prog]; ok {
 		args = append([]string{name}, args...)
 		if name == "zprune" {
+			if a.Engines["zprune"] == nil {
+				fmt.Fprintln(a.Stderr, "zprune: this is the zelta binary; zprune is now a separate command. Reinstall Zelta to get it.")
+				return 1
+			}
 			return a.execute(ctx, args)
 		}
 	}
@@ -180,6 +184,9 @@ func (a *App) rootCommand(status *int, internal bool) *cobra.Command {
 	})
 	root.CompletionOptions.HiddenDefaultCmd = false
 	for _, v := range verbs {
+		if v.name == "zprune" && a.Engines["zprune"] == nil {
+			continue
+		}
 		cmd, _ := a.verbCommand(v, status, internal)
 		root.AddCommand(cmd)
 	}
@@ -226,6 +233,8 @@ func suggestion(name string) string {
 		return "zelta backup"
 	case "rollback":
 		return "zelta revert"
+	case "zprune":
+		return "zprune"
 	}
 	best, bestDist := "", 3
 	for _, v := range verbs {

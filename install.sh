@@ -2,7 +2,7 @@
 #
 # Zelta installer
 #
-# Installs the zelta binary (and the zprune link), manual pages, shell
+# Installs the zelta and zprune binaries, manual pages, shell
 # completions, and example configuration. It honors the same variables as
 # the original Zelta installer:
 #
@@ -33,13 +33,16 @@ fi
 ZELTA="$ZELTA_BIN/zelta"
 ZELTA_UPDATED=""
 
-# Build the binary unless a prebuilt one is supplied with ZELTA_BINARY.
+# Build the binaries unless prebuilt ones are supplied: ZELTA_BINARY, with
+# zprune next to it.
 BINARY="${ZELTA_BINARY:-bin/zelta}"
+ZPRUNE_BINARY="$(dirname "$BINARY")/zprune"
 if [ -z "${ZELTA_BINARY:-}" ]; then
 	if command -v go >/dev/null 2>&1; then
 		echo "building: $BINARY"
 		mkdir -p bin
-		CGO_ENABLED=0 go build -trimpath -o "$BINARY" ./cmd/zelta || {
+		CGO_ENABLED=0 go build -trimpath -o "$BINARY" ./cmd/zelta &&
+			CGO_ENABLED=0 go build -trimpath -o "$ZPRUNE_BINARY" ./cmd/zprune || {
 			echo "Error: build failed" >&2
 			exit 1
 		}
@@ -74,7 +77,7 @@ mkdir -p "$ZELTA_BIN" "$ZELTA_SHARE" "$ZELTA_ETC" || {
 }
 
 copy_file "$BINARY" "$ZELTA" 755
-link_file zelta "$ZELTA_BIN/zprune"
+copy_file "$ZPRUNE_BINARY" "$ZELTA_BIN/zprune" 755
 
 if [ -n "$ZELTA_DOC" ]; then
 	for section in 7 8; do

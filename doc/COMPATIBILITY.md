@@ -49,7 +49,8 @@ These changes make runs faster without changing their results.
 - `--retry` and `--host-prefix` accept an optional value (`--retry=3`).
 - `--dry-run` and `--snapshot-always` are accepted as documented aliases.
 - Legacy command names work fully: `zmatch`, `zpull`, `zpush`, `zsync`,
-  `zeport`, `zp`, and `zprune` (also `zelta zprune`).
+  `zeport`, and `zp`. `zprune` is a separate binary, as it was a separate
+  script in Zelta 1.2, so `zelta` itself never destroys snapshots.
 - `zelta completion bash|zsh|fish|powershell` generates shell completions,
   including dataset, snapshot, and policy-object completion.
 - `zelta ipc-env` quotes values as FreeBSD sh prints `set` output, which is

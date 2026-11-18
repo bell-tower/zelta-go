@@ -51,6 +51,12 @@ cd zelta-go
 sudo ./install.sh          # or: make && sudo make install PREFIX=/usr/local
 ```
 
+Or install just the `zelta` and `zprune` binaries with Go, without manual pages or shell completions:
+
+```sh
+go install zelta.space/cmd/...@latest
+```
+
 `install.sh` honors the same `ZELTA_BIN`, `ZELTA_SHARE`, `ZELTA_ETC`, and `ZELTA_DOC` variables as the original installer and installs into your home directory when run as a regular user. It never overwrites an existing `zelta.env` or `zelta.conf`.
 
 The one-shot installer at `zelta.space` and the FreeBSD port install the stable Awk release, not zelta-go.

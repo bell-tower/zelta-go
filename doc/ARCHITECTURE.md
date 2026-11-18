@@ -9,7 +9,8 @@ deviations are recorded in [COMPATIBILITY.md](COMPATIBILITY.md).
 ## Layout
 
 ```
-cmd/zelta/            main: argv[0] dispatch (zelta, zprune, zmatch, zpull, ...)
+cmd/zelta/            main: argv[0] dispatch (zelta, zmatch, zpull, ...)
+cmd/zprune/           main: zprune, the only binary that destroys snapshots
 zelta/                public Go API: Client, typed options and results
 internal/cli/         cobra command tree, flags generated from the option registry,
                       help, usage errors, completions, ipc-* verbs
