@@ -107,7 +107,12 @@ func TestPrune(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, rec)
 	}
-	want := []PruneDataset{{Name: "apool/src", Suffix: "", Destroy: []string{"@s1", "@s2", "@s3"}, Keep: []string{"@s4"}}}
+	var snaps []Snapshot
+	for i := range 6 {
+		n := int64(i + 1)
+		snaps = append(snaps, Snapshot{Name: "@s" + itoa(n), GUID: itoa(100 + n), Creation: time.Unix(testNow.Unix()-(7-n)*40*86400, 0), Written: 10})
+	}
+	want := []PruneDataset{{Name: "apool/src", Suffix: "", Destroy: []string{"@s1", "@s2", "@s3"}, Keep: []string{"@s4"}, Snapshots: snaps}}
 	if !reflect.DeepEqual(plan.Datasets, want) {
 		t.Errorf("plan = %+v", plan.Datasets)
 	}

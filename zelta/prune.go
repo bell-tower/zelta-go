@@ -31,6 +31,9 @@ type PruneDataset struct {
 	// Keep lists the snapshots older than the guard match that retention
 	// keeps, oldest first.
 	Keep []string
+	// Snapshots lists every snapshot of the dataset, oldest first. Those in
+	// neither Destroy nor Keep are at or newer than the guard match.
+	Snapshots []Snapshot
 }
 
 // Candidates returns the snapshots to destroy as "zelta prune" prints them:
@@ -85,7 +88,11 @@ func (c *Client) prune(ctx context.Context, endpoint string, opts *PruneOptions,
 	}
 	out := &PrunePlan{Skipped: skipped, candidates: plan.Candidates(), guids: plan.SelectedGUIDs()}
 	for _, d := range plan.Datasets {
-		out.Datasets = append(out.Datasets, PruneDataset{Name: d.Name, Suffix: d.Suffix, Destroy: d.Selected(), Keep: d.Protected()})
+		pd := PruneDataset{Name: d.Name, Suffix: d.Suffix, Destroy: d.Selected(), Keep: d.Protected()}
+		for _, r := range d.Snapshots() {
+			pd.Snapshots = append(pd.Snapshots, snapshotOf(r))
+		}
+		out.Datasets = append(out.Datasets, pd)
 	}
 	if destroy {
 		out.Destroyed, err = prune.Destroy(ctx, o.rt, plan)

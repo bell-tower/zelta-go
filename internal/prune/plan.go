@@ -647,6 +647,20 @@ func (d *Dataset) Selected() []string { return savepoints(d.prune) }
 // that retention keeps, oldest first.
 func (d *Dataset) Protected() []string { return savepoints(d.kept) }
 
+// Snapshots returns every listed snapshot of the dataset, oldest first.
+func (d *Dataset) Snapshots() []*match.Row {
+	if d.src == nil {
+		return nil
+	}
+	var out []*match.Row
+	for _, r := range slices.Backward(d.src.Snaps) {
+		if r.Kind == match.KindSnapshot {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 func savepoints(list []entry) []string {
 	out := make([]string, 0, len(list))
 	for _, l := range slices.Backward(list) {
