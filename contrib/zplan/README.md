@@ -22,7 +22,7 @@ the planner. ZELTA_* variables and `zelta.env` apply as for `zelta`.
 
 ## The view
 
-Each snapshot is a colored cell, oldest first: red is destroyed, green is
+Each snapshot is a colored cell, oldest first: red is destroyed, blue is
 kept by retention, cyan is at or newer than the guard match.
 
 - **Several datasets:** one line each, all at the same scale.

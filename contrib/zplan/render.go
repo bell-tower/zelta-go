@@ -122,8 +122,9 @@ func mix(run []verdict) cell {
 type style struct{ color bool }
 
 // Palette colors only, so the terminal's theme picks the shades: light,
-// dark, and solarized all keep their own red, green, and cyan.
-var fg = [nVerdicts]int{guarded: 36, kept: 32, doomed: 31}
+// dark, and solarized all keep their own red, blue, and cyan. Red and blue
+// stay apart with red-green color blindness; red and green do not.
+var fg = [nVerdicts]int{guarded: 36, kept: 34, doomed: 31}
 
 // monochrome glyphs, by verdict: destruction fades.
 var mono = [nVerdicts]string{guarded: "▓", kept: "█", doomed: "░"}
