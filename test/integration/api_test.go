@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	zg "github.com/bell-tower/zelta-go/zelta"
+	zg "zelta.space/zelta"
 )
 
 // logSink collects slog messages.

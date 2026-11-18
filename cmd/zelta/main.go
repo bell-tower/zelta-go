@@ -9,16 +9,16 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/backup"
-	"github.com/bell-tower/zelta-go/internal/cli"
-	"github.com/bell-tower/zelta-go/internal/config"
-	"github.com/bell-tower/zelta-go/internal/execx"
-	"github.com/bell-tower/zelta-go/internal/failover"
-	"github.com/bell-tower/zelta-go/internal/match"
-	"github.com/bell-tower/zelta-go/internal/policy"
-	"github.com/bell-tower/zelta-go/internal/prune"
-	"github.com/bell-tower/zelta-go/internal/report"
+	"zelta.space/internal/app"
+	"zelta.space/internal/backup"
+	"zelta.space/internal/cli"
+	"zelta.space/internal/config"
+	"zelta.space/internal/execx"
+	"zelta.space/internal/failover"
+	"zelta.space/internal/match"
+	"zelta.space/internal/policy"
+	"zelta.space/internal/prune"
+	"zelta.space/internal/report"
 )
 
 func main() {

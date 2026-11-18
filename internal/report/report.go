@@ -9,11 +9,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/command"
-	"github.com/bell-tower/zelta-go/internal/endpoint"
-	"github.com/bell-tower/zelta-go/internal/execx"
-	"github.com/bell-tower/zelta-go/internal/zfs"
+	"zelta.space/internal/app"
+	"zelta.space/internal/command"
+	"zelta.space/internal/endpoint"
+	"zelta.space/internal/execx"
+	"zelta.space/internal/zfs"
 )
 
 // maxAge is how old a dataset's latest snapshot change may be.

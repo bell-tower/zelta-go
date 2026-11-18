@@ -9,7 +9,8 @@ replacing the Awk implementation.
 
 ### Changed
 - **Rewrite**: zelta-go is now a drop-in replacement for Zelta (Awk): same commands, flags, `ZELTA_*` variables, `zelta.env`, `zelta.conf`, output, and exit codes. Intentional differences are listed in [doc/COMPATIBILITY.md](doc/COMPATIBILITY.md).
-- **API (breaking)**: The old public packages (`backup`, `cmdbuild`, `data`, `endpoint`, `job`, `lineage`, `match`, `prune`, `rotate`, `sdk`, `zconf`, `zfs`) are removed. Use `github.com/bell-tower/zelta-go/zelta`.
+- **API (breaking)**: The old public packages (`backup`, `cmdbuild`, `data`, `endpoint`, `job`, `lineage`, `match`, `prune`, `rotate`, `sdk`, `zconf`, `zfs`) are removed. Use `zelta.space/zelta`.
+- **Module path (breaking)**: The module is now `zelta.space` (was `github.com/bell-tower/zelta-go`). Import `zelta.space/zelta`; install with `go install zelta.space/cmd/zelta@latest`.
 - **License**: zelta-go is now released under the BSD 2-Clause License, like Zelta.
 
 ### Added

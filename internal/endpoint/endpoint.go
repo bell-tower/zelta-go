@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/bell-tower/zelta-go/internal/command"
+	"zelta.space/internal/command"
 )
 
 // Endpoint is a parsed dataset location.

@@ -24,11 +24,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/command"
-	"github.com/bell-tower/zelta-go/internal/config"
-	"github.com/bell-tower/zelta-go/internal/execx"
-	"github.com/bell-tower/zelta-go/internal/shellwords"
+	"zelta.space/internal/app"
+	"zelta.space/internal/command"
+	"zelta.space/internal/config"
+	"zelta.space/internal/execx"
+	"zelta.space/internal/shellwords"
 )
 
 // defaultBackupCommand runs jobs in-process.

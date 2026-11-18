@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/command"
-	"github.com/bell-tower/zelta-go/internal/logging"
+	"zelta.space/internal/app"
+	"zelta.space/internal/command"
+	"zelta.space/internal/logging"
 )
 
 func TestCommand(t *testing.T) {

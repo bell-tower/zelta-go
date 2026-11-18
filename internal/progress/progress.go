@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bell-tower/zelta-go/internal/config"
-	"github.com/bell-tower/zelta-go/internal/units"
+	"zelta.space/internal/config"
+	"zelta.space/internal/units"
 )
 
 // Board holds the streams currently being sent.

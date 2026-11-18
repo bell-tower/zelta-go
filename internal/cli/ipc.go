@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bell-tower/zelta-go/internal/command"
-	"github.com/bell-tower/zelta-go/internal/config"
-	"github.com/bell-tower/zelta-go/internal/endpoint"
-	"github.com/bell-tower/zelta-go/internal/execx"
-	"github.com/bell-tower/zelta-go/internal/logging"
-	"github.com/bell-tower/zelta-go/internal/shellwords"
+	"zelta.space/internal/command"
+	"zelta.space/internal/config"
+	"zelta.space/internal/endpoint"
+	"zelta.space/internal/execx"
+	"zelta.space/internal/logging"
+	"zelta.space/internal/shellwords"
 )
 
 // ipcLog implements "zelta ipc-log": it reads level/message records (the

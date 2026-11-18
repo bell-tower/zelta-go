@@ -12,7 +12,7 @@ package command
 import (
 	"strings"
 
-	"github.com/bell-tower/zelta-go/internal/shellwords"
+	"zelta.space/internal/shellwords"
 )
 
 // Arg is a single command word.

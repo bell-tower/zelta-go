@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bell-tower/zelta-go/internal/execx"
+	"zelta.space/internal/execx"
 )
 
 func encryptedFx(t *testing.T, opts map[string]string, tgtIVSet string) *fx {

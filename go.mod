@@ -1,4 +1,4 @@
-module github.com/bell-tower/zelta-go
+module zelta.space
 
 go 1.26.0
 

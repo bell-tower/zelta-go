@@ -5,12 +5,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/command"
-	"github.com/bell-tower/zelta-go/internal/execx"
-	"github.com/bell-tower/zelta-go/internal/logging"
-	"github.com/bell-tower/zelta-go/internal/units"
-	"github.com/bell-tower/zelta-go/internal/zfs"
+	"zelta.space/internal/app"
+	"zelta.space/internal/command"
+	"zelta.space/internal/execx"
+	"zelta.space/internal/logging"
+	"zelta.space/internal/units"
+	"zelta.space/internal/zfs"
 )
 
 // validateDatasets checks the operands and loads both endpoints.

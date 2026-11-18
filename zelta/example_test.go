@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/bell-tower/zelta-go/zelta"
+	"zelta.space/zelta"
 )
 
 func Example() {

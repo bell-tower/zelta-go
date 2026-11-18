@@ -30,7 +30,7 @@ build:
 	@mkdir -p bin
 	@v='$(VERSION)'; [ -n "$$v" ] || v=$$(git describe --tags 2>/dev/null || echo 1.3.0-dev); v=$${v#v}; \
 	echo "building zelta $$v"; \
-	CGO_ENABLED=0 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS) -X github.com/bell-tower/zelta-go/internal/version.Version=$$v" -o bin/zelta ./cmd/zelta
+	CGO_ENABLED=0 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS) -X zelta.space/internal/version.Version=$$v" -o bin/zelta ./cmd/zelta
 	@ln -sf zelta bin/zprune
 
 test:

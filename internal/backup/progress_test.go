@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bell-tower/zelta-go/internal/command"
-	"github.com/bell-tower/zelta-go/internal/execx"
-	"github.com/bell-tower/zelta-go/internal/progress"
+	"zelta.space/internal/command"
+	"zelta.space/internal/execx"
+	"zelta.space/internal/progress"
 )
 
 // peekExec runs after once a pipeline has delivered its output, while the

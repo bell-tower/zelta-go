@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bell-tower/zelta-go/internal/execx"
+	"zelta.space/internal/execx"
 )
 
 var testNow = time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)

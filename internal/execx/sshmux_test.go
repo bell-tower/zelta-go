@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bell-tower/zelta-go/internal/command"
+	"zelta.space/internal/command"
 )
 
 type startLog struct {

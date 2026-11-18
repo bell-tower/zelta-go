@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/bell-tower/zelta-go/internal/units"
+	"zelta.space/internal/units"
 )
 
 // Source records where an option value came from, in precedence order.

@@ -3,10 +3,10 @@ package zelta
 import (
 	"context"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/backup"
-	"github.com/bell-tower/zelta-go/internal/failover"
-	"github.com/bell-tower/zelta-go/internal/policy"
+	"zelta.space/internal/app"
+	"zelta.space/internal/backup"
+	"zelta.space/internal/failover"
+	"zelta.space/internal/policy"
 )
 
 // Lock makes a dataset tree read-only and unmounts it.

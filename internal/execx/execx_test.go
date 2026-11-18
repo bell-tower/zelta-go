@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bell-tower/zelta-go/internal/command"
+	"zelta.space/internal/command"
 )
 
 func TestOSRun(t *testing.T) {

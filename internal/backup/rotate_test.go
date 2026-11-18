@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bell-tower/zelta-go/internal/execx"
+	"zelta.space/internal/execx"
 )
 
 // rotateFx scripts a target that diverged after @a; after the rename the

@@ -7,12 +7,12 @@ import (
 	"io"
 	"strings"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/command"
-	"github.com/bell-tower/zelta-go/internal/endpoint"
-	"github.com/bell-tower/zelta-go/internal/execx"
-	"github.com/bell-tower/zelta-go/internal/shellwords"
-	"github.com/bell-tower/zelta-go/internal/units"
+	"zelta.space/internal/app"
+	"zelta.space/internal/command"
+	"zelta.space/internal/endpoint"
+	"zelta.space/internal/execx"
+	"zelta.space/internal/shellwords"
+	"zelta.space/internal/units"
 )
 
 // zprune carries the state of one zprune run.

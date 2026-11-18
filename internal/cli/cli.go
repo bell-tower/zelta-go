@@ -17,12 +17,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/command"
-	"github.com/bell-tower/zelta-go/internal/config"
-	"github.com/bell-tower/zelta-go/internal/execx"
-	"github.com/bell-tower/zelta-go/internal/progress"
-	"github.com/bell-tower/zelta-go/internal/version"
+	"zelta.space/internal/app"
+	"zelta.space/internal/command"
+	"zelta.space/internal/config"
+	"zelta.space/internal/execx"
+	"zelta.space/internal/progress"
+	"zelta.space/internal/version"
 )
 
 // App is the zelta command-line application.

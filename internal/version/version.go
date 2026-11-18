@@ -2,7 +2,7 @@
 package version
 
 // Version is the release version, overridden at build time with
-// -ldflags "-X github.com/bell-tower/zelta-go/internal/version.Version=...".
+// -ldflags "-X zelta.space/internal/version.Version=...".
 var Version = "1.3.0-dev"
 
 // String returns the version banner printed by "zelta version".

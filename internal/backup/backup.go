@@ -15,11 +15,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/config"
-	"github.com/bell-tower/zelta-go/internal/endpoint"
-	"github.com/bell-tower/zelta-go/internal/match"
-	"github.com/bell-tower/zelta-go/internal/units"
+	"zelta.space/internal/app"
+	"zelta.space/internal/config"
+	"zelta.space/internal/endpoint"
+	"zelta.space/internal/match"
+	"zelta.space/internal/units"
 )
 
 // Reasons a snapshot is needed in IF_NEEDED mode.

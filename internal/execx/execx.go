@@ -15,7 +15,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/bell-tower/zelta-go/internal/command"
+	"zelta.space/internal/command"
 )
 
 // Stream identifies where an output line came from.

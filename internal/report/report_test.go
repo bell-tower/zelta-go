@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/execx"
+	"zelta.space/internal/app"
+	"zelta.space/internal/execx"
 )
 
 var ctx = context.Background()

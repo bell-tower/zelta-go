@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bell-tower/zelta-go/internal/units"
+	"zelta.space/internal/units"
 )
 
 // Output format version reported in "output_version".

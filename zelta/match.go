@@ -3,8 +3,8 @@ package zelta
 import (
 	"context"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/match"
+	"zelta.space/internal/app"
+	"zelta.space/internal/match"
 )
 
 // SyncState is whether a dataset's replica can be brought up to date.

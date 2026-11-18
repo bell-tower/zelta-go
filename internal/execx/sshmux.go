@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/bell-tower/zelta-go/internal/command"
+	"zelta.space/internal/command"
 )
 
 // SSHMux runs commands through Inner, routing every command sent to the

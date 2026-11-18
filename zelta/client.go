@@ -13,13 +13,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/backup"
-	"github.com/bell-tower/zelta-go/internal/config"
-	"github.com/bell-tower/zelta-go/internal/execx"
-	"github.com/bell-tower/zelta-go/internal/failover"
-	"github.com/bell-tower/zelta-go/internal/logging"
-	"github.com/bell-tower/zelta-go/internal/version"
+	"zelta.space/internal/app"
+	"zelta.space/internal/backup"
+	"zelta.space/internal/config"
+	"zelta.space/internal/execx"
+	"zelta.space/internal/failover"
+	"zelta.space/internal/logging"
+	"zelta.space/internal/version"
 )
 
 func init() {

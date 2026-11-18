@@ -11,8 +11,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/bell-tower/zelta-go/internal/command"
-	"github.com/bell-tower/zelta-go/internal/config"
+	"zelta.space/internal/command"
+	"zelta.space/internal/config"
 )
 
 // completionTimeout bounds zfs and ssh calls made while completing.

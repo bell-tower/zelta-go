@@ -4,7 +4,7 @@ import (
 	"context"
 	"slices"
 
-	"github.com/bell-tower/zelta-go/internal/app"
+	"zelta.space/internal/app"
 )
 
 // Result describes a finished replication run.

@@ -182,7 +182,7 @@ Zelta can run entirely from a bastion host using SSH keys or agent forwarding. T
 The [`zelta`](zelta) package runs the same engine in-process, with typed options and results instead of flags and text output:
 
 ```go
-import "github.com/bell-tower/zelta-go/zelta"
+import "zelta.space/zelta"
 
 c, err := zelta.New(zelta.WithLogger(slog.Default()))
 if err != nil {
@@ -197,7 +197,7 @@ for _, d := range res.Datasets {
 }
 ```
 
-It covers match, backup (and replicate), snapshot, prune planning and guarded destruction, clone, revert, rotate, rebase, lock, unlock, failover, propsync, and policy runs. A client uses only built-in defaults and its own settings unless created with `zelta.WithEnvironment()`, which reads `ZELTA_*` variables and `zelta.env` the way the command does. Failures are `*zelta.Error` values carrying the command's exit status and logged messages; nothing is printed. Run `go doc github.com/bell-tower/zelta-go/zelta` for the full API.
+It covers match, backup (and replicate), snapshot, prune planning and guarded destruction, clone, revert, rotate, rebase, lock, unlock, failover, propsync, and policy runs. A client uses only built-in defaults and its own settings unless created with `zelta.WithEnvironment()`, which reads `ZELTA_*` variables and `zelta.env` the way the command does. Failures are `*zelta.Error` values carrying the command's exit status and logged messages; nothing is printed. Run `go doc zelta.space/zelta` for the full API.
 
 ---
 

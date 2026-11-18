@@ -7,10 +7,10 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/endpoint"
-	"github.com/bell-tower/zelta-go/internal/logging"
-	"github.com/bell-tower/zelta-go/internal/units"
+	"zelta.space/internal/app"
+	"zelta.space/internal/endpoint"
+	"zelta.space/internal/logging"
+	"zelta.space/internal/units"
 )
 
 // Run implements "zelta match SOURCE [TARGET]".

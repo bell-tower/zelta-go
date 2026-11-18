@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bell-tower/zelta-go/internal/app"
+	"zelta.space/internal/app"
 )
 
 // namedSnapshot scripts a source with @one, @two, and @three and a target

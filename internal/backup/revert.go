@@ -4,9 +4,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/command"
-	"github.com/bell-tower/zelta-go/internal/zfs"
+	"zelta.space/internal/app"
+	"zelta.space/internal/command"
+	"zelta.space/internal/zfs"
 )
 
 // validateRevertTree checks, before anything is renamed, that every dataset

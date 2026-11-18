@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/bell-tower/zelta-go/internal/backup"
+	"zelta.space/internal/backup"
 )
 
 // BackupResult describes a finished Backup or Rotate.

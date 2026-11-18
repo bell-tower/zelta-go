@@ -3,7 +3,7 @@ package cli
 import (
 	"context"
 
-	"github.com/bell-tower/zelta-go/internal/app"
+	"zelta.space/internal/app"
 )
 
 // Engine runs a command with its positional operands.

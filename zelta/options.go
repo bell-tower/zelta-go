@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bell-tower/zelta-go/internal/config"
+	"zelta.space/internal/config"
 )
 
 // Filter limits the datasets and snapshots an operation considers.

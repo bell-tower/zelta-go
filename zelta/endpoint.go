@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bell-tower/zelta-go/internal/endpoint"
+	"zelta.space/internal/endpoint"
 )
 
 // Endpoint is a dataset location in Zelta's scp-like syntax:

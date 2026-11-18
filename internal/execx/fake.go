@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/bell-tower/zelta-go/internal/command"
+	"zelta.space/internal/command"
 )
 
 // Out returns a successful result with the given stdout lines.

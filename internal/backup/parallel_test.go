@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/execx"
+	"zelta.space/internal/app"
+	"zelta.space/internal/execx"
 )
 
 // pipeRecorder scripts every send/receive pipeline, recording when each

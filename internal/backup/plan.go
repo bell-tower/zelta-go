@@ -1,9 +1,9 @@
 package backup
 
 import (
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/endpoint"
-	"github.com/bell-tower/zelta-go/internal/match"
+	"zelta.space/internal/app"
+	"zelta.space/internal/endpoint"
+	"zelta.space/internal/match"
 )
 
 // validateSnapshots takes any needed source snapshot, loads the snapshot

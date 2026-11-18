@@ -4,7 +4,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/bell-tower/zelta-go/internal/progress"
+	"zelta.space/internal/progress"
 )
 
 // statusBoard prints the streams in flight to stderr on each status signal.

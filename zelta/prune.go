@@ -3,8 +3,8 @@ package zelta
 import (
 	"context"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/prune"
+	"zelta.space/internal/app"
+	"zelta.space/internal/prune"
 )
 
 // PrunePlan is the set of snapshots selected for pruning.

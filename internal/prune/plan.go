@@ -13,12 +13,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/command"
-	"github.com/bell-tower/zelta-go/internal/endpoint"
-	"github.com/bell-tower/zelta-go/internal/match"
-	"github.com/bell-tower/zelta-go/internal/units"
-	"github.com/bell-tower/zelta-go/internal/zfs"
+	"zelta.space/internal/app"
+	"zelta.space/internal/command"
+	"zelta.space/internal/endpoint"
+	"zelta.space/internal/match"
+	"zelta.space/internal/units"
+	"zelta.space/internal/zfs"
 )
 
 // Guard modes for --prune-guard.

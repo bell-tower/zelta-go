@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/bell-tower/zelta-go/doc"
+	"zelta.space/doc"
 )
 
 // systemMan shows a manual page: from ZELTA_DOC when set, else the installed

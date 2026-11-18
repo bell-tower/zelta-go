@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bell-tower/zelta-go/internal/execx"
+	"zelta.space/internal/execx"
 )
 
 const defaultSnap = "@zelta_2026-01-02_03.04.05"

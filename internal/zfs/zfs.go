@@ -6,10 +6,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/command"
-	"github.com/bell-tower/zelta-go/internal/endpoint"
-	"github.com/bell-tower/zelta-go/internal/logging"
+	"zelta.space/internal/app"
+	"zelta.space/internal/command"
+	"zelta.space/internal/endpoint"
+	"zelta.space/internal/logging"
 )
 
 // Remote command kinds, selecting REMOTE_DEFAULT, REMOTE_SEND, or REMOTE_RECV.

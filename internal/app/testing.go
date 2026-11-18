@@ -5,10 +5,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/bell-tower/zelta-go/internal/config"
-	"github.com/bell-tower/zelta-go/internal/execx"
-	"github.com/bell-tower/zelta-go/internal/jsonout"
-	"github.com/bell-tower/zelta-go/internal/logging"
+	"zelta.space/internal/config"
+	"zelta.space/internal/execx"
+	"zelta.space/internal/jsonout"
+	"zelta.space/internal/logging"
 )
 
 // TestRuntime is a Runtime wired to buffers and a fake executor, for tests.

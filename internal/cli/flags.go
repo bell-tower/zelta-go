@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/bell-tower/zelta-go/internal/config"
+	"zelta.space/internal/config"
 )
 
 // noArg is the value pflag passes to flags that take no argument.

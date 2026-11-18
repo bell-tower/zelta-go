@@ -4,11 +4,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/command"
-	"github.com/bell-tower/zelta-go/internal/endpoint"
-	"github.com/bell-tower/zelta-go/internal/shellwords"
-	"github.com/bell-tower/zelta-go/internal/zfs"
+	"zelta.space/internal/app"
+	"zelta.space/internal/command"
+	"zelta.space/internal/endpoint"
+	"zelta.space/internal/shellwords"
+	"zelta.space/internal/zfs"
 )
 
 // sendCheckActive reports whether unsupported default send options may be

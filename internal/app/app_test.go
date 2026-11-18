@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bell-tower/zelta-go/internal/command"
-	"github.com/bell-tower/zelta-go/internal/config"
-	"github.com/bell-tower/zelta-go/internal/execx"
+	"zelta.space/internal/command"
+	"zelta.space/internal/config"
+	"zelta.space/internal/execx"
 )
 
 func TestErrors(t *testing.T) {

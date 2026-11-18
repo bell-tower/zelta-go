@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/bell-tower/zelta-go/internal/config"
+	"zelta.space/internal/config"
 )
 
 const endpointForm = "Each endpoint is in the form: [user@host:]pool[/dataset/][@snap]"

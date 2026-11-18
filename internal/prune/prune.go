@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/logging"
+	"zelta.space/internal/app"
+	"zelta.space/internal/logging"
 )
 
 // Run implements "zelta prune ENDPOINT [GUARD]": it reports prune candidates

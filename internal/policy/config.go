@@ -8,9 +8,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/bell-tower/zelta-go/internal/app"
-	"github.com/bell-tower/zelta-go/internal/config"
-	"github.com/bell-tower/zelta-go/internal/logging"
+	"zelta.space/internal/app"
+	"zelta.space/internal/config"
+	"zelta.space/internal/logging"
 )
 
 // maxImportDepth bounds nested "import:" fragments.

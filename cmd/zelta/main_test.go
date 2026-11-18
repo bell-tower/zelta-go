@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bell-tower/zelta-go/internal/execx"
-	"github.com/bell-tower/zelta-go/internal/failover"
+	"zelta.space/internal/execx"
+	"zelta.space/internal/failover"
 )
 
 func TestWiring(t *testing.T) {
