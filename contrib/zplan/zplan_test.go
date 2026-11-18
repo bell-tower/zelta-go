@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -72,11 +73,29 @@ func TestBlockCapsAt1000(t *testing.T) {
 func TestRows(t *testing.T) {
 	p := &zelta.PrunePlan{Datasets: []zelta.PruneDataset{{
 		Name: "pool/ds", Destroy: []string{"@a"}, Keep: []string{"@b"},
-		Snapshots: []zelta.Snapshot{{Name: "@a", Used: 5}, {Name: "@b"}, {Name: "@c"}},
+		Snapshots:  []zelta.Snapshot{{Name: "@a", Used: 5}, {Name: "@b"}, {Name: "@c"}},
+		ReclaimMin: 5, ReclaimMax: 9,
 	}, {Name: "pool/ds/sub", Suffix: "/sub"}}}
 	got, empty := rows(p)
-	if len(got) != 1 || got[0].name != "pool/ds" || !reflect.DeepEqual(got[0].v, vs("dkg")) || got[0].doomed != 1 || got[0].reclaim != 5 || empty != 1 {
+	if len(got) != 1 || got[0].name != "pool/ds" || !reflect.DeepEqual(got[0].v, vs("dkg")) || got[0].doomed != 1 || got[0].lo != 5 || got[0].hi != 9 || empty != 1 {
 		t.Errorf("rows = %+v, %d empty", got, empty)
+	}
+}
+
+func TestFreed(t *testing.T) {
+	exact := row{lo: 1 << 20, hi: 1 << 20}
+	open := row{lo: 1 << 20, hi: 3 << 20}
+	for _, c := range []struct {
+		rows []row
+		want string
+	}{
+		{[]row{exact, exact}, "2.00M"},
+		{[]row{exact, open}, "2.00M–4.00M…"},
+		{[]row{exact, {lo: 1 << 20, hi: 3 << 20, err: errors.New("x")}}, "≥ 2.00M"},
+	} {
+		if got := freed(c.rows); got != c.want {
+			t.Errorf("freed = %q, want %q", got, c.want)
+		}
 	}
 }
 

@@ -146,11 +146,9 @@ func (a *app) summary(w int, per float64) string {
 		rs, where = a.rows[a.sel:a.sel+1], a.rows[a.sel].name
 	}
 	total, n := 0, 0
-	var reclaim int64
 	for _, r := range rs {
 		total += len(r.v)
 		n += r.doomed
-		reclaim += r.reclaim
 	}
 	ds := "datasets"
 	if len(a.rows) == 1 {
@@ -167,7 +165,7 @@ func (a *app) summary(w int, per float64) string {
 		l.add(st, "2", fmt.Sprintf(" (+%d without)", a.empty))
 	}
 	if n > 0 {
-		l.add(st, "", ", frees ≥ "+size(reclaim))
+		l.add(st, "", ", frees "+freed(rs))
 	}
 	var leg line
 	for _, x := range []struct {
@@ -185,6 +183,24 @@ func (a *app) summary(w int, per float64) string {
 		l.raw(leg.String(), leg.w)
 	}
 	return l.String()
+}
+
+// freed is what destroying the rows' doomed snapshots frees: exact, a range
+// while it is measured, or at least the lower bound if measuring failed.
+func freed(rs []row) string {
+	var lo, hi int64
+	failed := false
+	for _, r := range rs {
+		lo, hi = lo+r.lo, hi+r.hi
+		failed = failed || r.err != nil
+	}
+	switch {
+	case failed:
+		return "≥ " + size(lo)
+	case lo == hi:
+		return size(lo)
+	}
+	return size(lo) + "–" + size(hi) + "…"
 }
 
 // wrap breaks text at spaces into at most n lines of width runes,

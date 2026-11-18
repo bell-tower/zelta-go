@@ -105,13 +105,23 @@ type app struct {
 	rows         []row
 	empty        int // datasets without snapshots, not shown
 	st           style
+	// pruned is the plan the rows show, for measuring what it frees.
+	pruned *zelta.PrunePlan
 }
 
 type planned struct {
-	gen   int
-	rows  []row
-	empty int
-	err   error
+	gen    int
+	pruned *zelta.PrunePlan
+	rows   []row
+	empty  int
+	err    error
+}
+
+// measured is the exact space rows[row] of plan gen frees.
+type measured struct {
+	gen, row int
+	n        int64
+	err      error
 }
 
 func (a *app) plan(ctx context.Context, gen int) planned {
@@ -122,7 +132,33 @@ func (a *app) plan(ctx context.Context, gen int) planned {
 		return planned{gen: gen, err: err}
 	}
 	r, empty := rows(p)
-	return planned{gen: gen, rows: r, empty: empty}
+	return planned{gen: gen, pruned: p, rows: r, empty: empty}
+}
+
+// measure sends the exact space each row frees, for rows whose bounds
+// differ, until ctx ends or a measurement fails.
+func (a *app) measure(ctx context.Context, gen int, out chan<- measured) {
+	var todo [][2]int // row, dataset
+	for i, r := range a.rows {
+		if r.lo != r.hi {
+			todo = append(todo, [2]int{i, r.idx})
+		}
+	}
+	p := a.pruned
+	go func() {
+		for _, t := range todo {
+			i := t[0]
+			n, err := a.c.PruneReclaim(ctx, p, t[1])
+			select {
+			case out <- measured{gen, i, n, err}:
+			case <-ctx.Done():
+				return
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
 }
 
 // print writes the plan once, for pipes and scripts.
@@ -132,6 +168,19 @@ func (a *app) print() int {
 		fmt.Fprintln(os.Stderr, "zplan:", p.err)
 		return 1
 	}
+	a.rows, a.pruned = p.rows, p.pruned
+	ch := make(chan measured, len(p.rows))
+	a.measure(context.Background(), 0, ch)
+	for range a.pending() {
+		m := <-ch
+		if m.err != nil {
+			a.rows[m.row].err = m.err
+			fmt.Fprintln(os.Stderr, "zplan:", m.err)
+			break
+		}
+		a.rows[m.row].lo, a.rows[m.row].hi = m.n, m.n
+	}
+	p.rows = a.rows
 	st := style{color: false}
 	lines, per := bars(st, p.rows, 0, -1, 80, len(p.rows))
 	if per > 1.05 {
@@ -140,8 +189,26 @@ func (a *app) print() int {
 	for _, l := range lines {
 		fmt.Println(strings.TrimRight(l, " "))
 	}
+	n := 0
+	for _, r := range p.rows {
+		n += r.doomed
+	}
+	if n > 0 {
+		fmt.Printf("# destroy %d snapshots, frees %s\n", n, freed(p.rows))
+	}
 	fmt.Println(command(a.fields, a.endpoint, a.guard))
 	return 0
+}
+
+// pending counts the rows not yet measured exactly.
+func (a *app) pending() int {
+	n := 0
+	for _, r := range a.rows {
+		if r.lo != r.hi && r.err == nil {
+			n++
+		}
+	}
+	return n
 }
 
 func (a *app) interactive() int {
@@ -158,6 +225,8 @@ func (a *app) interactive() int {
 	keys := make(chan string, 64)
 	go scr.keys(keys)
 	results := make(chan planned, 1)
+	sizes := make(chan measured, 16)
+	stopMeasure := func() {}
 	resize := winch()
 	debounce := time.NewTimer(0)
 
@@ -167,6 +236,7 @@ func (a *app) interactive() int {
 		go func() { results <- a.plan(ctx, gen) }()
 	}
 	replan := func() {
+		stopMeasure()
 		a.gen++
 		debounce.Reset(300 * time.Millisecond)
 	}
@@ -186,13 +256,25 @@ loop:
 			if r.gen == a.gen {
 				a.err, a.planGen = r.err, r.gen
 				if r.err == nil {
-					a.rows, a.empty = r.rows, r.empty
+					a.rows, a.empty, a.pruned = r.rows, r.empty, r.pruned
+					stopMeasure()
+					mctx, stop := context.WithCancel(ctx)
+					stopMeasure = stop
+					a.measure(mctx, r.gen, sizes)
 					if a.sel >= len(a.rows) || len(a.rows) < 2 {
 						a.sel, a.zoom = -1, false
 					}
 				}
 			} else {
 				start()
+			}
+		case m := <-sizes:
+			if m.gen == a.planGen && m.row < len(a.rows) {
+				if m.err != nil {
+					a.rows[m.row].err = m.err
+				} else {
+					a.rows[m.row].lo, a.rows[m.row].hi = m.n, m.n
+				}
 			}
 		case <-resize:
 		case k, ok := <-keys:

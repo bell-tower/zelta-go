@@ -22,22 +22,26 @@ const (
 
 // row is one dataset's verdicts, oldest first.
 type row struct {
-	name    string
-	v       []verdict
-	times   []time.Time
-	doomed  int
-	reclaim int64 // sum of used of the doomed snapshots
+	name   string
+	idx    int // index in the plan's Datasets
+	v      []verdict
+	times  []time.Time
+	doomed int
+	// lo and hi bound the space destroying the doomed snapshots frees;
+	// they are equal once it is exact. err is why measuring it failed.
+	lo, hi int64
+	err    error
 }
 
 // rows returns the datasets that have snapshots and how many don't.
 func rows(p *zelta.PrunePlan) (out []row, empty int) {
-	for _, d := range p.Datasets {
+	for i, d := range p.Datasets {
 		if len(d.Snapshots) == 0 {
 			empty++
 			continue
 		}
 		destroy, keep := set(d.Destroy), set(d.Keep)
-		r := row{name: d.Name}
+		r := row{name: d.Name, idx: i, lo: d.ReclaimMin, hi: d.ReclaimMax}
 		if d.Suffix != "" {
 			r.name = d.Suffix
 		}
@@ -47,7 +51,6 @@ func rows(p *zelta.PrunePlan) (out []row, empty int) {
 			case destroy[s.Name]:
 				r.v = append(r.v, doomed)
 				r.doomed++
-				r.reclaim += s.Used
 			case keep[s.Name]:
 				r.v = append(r.v, kept)
 			default:
