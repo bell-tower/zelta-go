@@ -446,14 +446,7 @@ func (d *Dataset) selectSize(ctx context.Context, rt *app.Runtime, ep endpoint.E
 	for _, r := range d.eligible {
 		eligible[r] = true
 	}
-	// chain is every snapshot oldest first, then the live dataset.
-	var chain []*match.Row
-	for _, r := range slices.Backward(d.src.Snaps) {
-		if r.Kind == match.KindSnapshot {
-			chain = append(chain, r)
-		}
-	}
-	chain = append(chain, d.src.Row)
+	chain := d.chain()
 	var selected []*match.Row
 	var done int64
 	for a := 0; a < len(chain)-1 && done < size; a++ {
