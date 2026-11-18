@@ -72,7 +72,7 @@ func TestBlockCapsAt1000(t *testing.T) {
 func TestRows(t *testing.T) {
 	p := &zelta.PrunePlan{Datasets: []zelta.PruneDataset{{
 		Name: "pool/ds", Destroy: []string{"@a"}, Keep: []string{"@b"},
-		Snapshots: []zelta.PruneSnapshot{{Name: "@a", Used: 5}, {Name: "@b"}, {Name: "@c"}},
+		Snapshots: []zelta.Snapshot{{Name: "@a", Used: 5}, {Name: "@b"}, {Name: "@c"}},
 	}, {Name: "pool/ds/sub", Suffix: "/sub"}}}
 	got, empty := rows(p)
 	if len(got) != 1 || got[0].name != "pool/ds" || !reflect.DeepEqual(got[0].v, vs("dkg")) || got[0].doomed != 1 || got[0].reclaim != 5 || empty != 1 {
