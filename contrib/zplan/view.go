@@ -84,7 +84,7 @@ func (a *app) view(w, h int) []string {
 	case a.sel >= 0:
 		help = "↑↓ PgUp PgDn dataset  → zoom  Tab fields  Enter print & quit  Esc quit"
 	}
-	out = append(out, st.sgr("2", fit(help, w)))
+	out = append(out, st.sgr("2", fitRight(help, w)))
 	return out
 }
 
