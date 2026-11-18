@@ -36,15 +36,17 @@ func run() int {
 		fmt.Fprint(os.Stderr, usage)
 		fl.PrintDefaults()
 	}
-	guard := fl.String("match-endpoint", "", "replica whose sync state guards snapshots")
-	fs := newFields("x")
-	val := map[int]*string{}
-	for _, i := range []int{fNum, fTime, fGrid, fSize, fGuard} {
-		val[i] = fl.String(strings.TrimPrefix(fs[i].flag, "--"), "", fs[i].hint)
+	guard := fl.String("match-endpoint", "", "protect the snapshots the replica `GUARD` needs")
+	val := map[int]*string{
+		fNum:   fl.String("prune-num", "", "keep the newest `N` snapshots older than the match"),
+		fTime:  fl.String("prune-time", "", "keep snapshots newer than `DURATION`"),
+		fGrid:  fl.String("prune-grid", "", "GFS `GRID` retention such as '30x1 day, 52x1 week, 1 year'"),
+		fSize:  fl.String("prune-size", "", "select the oldest snapshots until `SIZE` is reclaimed"),
+		fGuard: fl.String("prune-guard", "", "guard `MODE`: latest, unsynced, or none"),
+		fDepth: fl.StringP("depth", "d", "", "limit the recursion depth to `LEVELS`"),
 	}
-	val[fDepth] = fl.StringP("depth", "d", "", "limit the recursion depth")
-	exclude := fl.StringArrayP("exclude", "X", nil, "exclude dataset or snapshot patterns")
-	include := fl.StringArray("include", nil, "include only dataset or snapshot patterns")
+	exclude := fl.StringArrayP("exclude", "X", nil, "exclude dataset or snapshot `PATTERN`s")
+	include := fl.StringArray("include", nil, "include only dataset or snapshot `PATTERN`s")
 	noGuard := fl.Bool("no-prune-guard", false, "disable match-endpoint safety checks")
 	if err := fl.Parse(os.Args[1:]); err != nil {
 		if err == pflag.ErrHelp {
@@ -62,7 +64,7 @@ func run() int {
 	}
 	endpoint := args[0]
 
-	fs = newFields(*guard)
+	fs := newFields(*guard)
 	for i, v := range val {
 		if *v != "" {
 			fs[i].val = *v
