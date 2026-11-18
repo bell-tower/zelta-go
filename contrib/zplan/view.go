@@ -43,8 +43,10 @@ func (a *app) view(w, h int) []string {
 	var viz []string
 	per := 1.0
 	switch {
-	case a.rows == nil && a.err == nil:
+	case a.planGen == 0 && a.err == nil:
 		viz = []string{st.sgr("2", "listing snapshots…")}
+	case len(a.rows) == 0:
+		viz = []string{st.sgr("2", "no snapshots")}
 	case len(a.rows) == 1:
 		viz, per = block(st, a.rows[0], w, vizH)
 	default:
@@ -137,6 +139,9 @@ func (a *app) summary(w int, per float64) string {
 	}
 	l.add(st, "1", fmt.Sprintf("destroy %d", n))
 	l.add(st, "", fmt.Sprintf(" of %d snapshots in %d %s", total, len(a.rows), ds))
+	if a.empty > 0 {
+		l.add(st, "2", fmt.Sprintf(" (+%d without)", a.empty))
+	}
 	if n > 0 {
 		l.add(st, "", ", frees ≥ "+size(reclaim))
 	}

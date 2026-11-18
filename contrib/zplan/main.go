@@ -79,7 +79,7 @@ func run() int {
 		fmt.Fprintln(os.Stderr, "zplan:", err)
 		return 1
 	}
-	a := &app{c: c, endpoint: endpoint, guard: *guard, fields: fs}
+	a := &app{c: c, endpoint: endpoint, guard: *guard, fields: fs, gen: 1}
 	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
 		return a.print()
 	}
@@ -97,13 +97,15 @@ type app struct {
 	busy         bool
 	err          error
 	rows         []row
+	empty        int // datasets without snapshots, not shown
 	st           style
 }
 
 type planned struct {
-	gen  int
-	rows []row
-	err  error
+	gen   int
+	rows  []row
+	empty int
+	err   error
 }
 
 func (a *app) plan(ctx context.Context, gen int) planned {
@@ -113,7 +115,8 @@ func (a *app) plan(ctx context.Context, gen int) planned {
 	if err != nil {
 		return planned{gen: gen, err: err}
 	}
-	return planned{gen: gen, rows: rows(p)}
+	r, empty := rows(p)
+	return planned{gen: gen, rows: r, empty: empty}
 }
 
 // print writes the plan once, for pipes and scripts.
@@ -176,7 +179,7 @@ loop:
 			if r.gen == a.gen {
 				a.err, a.planGen = r.err, r.gen
 				if r.err == nil {
-					a.rows = r.rows
+					a.rows, a.empty = r.rows, r.empty
 					a.scroll = min(a.scroll, max(0, len(a.rows)-1))
 				}
 			} else {

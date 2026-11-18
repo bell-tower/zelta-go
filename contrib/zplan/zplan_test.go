@@ -74,9 +74,9 @@ func TestRows(t *testing.T) {
 		Name: "pool/ds", Destroy: []string{"@a"}, Keep: []string{"@b"},
 		Snapshots: []zelta.PruneSnapshot{{Name: "@a", Used: 5}, {Name: "@b"}, {Name: "@c"}},
 	}, {Name: "pool/ds/sub", Suffix: "/sub"}}}
-	got := rows(p)
-	if got[0].name != "pool/ds" || !reflect.DeepEqual(got[0].v, vs("dkg")) || got[0].doomed != 1 || got[0].reclaim != 5 || got[1].name != "/sub" {
-		t.Errorf("rows = %+v", got)
+	got, empty := rows(p)
+	if len(got) != 1 || got[0].name != "pool/ds" || !reflect.DeepEqual(got[0].v, vs("dkg")) || got[0].doomed != 1 || got[0].reclaim != 5 || empty != 1 {
+		t.Errorf("rows = %+v, %d empty", got, empty)
 	}
 }
 
@@ -113,5 +113,13 @@ func TestParseKeys(t *testing.T) {
 	want := []string{"7", "d", kUp, kBackTab, kTab, kEnter, kBack, kClear, kEsc}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("keys = %q", got)
+	}
+}
+
+func TestSize(t *testing.T) {
+	for b, want := range map[int64]string{512: "512B", 1536: "1.50K", 1023 * 1024: "1023K", 68300 << 20: "66.7G"} {
+		if got := size(b); got != want {
+			t.Errorf("size(%d) = %s, want %s", b, got, want)
+		}
 	}
 }

@@ -29,9 +29,13 @@ type row struct {
 	reclaim int64 // sum of used of the doomed snapshots
 }
 
-func rows(p *zelta.PrunePlan) []row {
-	var out []row
+// rows returns the datasets that have snapshots and how many don't.
+func rows(p *zelta.PrunePlan) (out []row, empty int) {
 	for _, d := range p.Datasets {
+		if len(d.Snapshots) == 0 {
+			empty++
+			continue
+		}
 		destroy, keep := set(d.Destroy), set(d.Keep)
 		r := row{name: d.Name}
 		if d.Suffix != "" {
@@ -52,7 +56,7 @@ func rows(p *zelta.PrunePlan) []row {
 		}
 		out = append(out, r)
 	}
-	return out
+	return out, empty
 }
 
 func set(list []string) map[string]bool {
@@ -216,8 +220,9 @@ func bars(s style, rs []row, first, width, height int) ([]string, float64) {
 		maxN = max(maxN, len(r.v))
 	}
 	nameW = min(nameW, max(12, width/3))
-	const countW = 12 // " 1234 / 5678"
-	room := width - nameW - countW - 2
+	d := len(fmt.Sprint(maxN))
+	countW := 2*d + 5 // " 12 / 34 "
+	room := width - nameW - countW
 	scale := 1.0 // snapshots per cell
 	if maxN > room {
 		scale = float64(maxN) / float64(room)
@@ -229,9 +234,8 @@ func bars(s style, rs []row, first, width, height int) ([]string, float64) {
 		var l line
 		l.add(s, "", fit(r.name, nameW))
 		l.pad(nameW)
-		l.add(s, "", fmt.Sprintf(" %5d", r.doomed))
-		l.add(s, "2", fmt.Sprintf(" / %-4d", len(r.v)))
-		l.pad(nameW + countW + 1)
+		l.add(s, "", fmt.Sprintf(" %*d", d, r.doomed))
+		l.add(s, "2", fmt.Sprintf(" / %-*d ", d, len(r.v)))
 		for _, c := range cells(r.v, int(math.Ceil(float64(len(r.v))/scale))) {
 			l.raw(s.wide(c, wide), wide)
 		}
@@ -296,5 +300,12 @@ func size(b int64) string {
 		f /= unit
 		u++
 	}
-	return fmt.Sprintf("%.3g%c", f, "BKMGTPE"[u])
+	prec := 2
+	switch {
+	case f >= 100:
+		prec = 0
+	case f >= 10:
+		prec = 1
+	}
+	return fmt.Sprintf("%.*f%c", prec, f, "BKMGTPE"[u])
 }
