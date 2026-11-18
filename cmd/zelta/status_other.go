@@ -1,12 +1,8 @@
-//go:build !(darwin || dragonfly || freebsd || netbsd || openbsd)
+//go:build !unix
 
 package main
 
-import (
-	"os"
-	"syscall"
-)
+import "os"
 
-// statusSignals request a status line. There is no SIGINFO here, so only
-// SIGUSR1 (as with dd(1)).
-var statusSignals = []os.Signal{syscall.SIGUSR1}
+// statusSignals is empty: there is no status signal off Unix.
+var statusSignals []os.Signal

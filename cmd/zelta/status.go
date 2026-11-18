@@ -11,6 +11,10 @@ import (
 func statusBoard() *progress.Board {
 	fi, err := os.Stderr.Stat()
 	b := &progress.Board{TTY: err == nil && fi.Mode()&os.ModeCharDevice != 0}
+	// Notify with no signals would relay every signal.
+	if len(statusSignals) == 0 {
+		return b
+	}
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, statusSignals...)
 	go func() {
