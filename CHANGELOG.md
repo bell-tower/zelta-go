@@ -20,6 +20,7 @@ replacing the Awk implementation.
 - **Backup**: Ctrl+T (SIGINFO, BSD and macOS) or SIGUSR1 (any system) prints bytes sent for every stream in flight, local or remote. `ZELTA_SEND_PROGRESS` (`auto`, `1`, `0`) controls the `zfs send -v` progress reports behind it.
 - **Prune**: `--prune-grid-type=union` (and `PruneOptions.GridType`) measures every grid term from the anchor and keeps a snapshot that any term keeps. The default, `band` (alias `zrepl`), keeps the consecutive bands of Zelta 1.2; union is planned as the default for Zelta 2.
 - **API**: `PruneOptions.Approved` makes `Prune` destroy only snapshots from a reviewed plan that are still candidates; the rest are reported in `PrunePlan.Skipped`. Snapshots are matched by GUID, so planner UIs can re-run `PlanPrune` freely and then destroy exactly what they showed.
+- **API**: `PruneDataset.ReclaimMin` and `ReclaimMax` bound the space a plan frees from the snapshot listing, and `Client.PruneReclaim` measures it exactly, as `zfs destroy -nvp` would, reading `written@` only for runs the bounds can't decide. `Snapshot.Referenced` is listed too.
 
 ### Fixed
 - **Upstream**: Includes Zelta fixes #83 and #84.

@@ -19,8 +19,10 @@ type Snapshot struct {
 	Used int64
 	// Written is the space written since the previous snapshot.
 	Written int64
+	// Referenced is the space the snapshot refers to, shared or not.
+	Referenced int64
 }
 
 func snapshotOf(r *match.Row) Snapshot {
-	return Snapshot{Name: r.Savepoint, GUID: r.GUID, Creation: time.Unix(r.Creation, 0), Used: r.Used, Written: r.Written}
+	return Snapshot{Name: r.Savepoint, GUID: r.GUID, Creation: time.Unix(r.Creation, 0), Used: r.Used, Written: r.Written, Referenced: r.Referenced}
 }

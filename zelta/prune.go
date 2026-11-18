@@ -2,6 +2,7 @@ package zelta
 
 import (
 	"context"
+	"errors"
 
 	"zelta.space/internal/app"
 	"zelta.space/internal/prune"
@@ -19,6 +20,8 @@ type PrunePlan struct {
 
 	candidates []string
 	guids      map[string]string
+	plan       *prune.Plan
+	settings   map[string]string
 }
 
 // PruneDataset is the plan for one dataset.
@@ -34,6 +37,28 @@ type PruneDataset struct {
 	// Snapshots lists every snapshot of the dataset, oldest first. Those in
 	// neither Destroy nor Keep are at or newer than the guard match.
 	Snapshots []Snapshot
+	// ReclaimMin and ReclaimMax bound the space destroying Destroy frees,
+	// from the snapshot listing alone. They are equal when that is exact;
+	// otherwise Client.PruneReclaim measures it.
+	ReclaimMin, ReclaimMax int64
+}
+
+// PruneReclaim returns the space destroying plan.Datasets[i].Destroy frees,
+// as "zfs destroy -nvp" would report it, without destroying anything. It
+// reads "written@" once for each run of consecutive snapshots whose
+// ReclaimMin and ReclaimMax differ, so a planner can show the bounds at
+// once and the exact figure when it arrives. Destroy may have been edited.
+func (c *Client) PruneReclaim(ctx context.Context, plan *PrunePlan, i int) (int64, error) {
+	if plan == nil || plan.plan == nil || i < 0 || i >= len(plan.Datasets) {
+		return 0, errors.New("zelta: PruneReclaim needs a dataset of a plan from PlanPrune")
+	}
+	o, err := c.start(ctx, "prune", plan.settings)
+	if err != nil {
+		return 0, err
+	}
+	p := plan.plan
+	n, err := p.Datasets[i].Reclaim(ctx, o.rt, p.Source, plan.Datasets[i].Destroy)
+	return n, o.finish(err)
 }
 
 // Candidates returns the snapshots to destroy as "zelta prune" prints them:
@@ -86,12 +111,13 @@ func (c *Client) prune(ctx context.Context, endpoint string, opts *PruneOptions,
 	if opts.Approved != nil {
 		skipped = plan.Restrict(opts.Approved.approved())
 	}
-	out := &PrunePlan{Skipped: skipped, candidates: plan.Candidates(), guids: plan.SelectedGUIDs()}
+	out := &PrunePlan{Skipped: skipped, candidates: plan.Candidates(), guids: plan.SelectedGUIDs(), plan: plan, settings: s}
 	for _, d := range plan.Datasets {
 		pd := PruneDataset{Name: d.Name, Suffix: d.Suffix, Destroy: d.Selected(), Keep: d.Protected()}
 		for _, r := range d.Snapshots() {
 			pd.Snapshots = append(pd.Snapshots, snapshotOf(r))
 		}
+		pd.ReclaimMin, pd.ReclaimMax = d.ReclaimBounds(pd.Destroy)
 		out.Datasets = append(out.Datasets, pd)
 	}
 	if destroy {
