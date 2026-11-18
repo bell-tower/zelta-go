@@ -2,8 +2,11 @@
 
 An interactive planner for `zelta prune`. Tune retention and filters and
 see the fate of every snapshot as you type: each change re-plans with
-Zelta. zplan never destroys anything. Enter prints the `zprune` command
-for the plan, which previews and confirms again before destroying.
+Zelta, and the summary shows the space the plan frees, as `zfs destroy
+-nvp` reports it. zplan never destroys anything: destroying is zprune's
+job, so every destructive action has one reviewed path. Enter prints the
+`zprune` command for the plan, which previews and confirms again before
+destroying.
 
 ```sh
 go install zelta.space/contrib/zplan@latest

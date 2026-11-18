@@ -6,3 +6,5 @@ golang.org/x/term v0.48.0 h1:G6UU1eiSB8nl3DzeUGt7Mg+2SctI8tPS6Z5/mBt6cOk=
 golang.org/x/term v0.48.0/go.mod h1:BRDLHCZr2SUjIeBHHpRyQeC9xzSAVbzY2rvKgafnHf4=
 zelta.space v0.0.0-20261118203431-d62c1bc45640 h1:71AxCxoWeUvj6Nt0yxkrdOWZP4Mf9IEsr03HWyYxbmE=
 zelta.space v0.0.0-20261118203431-d62c1bc45640/go.mod h1:twMMAdoDtcrD4hbvHlii/hJqpFxLTKAprFyFNDLdIcM=
+zelta.space v0.0.0-20261118214923-bc2220e17b42 h1:vtD/7mraEDmTe014CMt/wx09QrR9SaHkhLIHAizpkXE=
+zelta.space v0.0.0-20261118214923-bc2220e17b42/go.mod h1:twMMAdoDtcrD4hbvHlii/hJqpFxLTKAprFyFNDLdIcM=
